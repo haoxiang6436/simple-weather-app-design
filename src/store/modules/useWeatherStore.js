@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
 import { getGeographicalLocationAPI, getCityLatitudeAndLatitudeAPI, get_7DaysOfWeatherAPI, getRealTimeWeatherAPI } from '@/apis/getWeatherAPI';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 
 export const useWeatherStore = defineStore('Weather', () => {
+  const TheWeatherDataIsLoaded = ref(100)
   const dayDateCity = ref({
     day: '星期八',
     date: '2028年8月8日',
@@ -10,7 +11,11 @@ export const useWeatherStore = defineStore('Weather', () => {
   })
   const WeatherDataUpdatedAtATime = ref({
     FourDayWeather: 0,
-    RealTimeWeather: 0
+    RealTimeWeather: 0,
+    nowDate: Date.now(),
+  })
+  const WeatherDataUpdatedAtATimeComputed = computed(() => {
+    return ((WeatherDataUpdatedAtATime.value.nowDate - WeatherDataUpdatedAtATime.value.RealTimeWeather) / 1000 / 60).toFixed(0)
   })
   const FourDayWeatherData = ref(
     [
@@ -58,6 +63,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     text: '晴',
   })
   const getLocationInformation = async () => {
+    WeatherDataUpdatedAtATime.value.nowDate = Date.now()
     // 获取位置
     const { data: { adcode } } = await getGeographicalLocationAPI();
     // 获取location
@@ -76,11 +82,12 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
   }
   const getFourDayWeatherData = async (important) => {
-    const TimeInterval = new Date().getTime() - WeatherDataUpdatedAtATime.value.FourDayWeather
-    if (TimeInterval < 1000 * 60 * 120 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
-      console.log('实时天气未过期 < 30min：', TimeInterval / 1000);
+    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.FourDayWeather
+    if (TimeInterval < 1000 * 60 * 60 * 3 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+      console.log(`4日天气未过期 < 3h：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
       return
     }
+    ReviseState(100)
     const { daily } = await get_7DaysOfWeatherAPI(dayDateCity.value.location);
     FourDayWeatherData.value = daily.slice(0, 4).map((item, index) => {
       return {
@@ -106,15 +113,16 @@ export const useWeatherStore = defineStore('Weather', () => {
         fxDate: item.fxDate
       }
     })
-    WeatherDataUpdatedAtATime.value.FourDayWeather = new Date().getTime()
+    WeatherDataUpdatedAtATime.value.FourDayWeather = Date.now()
   }
   const getRealTimeWeather = async (important) => {
-    const TimeInterval = new Date().getTime() - WeatherDataUpdatedAtATime.value.RealTimeWeather
-    if (TimeInterval < 1000 * 60 * 30 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
-      console.log('4日天气未过期 < 120min：', TimeInterval / 1000);
+    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.RealTimeWeather
+    if (TimeInterval < 1000 * 60 * 15 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
+      console.log(`实时天气未过期 < 15min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
       return
     }
     // 获取实时天气
+    ReviseState(100)
     const { now } = await getRealTimeWeatherAPI(dayDateCity.value.location)
     nowWeatherData.value = {
       icon: now.icon,
@@ -126,7 +134,7 @@ export const useWeatherStore = defineStore('Weather', () => {
       day: getDayName(now.obsTime, '2'),
       date: formatDate(now.obsTime)
     }
-    WeatherDataUpdatedAtATime.value.RealTimeWeather = new Date().getTime()
+    WeatherDataUpdatedAtATime.value.RealTimeWeather = Date.now()
   }
   function getDayName(dateStr, dayType = '1') {
     const date = new Date(dateStr);
@@ -142,21 +150,37 @@ export const useWeatherStore = defineStore('Weather', () => {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}年${month}月${day}日`;
   }
+  /**
+   * 0：服务器错误
+   * 100：加载中 
+   * 200：加载成功 
+   * 300：加载失败 
+   * 400：无网络 
+   * @param {
+   * } code 
+   */
+  function ReviseState(code) {
+    TheWeatherDataIsLoaded.value = code
+  }
   return {
     // 获取位置/天气
     getLocationInformation,
     getFourDayWeatherData,
     getRealTimeWeather,
+    // 修改天气状态
+    ReviseState,
     // 城市时间日期
     dayDateCity,
     // 近四天天气
     FourDayWeatherData,
     // 实时天气
     nowWeatherData,
-    WeatherDataUpdatedAtATime
+    WeatherDataUpdatedAtATime,
+    WeatherDataUpdatedAtATimeComputed,
+    TheWeatherDataIsLoaded
   }
 }, {
   persist: {
-    key: 'WeatherApp-2024-2-1'
+    key: 'WeatherApp-2024-2-3'
   },
 })
