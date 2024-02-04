@@ -9,7 +9,6 @@ export const getCityLatitudeAndLatitudeAPI = (adcode) => {
     url: 'https://geoapi.qweather.com/v2/city/lookup',
     params: {
       location: adcode,
-      // key: '55926e800bcb4e4abd0e81e1e25f5165'
     }
   })
 }

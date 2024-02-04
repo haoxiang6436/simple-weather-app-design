@@ -21,39 +21,39 @@ export const useWeatherStore = defineStore('Weather', () => {
     [
       {
         fxDate: "今天",
-        tempMax: "6",
-        tempMin: "4",
-        iconDay: "305",
-        precip: "1.0",
-        humidity: "94",
-        windSpeedDay: "9"
+        tempMax: "0",
+        tempMin: "0",
+        iconDay: "100",
+        precip: "0",
+        humidity: "0",
+        windSpeedDay: "0"
       },
       {
         fxDate: "明天",
-        tempMax: "6",
-        tempMin: "4",
-        iconDay: "305",
-        precip: "1.0",
-        humidity: "94",
-        windSpeedDay: "9"
+        tempMax: "0",
+        tempMin: "0",
+        iconDay: "100",
+        precip: "0",
+        humidity: "0",
+        windSpeedDay: "0"
       },
       {
         fxDate: "星期一",
-        tempMax: "6",
-        tempMin: "4",
-        iconDay: "305",
-        precip: "1.0",
-        humidity: "94",
-        windSpeedDay: "9"
+        tempMax: "0",
+        tempMin: "0",
+        iconDay: "100",
+        precip: "0",
+        humidity: "0",
+        windSpeedDay: "0"
       },
       {
         fxDate: "星期二",
-        tempMax: "6",
-        tempMin: "4",
-        iconDay: "305",
-        precip: "1.0",
-        humidity: "94",
-        windSpeedDay: "9"
+        tempMax: "0",
+        tempMin: "0",
+        iconDay: "100",
+        precip: "0",
+        humidity: "0",
+        windSpeedDay: "0"
       },
     ]
   )
@@ -151,7 +151,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     return `${year}年${month}月${day}日`;
   }
   /**
-   * 0：服务器错误
+   * 0：未知错误
    * 100：加载中 
    * 200：加载成功 
    * 300：加载失败 
@@ -181,6 +181,6 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
 }, {
   persist: {
-    key: 'WeatherApp-2024-2-3'
+    key: 'WeatherApp-2024-2-3-1600'
   },
 })
