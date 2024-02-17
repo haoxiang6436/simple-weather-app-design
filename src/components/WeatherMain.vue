@@ -62,7 +62,7 @@
                 d="M748.059855 454.547497c-22.36231-108.577904-118.169353-191.614086-236.314147-191.614086-92.64912 0-172.455747 51.129494-210.771401 127.782292-99.011015 12.724813-172.45677 92.581582-172.45677 191.614086 0 105.373932 86.241176 191.614086 191.614086 191.614086l415.132812 0c89.445148 0 159.709445-70.287833 159.709445-159.735028C894.974903 531.200294 827.914578 460.934974 748.059855 454.547497"
                 p-id="6049" fill="#ffffff"></path>
             </svg>
-            {{ WeatherDataUpdatedAtATimeComputed < 3 ? '刚刚更新' : `${WeatherDataUpdatedAtATimeComputed}分钟前更新` }} </p>
+            {{ WeatherDataUpdatedAtATimeComputed < 1 ? '刚刚更新' : `${WeatherDataUpdatedAtATimeComputed}分钟前更新` }} </p>
               <p v-else-if="TheWeatherDataIsLoaded === 300">
                 <svg t="1706878677922" class="location-icon state-icon move" viewBox="0 0 1024 1024" version="1.1"
                   xmlns="http://www.w3.org/2000/svg" p-id="7239" width="16" height="16">

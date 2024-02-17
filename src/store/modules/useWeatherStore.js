@@ -83,8 +83,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
   const getFourDayWeatherData = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.FourDayWeather
-    if (TimeInterval < 1000 * 60 * 60 * 3 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
-      console.log(`4日天气未过期 < 3h：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+    if (TimeInterval < 1000 * 60 * 60 * 2 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+      console.log(`4日天气未过期 < 2h：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
       return
     }
     ReviseState(100)
@@ -117,8 +117,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
   const getRealTimeWeather = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.RealTimeWeather
-    if (TimeInterval < 1000 * 60 * 15 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
-      console.log(`实时天气未过期 < 15min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+    if (TimeInterval < 1000 * 60 * 5 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
+      console.log(`实时天气未过期 < 5min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
       return
     }
     // 获取实时天气
@@ -181,6 +181,6 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
 }, {
   persist: {
-    key: 'WeatherApp-2024-2-3-1600'
+    key: 'WeatherApp-2024-2-12'
   },
 })
