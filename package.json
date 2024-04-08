@@ -13,7 +13,10 @@
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.1",
     "qweather-icons": "^1.6.0",
-    "vue": "^3.2.13"
+    "three": "^0.161.0",
+    "vanta": "^0.5.24",
+    "vue": "^3.2.13",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",

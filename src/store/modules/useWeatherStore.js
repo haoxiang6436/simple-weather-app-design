@@ -65,16 +65,16 @@ export const useWeatherStore = defineStore('Weather', () => {
   const getLocationInformation = async () => {
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
     // 获取位置
-    const { data: { adcode } } = await getGeographicalLocationAPI();
+    const { data: { area_code } } = await getGeographicalLocationAPI();
     // 获取location
-    if (adcode !== dayDateCity.value.adcode) {
+    if (area_code !== dayDateCity.value.area_code) {
       console.log('位置变化');
-      const { location } = await getCityLatitudeAndLatitudeAPI(adcode);
+      const { location } = await getCityLatitudeAndLatitudeAPI(area_code);
       dayDateCity.value = {
         ...dayDateCity.value,
-        city: `${location[0].adm2}, ${location[0].name}`,
+        city: location[0].adm2 === location[0].name ? location[0].adm2 :  `${location[0].adm2}, ${location[0].name}`,
         location: location[0].id,
-        adcode: adcode
+        area_code: area_code
       }
       await getFourDayWeatherData(true)
       await getRealTimeWeather(true)
