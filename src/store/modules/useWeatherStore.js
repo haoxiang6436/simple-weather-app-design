@@ -1,22 +1,28 @@
 import { defineStore } from 'pinia'
-import { getGeographicalLocationAPI, getCityLatitudeAndLatitudeAPI, get_7DaysOfWeatherAPI, getRealTimeWeatherAPI } from '@/apis/getWeatherAPI';
+import { getGeographicalLocationAPI, getCityLatitudeAndLatitudeAPI, get_7DaysOfWeatherAPI, getRealTimeWeatherAPI, getWeatherEarlyWarningAPI } from '@/apis/getWeatherAPI';
 import { ref, computed } from 'vue';
 
 export const useWeatherStore = defineStore('Weather', () => {
+  // 天气数据加载状态
   const TheWeatherDataIsLoaded = ref(100)
+  // 城市日期信息
   const dayDateCity = ref({
     day: '星期八',
     date: '2028年8月8日',
     city: '中国大陆',
   })
+  // 天气数据更新时间
   const WeatherDataUpdatedAtATime = ref({
     FourDayWeather: 0,
     RealTimeWeather: 0,
     nowDate: Date.now(),
+    EarlyWarning:0,
   })
+  // 计算天气数据更新时间与当前时间之间的差值（分钟）
   const WeatherDataUpdatedAtATimeComputed = computed(() => {
     return ((WeatherDataUpdatedAtATime.value.nowDate - WeatherDataUpdatedAtATime.value.RealTimeWeather) / 1000 / 60).toFixed(0)
   })
+  // 5日天气
   const FourDayWeatherData = ref(
     [
       {
@@ -57,11 +63,31 @@ export const useWeatherStore = defineStore('Weather', () => {
       },
     ]
   )
+  // 实时天气
   const nowWeatherData = ref({
     icon: '100',
     temp: '0',
     text: '晴',
   })
+  // 天气预警信息
+  const WeatherEarlyWarning = ref([])
+  const EarlyWarningDetailsDialog = ref(false)
+  // 获取天气预警信息
+  const getWeatherEarlyWarning = async (important) => {
+    // 验证数据有效期
+    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.EarlyWarning
+    if (TimeInterval < 1000 * 60 * 5 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+      console.log(`天气预警未过期 < 5min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+      return
+    }
+    ReviseState(100)
+    // 执行请求
+    const {warning} = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
+    WeatherEarlyWarning.value = warning
+    console.log(warning)
+    WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
+  }
+  // 获取位置信息
   const getLocationInformation = async () => {
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
     // 获取位置
@@ -72,7 +98,7 @@ export const useWeatherStore = defineStore('Weather', () => {
       const { location } = await getCityLatitudeAndLatitudeAPI(area_code);
       dayDateCity.value = {
         ...dayDateCity.value,
-        city: location[0].adm2 === location[0].name ? location[0].adm2 :  `${location[0].adm2}, ${location[0].name}`,
+        city: location[0].adm2 === location[0].name ? location[0].adm2 : `${location[0].adm2}, ${location[0].name}`,
         location: location[0].id,
         area_code: area_code
       }
@@ -81,6 +107,7 @@ export const useWeatherStore = defineStore('Weather', () => {
       return
     }
   }
+  // 获取5日天气
   const getFourDayWeatherData = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.FourDayWeather
     if (TimeInterval < 1000 * 60 * 60 * 2 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
@@ -107,14 +134,15 @@ export const useWeatherStore = defineStore('Weather', () => {
         windSpeedDay: item.windSpeedDay,
       }
     });
-    FourDayWeatherData.value.map(item => {
-      return {
-        ...item,
-        fxDate: item.fxDate
-      }
-    })
+    // FourDayWeatherData.value.map(item => {
+    //   return {
+    //     ...item,
+    //     fxDate: item.fxDate
+    //   }
+    // })
     WeatherDataUpdatedAtATime.value.FourDayWeather = Date.now()
   }
+  // 获取实时天气
   const getRealTimeWeather = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.RealTimeWeather
     if (TimeInterval < 1000 * 60 * 5 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
@@ -136,6 +164,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
     WeatherDataUpdatedAtATime.value.RealTimeWeather = Date.now()
   }
+  // 日期转中文1
   function getDayName(dateStr, dayType = '1') {
     const date = new Date(dateStr);
     const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -143,6 +172,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     const dayName = dayType === '1' ? dayNames[date.getDay()] : dayNames2[date.getDay()];
     return dayName;
   }
+  // 日期转中文2
   function formatDate(dateStr) {
     const date = new Date(dateStr);
     const year = date.getFullYear();
@@ -167,6 +197,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     getLocationInformation,
     getFourDayWeatherData,
     getRealTimeWeather,
+    getWeatherEarlyWarning,
     // 修改天气状态
     ReviseState,
     // 城市时间日期
@@ -177,7 +208,9 @@ export const useWeatherStore = defineStore('Weather', () => {
     nowWeatherData,
     WeatherDataUpdatedAtATime,
     WeatherDataUpdatedAtATimeComputed,
-    TheWeatherDataIsLoaded
+    TheWeatherDataIsLoaded,
+    WeatherEarlyWarning,
+    EarlyWarningDetailsDialog
   }
 }, {
   persist: {

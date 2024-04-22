@@ -29,3 +29,11 @@ export const getRealTimeWeatherAPI = (adcode) => {
     }
   })
 }
+export const getWeatherEarlyWarningAPI = (adcode) => {
+  return request({
+    url:'https://devapi.qweather.com/v7/warning/now',
+    params:{
+      location:adcode
+    }
+  })
+}
