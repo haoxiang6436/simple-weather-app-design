@@ -2,6 +2,27 @@ import { defineStore } from 'pinia'
 import { getGeographicalLocationAPI, getCityLatitudeAndLatitudeAPI, get_7DaysOfWeatherAPI, getRealTimeWeatherAPI, getWeatherEarlyWarningAPI } from '@/apis/getWeatherAPI';
 import { ref, computed } from 'vue';
 
+
+
+export const useWallpaperOptionsStore = defineStore('WallpaperOptions', () => {
+  const UseIpAutoTargeting = ref(false)
+  const WallpaperOptions = ref({
+    TheFirstTime: true,
+  })
+  const SetUseIpAutoTargeting = (WhetherItIsEnabled) => {
+    UseIpAutoTargeting.value = WhetherItIsEnabled
+  }
+  return {
+    UseIpAutoTargeting,
+    SetUseIpAutoTargeting,
+    WallpaperOptions
+  }
+}, {
+  persist: {
+    key: 'WallpaperOptions-2024-6-16-00'
+  },
+})
+
 export const useWeatherStore = defineStore('Weather', () => {
   // 天气数据加载状态
   const TheWeatherDataIsLoaded = ref(100)
@@ -9,14 +30,16 @@ export const useWeatherStore = defineStore('Weather', () => {
   const dayDateCity = ref({
     day: '星期八',
     date: '2028年8月8日',
-    city: '中国大陆',
+    city: '北京市，北京',
+    location: 101010100,
+    area_code: null
   })
   // 天气数据更新时间
   const WeatherDataUpdatedAtATime = ref({
     FourDayWeather: 0,
     RealTimeWeather: 0,
     nowDate: Date.now(),
-    EarlyWarning:0,
+    EarlyWarning: 0,
   })
   // 计算天气数据更新时间与当前时间之间的差值（分钟）
   const WeatherDataUpdatedAtATimeComputed = computed(() => {
@@ -72,6 +95,54 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 天气预警信息
   const WeatherEarlyWarning = ref([])
   const EarlyWarningDetailsDialog = ref(false)
+  // 获取位置信息
+  const getLocationInformation = async (option) => {
+    const WallpaperOptions = useWallpaperOptionsStore()
+    WeatherDataUpdatedAtATime.value.nowDate = Date.now()
+    if (option?.isSearch) {
+      console.log('搜索更新');
+      const { city } = option
+      dayDateCity.value = {
+        ...dayDateCity.value,
+        city: city.adm1 === city.name ? city.adm1 : `${city.adm1}, ${city.name}`,
+        location: city.id,
+        area_code: null
+      }
+      await getFourDayWeatherData(true)
+      await getRealTimeWeather(true)
+      await getWeatherEarlyWarning(true)
+      ReviseState(200)
+      return
+    }
+    if (WallpaperOptions.UseIpAutoTargeting) {
+      console.log('IP更新');
+      // 获取位置
+      const { data: { area_code } } = await getGeographicalLocationAPI();
+      // 获取location
+      if (area_code !== dayDateCity.value.area_code) {
+        console.log('位置变化');
+        const { location } = await getCityLatitudeAndLatitudeAPI(area_code);
+        dayDateCity.value = {
+          ...dayDateCity.value,
+          city: location[0].adm2 === location[0].name ? location[0].adm2 : `${location[0].adm2}, ${location[0].name}`,
+          location: location[0].id,
+          area_code: area_code
+        }
+        await getFourDayWeatherData(true)
+        await getRealTimeWeather(true)
+        await getWeatherEarlyWarning(true)
+        ReviseState(200)
+        return
+      }
+    }
+    else {
+      await getFourDayWeatherData(true)
+      await getRealTimeWeather(true)
+      await getWeatherEarlyWarning(true)
+      ReviseState(200)
+      return
+    }
+  }
   // 获取天气预警信息
   const getWeatherEarlyWarning = async (important) => {
     // 验证数据有效期
@@ -82,30 +153,10 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
     ReviseState(100)
     // 执行请求
-    const {warning} = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
+    const { warning } = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
     WeatherEarlyWarning.value = warning
     console.log(warning)
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
-  }
-  // 获取位置信息
-  const getLocationInformation = async () => {
-    WeatherDataUpdatedAtATime.value.nowDate = Date.now()
-    // 获取位置
-    const { data: { area_code } } = await getGeographicalLocationAPI();
-    // 获取location
-    if (area_code !== dayDateCity.value.area_code) {
-      console.log('位置变化');
-      const { location } = await getCityLatitudeAndLatitudeAPI(area_code);
-      dayDateCity.value = {
-        ...dayDateCity.value,
-        city: location[0].adm2 === location[0].name ? location[0].adm2 : `${location[0].adm2}, ${location[0].name}`,
-        location: location[0].id,
-        area_code: area_code
-      }
-      await getFourDayWeatherData(true)
-      await getRealTimeWeather(true)
-      return
-    }
   }
   // 获取5日天气
   const getFourDayWeatherData = async (important) => {
@@ -214,6 +265,6 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
 }, {
   persist: {
-    key: 'WeatherApp-2024-2-12'
+    key: 'WeatherApp-2024-6-16-00'
   },
 })

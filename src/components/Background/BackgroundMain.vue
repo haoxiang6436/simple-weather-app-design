@@ -8,6 +8,9 @@
 <script setup>
 import StarrySky from './components/StarrySky.vue';
 import VantaBird from './components/VantaBird.vue';
+import {useWallpaperOptionsStore,useWeatherStore} from '@/store';
+const wallpaperOptionsStore = useWallpaperOptionsStore();
+const WeatherStore = useWeatherStore();
 import { ref } from 'vue';
 /**
  * 背景序号
@@ -46,6 +49,11 @@ window.wallpaperPropertyListener = {
     //背景序号
     if (properties.backgroundindex) {
       BackgroundIndex.value = properties.backgroundindex.value
+    }
+    // ip定位
+    if (properties.ipautotargeting) {
+      wallpaperOptionsStore.SetUseIpAutoTargeting(properties.ipautotargeting.value)
+      WeatherStore.getLocationInformation()
     }
   },
 };

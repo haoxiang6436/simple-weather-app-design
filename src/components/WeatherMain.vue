@@ -11,7 +11,7 @@
             d="M512 938.666667c-53.333333 0-384-257.258667-384-469.333334S299.925333 85.333333 512 85.333333s384 171.925333 384 384-330.666667 469.333333-384 469.333334z m0-352c64.8 0 117.333333-52.533333 117.333333-117.333334s-52.533333-117.333333-117.333333-117.333333-117.333333 52.533333-117.333333 117.333333 52.533333 117.333333 117.333333 117.333334z"
             fill="#ffffff" p-id="4351"></path>
         </svg>
-        <span class="location">{{ dayDateCity.city }}</span>
+        <span class="location" @click="SelectALocation">{{ dayDateCity.city }}</span>
         <div class="state">
           <transition mode="out-in">
             <p v-if="TheWeatherDataIsLoaded === 100">
@@ -174,7 +174,8 @@
         </ul>
       </div>
     </div>
-  </div>
+</div>
+  <SelectLocationDialog ref="SearchLocationDialogRef"></SelectLocationDialog>
 </template>
 
 <script setup>
@@ -182,8 +183,9 @@ import 'qweather-icons/font/qweather-icons.css'
 import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useWeatherStore } from '@/store/index';
+import SelectLocationDialog from './SelectLocationDialog.vue';
 const weatherStore = useWeatherStore()
-
+const SearchLocationDialogRef = ref(null)
 const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning ,EarlyWarningDetailsDialog} = storeToRefs(weatherStore)
 const { getLocationInformation, getFourDayWeatherData, getRealTimeWeather, ReviseState, getWeatherEarlyWarning } = weatherStore
 const activeItem = ref('今天')
@@ -216,7 +218,7 @@ const updateWeather = async () => {
     }, 1000)
   }
   catch (error) {
-    console.log(error);
+    console.error(error);
     errCount.value++
     if (errCount.value > 5) {
       // 失败次数超过5次，下一次请求将在30秒之后
@@ -228,6 +230,10 @@ const updateWeather = async () => {
     // 请求失败，五秒后重试
     timer = setTimeout(updateWeather, 1000 * 5)
   }
+}
+
+const SelectALocation = () => {
+  SearchLocationDialogRef.value.showDialog()
 }
 
 onMounted(() => {
@@ -255,7 +261,9 @@ onUnmounted(() => {
 .state {
   height: 2.5vw;
 }
-
+.location {
+  cursor: pointer;
+}
 .EarlyWarning {
   background-color: #ffffff40;
   padding: 0.2vw 0.8vw;

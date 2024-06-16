@@ -6,7 +6,8 @@
 
 <script setup>
 import BIRDS from 'vanta/dist/vanta.birds.min'
-import { onMounted, watch,  nextTick, defineProps } from 'vue'
+import { onMounted, watch,  nextTick } from 'vue'
+// eslint-disable-next-line no-undef
 const props = defineProps({
   VantaOptions: Object,
 })
