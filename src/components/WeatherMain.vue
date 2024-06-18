@@ -135,11 +135,11 @@
                 </p>
           </transition>
         </div>
-        <div  class="EarlyWarning"  v-if="WeatherEarlyWarning.length !== 0" @click="EarlyWarningDetailsDialog = true">
+        <div class="EarlyWarning" v-if="WeatherEarlyWarning.length !== 0" @click="EarlyWarningDetailsDialog = true">
           <svg class="icon" aria-hidden="true">
             <use :xlink:href="WeatherEarlyWarningLevel(WeatherEarlyWarning[0].level)"></use>
           </svg>
-          {{WeatherEarlyWarning[0].typeName}}{{WeatherEarlyWarning[0].level}}预警
+          {{ WeatherEarlyWarning[0].typeName }}{{ WeatherEarlyWarning[0].level }}预警
         </div>
       </div>
       <div class="weather-container">
@@ -166,7 +166,7 @@
       <div class="week-container">
         <ul class="week-list">
           <li v-for="item in FourDayWeatherData" :key="item.fxDate" :class="{ active: activeItem === item.fxDate }"
-            @click="activeItem = item.fxDate ">
+            @click="activeItem = item.fxDate">
             <i :class="`qi-${item.iconDay} day-icon`"></i>
             <span class="day-name">{{ item.fxDate }}</span>
             <span class="day-temp">{{ `${item.tempMax}/${item.tempMin}` }}°C</span>
@@ -174,7 +174,7 @@
         </ul>
       </div>
     </div>
-</div>
+  </div>
   <SelectLocationDialog ref="SearchLocationDialogRef"></SelectLocationDialog>
 </template>
 
@@ -186,7 +186,7 @@ import { useWeatherStore } from '@/store/index';
 import SelectLocationDialog from './SelectLocationDialog.vue';
 const weatherStore = useWeatherStore()
 const SearchLocationDialogRef = ref(null)
-const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning ,EarlyWarningDetailsDialog} = storeToRefs(weatherStore)
+const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
 const { getLocationInformation, getFourDayWeatherData, getRealTimeWeather, ReviseState, getWeatherEarlyWarning } = weatherStore
 const activeItem = ref('今天')
 const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item => item.fxDate === activeItem.value))
@@ -198,24 +198,23 @@ const WeatherEarlyWarningLevel = (event) => {
 }
 let timer = null
 let errCount = ref(0)
-
 const updateWeather = async () => {
   clearTimeout(timer)
   if (!window.navigator.onLine) {
+    console.log('离线');
     ReviseState(400)
     window.addEventListener('online', updateWeather)
     return
   }
+  console.log('上线');
   window.removeEventListener('online', updateWeather)
   try {
     await Promise.all([getLocationInformation(), getFourDayWeatherData(), getRealTimeWeather(), getWeatherEarlyWarning()])
     // 请求成功
-    timer = setTimeout(() => {
-      activeItem.value = FourDayWeatherData.value[0].fxDate
-      ReviseState(200)
-      errCount.value = 0
-      timer = setTimeout(updateWeather, 1000 * 60)
-    }, 1000)
+    activeItem.value = FourDayWeatherData.value[0].fxDate
+    ReviseState(200)
+    errCount.value = 0
+    timer = setTimeout(updateWeather, 1000 * 60)
   }
   catch (error) {
     console.error(error);
@@ -231,7 +230,6 @@ const updateWeather = async () => {
     timer = setTimeout(updateWeather, 1000 * 5)
   }
 }
-
 const SelectALocation = () => {
   SearchLocationDialogRef.value.showDialog()
 }
@@ -261,9 +259,11 @@ onUnmounted(() => {
 .state {
   height: 2.5vw;
 }
+
 .location {
   cursor: pointer;
 }
+
 .EarlyWarning {
   background-color: #ffffff40;
   padding: 0.2vw 0.8vw;

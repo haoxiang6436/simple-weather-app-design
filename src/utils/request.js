@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { useWeatherStore } from '@/store';
+
 
 // 创建一个axios实例
 const instance = axios.create({
@@ -75,6 +77,10 @@ instance.interceptors.response.use(
   },
   (error) => {
     // 对响应错误做点什么
+    console.log('网络错误');
+    const WeatherStore = useWeatherStore()
+    WeatherStore.ReviseState(400)
+    
     return Promise.reject(error);
   }
 );

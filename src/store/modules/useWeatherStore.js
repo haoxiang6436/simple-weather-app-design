@@ -100,7 +100,8 @@ export const useWeatherStore = defineStore('Weather', () => {
     const WallpaperOptions = useWallpaperOptionsStore()
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
     if (option?.isSearch) {
-      console.log('搜索更新');
+      // 
+      console.log('手动定位更新');
       const { city } = option
       dayDateCity.value = {
         ...dayDateCity.value,
@@ -115,7 +116,7 @@ export const useWeatherStore = defineStore('Weather', () => {
       return
     }
     if (WallpaperOptions.UseIpAutoTargeting) {
-      console.log('IP更新');
+      console.log('IP定位更新');
       // 获取位置
       const { data: { area_code } } = await getGeographicalLocationAPI();
       // 获取location
@@ -136,9 +137,7 @@ export const useWeatherStore = defineStore('Weather', () => {
       }
     }
     else {
-      await getFourDayWeatherData(true)
-      await getRealTimeWeather(true)
-      await getWeatherEarlyWarning(true)
+      await Promise.all([getFourDayWeatherData(),getRealTimeWeather(),getWeatherEarlyWarning()])
       ReviseState(200)
       return
     }
@@ -155,7 +154,6 @@ export const useWeatherStore = defineStore('Weather', () => {
     // 执行请求
     const { warning } = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
     WeatherEarlyWarning.value = warning
-    console.log(warning)
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
   }
   // 获取5日天气
@@ -185,12 +183,6 @@ export const useWeatherStore = defineStore('Weather', () => {
         windSpeedDay: item.windSpeedDay,
       }
     });
-    // FourDayWeatherData.value.map(item => {
-    //   return {
-    //     ...item,
-    //     fxDate: item.fxDate
-    //   }
-    // })
     WeatherDataUpdatedAtATime.value.FourDayWeather = Date.now()
   }
   // 获取实时天气
@@ -231,6 +223,10 @@ export const useWeatherStore = defineStore('Weather', () => {
     const day = date.getDate().toString().padStart(2, '0');
     return `${year}年${month}月${day}日`;
   }
+
+
+
+  
   /**
    * 0：未知错误
    * 100：加载中 

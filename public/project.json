@@ -1,0 +1,90 @@
+{
+	"contentrating" : "Everyone",
+	"description" : "2024-6-17：\n-修复错误",
+	"file" : "index.html",
+	"general" : 
+	{
+		"properties" : 
+		{
+			"backgroundindex" : 
+			{
+				"index" : 2,
+				"options" : 
+				[
+					{
+						"label" : "[小鸟]",
+						"value" : "1"
+					},
+					{
+						"label" : "[星空]",
+						"value" : "2"
+					},
+					{
+						"label" : "[动态粒子]",
+						"value" : "3"
+					},
+					{
+						"label" : "[无]",
+						"value" : "0"
+					}
+				],
+				"order" : 102,
+				"text" : "<br/><br/>————————<br/><h4>[🖼️动态背景]<br/><small>- 来这选一个漂亮的背景吧</small></h4>————————",
+				"type" : "combo",
+				"value" : "2"
+			},
+			"backgroundinteraction" : 
+			{
+				"condition" : "backgroundindex.value === \"1\"",
+				"index" : 3,
+				"order" : 103,
+				"text" : "<h4>[🤺和小鸟互动]<br/><small>- 勾选上我，使用鼠标干扰它们的飞行轨迹</small></h4>—————————————————<br/>",
+				"type" : "bool",
+				"value" : false
+			},
+			"ipautotargeting" : 
+			{
+				"index" : 1,
+				"order" : 101,
+				"text" : "<br/><br/>————————<br/><h4>[启用IP定位]<br/><small>- 勾选后手动定位将禁用</small></h4>————————",
+				"type" : "bool",
+				"value" : true
+			},
+			"schemecolor" : 
+			{
+				"order" : 1,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0.027450980392156862 0.09803921568627451 0.1843137254901961"
+			},
+			"text" : 
+			{
+				"index" : 0,
+				"order" : 100,
+				"text" : "——————————————————<br/><h4 align='center'>😥Notice<br/><small>If you are not in Chinese Mainland, the wallpaper will not work properly. Thank you for your understanding</small></h4>——————————————————<br/>",
+				"type" : "text",
+				"value" : "0 0 0"
+			},
+			"text2" : 
+			{
+				"index" : 4,
+				"order" : 104,
+				"text" : "<br/><br/>——————————————————<br/><h4>😀ThankYou<br/><small><br/>🎉最近一次的更新:2024-6-16<br/>--增加了可选使用ip定位（默认开启）<br/>由于部分地区ip定位无法正常使用，所以现新增自行点击更改位置（当IP单位取消勾选之后，可点击位置更改位置）<br/><br/>⚠️如果您使用的是移动网络，将可能导致位置不准确或获取失败<br/><br/>😘感谢您的使用，使用过程中有什么问题意见，欢迎反馈<br/><br/>📢壁纸将会持续更新新的内容，比如更有趣的背景<br/><br/>壁纸由<a href='https://cn.vuejs.org/'><img width='30px' height='30px' alt='【vue】' src='https://vuejs.org/images/logo.png'/></a>打造<br/>UI灵感来源于<a href='https://www.codepen.com/'><b>【codepen】</b></a><br/>3D动态背景来源<a href='https://www.vantajs.com/'><b>【vantaJS】</b></a><br/>天气服务来源<a href='https://www.qweather.com/'><b>【和风天气】</b></a></small></h4>——————————————————<br/>",
+				"type" : "text",
+				"value" : "0 0 0"
+			}
+		}
+	},
+	"preview" : "preview.gif",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"snapshotformat" : 0,
+	"snapshotoverlay" : "",
+	"tags" : [ "Relaxing" ],
+	"title" : "极简天气 | Weather",
+	"type" : "web",
+	"version" : 21,
+	"visibility" : "public",
+	"workshopid" : "3149014795",
+	"workshopurl" : "steam://url/CommunityFilePage/3149014795"
+}
