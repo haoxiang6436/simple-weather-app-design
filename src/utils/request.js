@@ -1,6 +1,17 @@
 import axios from 'axios';
 import { useWeatherStore } from '@/store';
 
+const extractDomain = (url) => {
+  // 正则表达式匹配域名
+  const domainRegex = /^(?:https?:\/\/)?(?:[^@\n]+@)?(?:www\.)?([^:/\n?]+)/im;
+  const matches = url.match(domainRegex);
+  if (matches && matches[1]) {
+    // 移除可能的端口号
+    const domain = matches[1].split(':')[0];
+    return domain;
+  }
+  return null;
+}
 
 // 创建一个axios实例
 const instance = axios.create({
@@ -20,7 +31,7 @@ instance.interceptors.request.use(
     // 在发送请求之前做些什么
     config.params = {
       ...config.params,
-      key: '029b583cfbcb40b38c93eb408b298d4d', // 设置你的API密钥
+      key: process.env.VUE_APP_KEYS.split(',')[process.env.VUE_APP_HOSTS.split(',').findIndex(i=>i==extractDomain(config.url))], // 设置API密钥
     }
     return config;
   },

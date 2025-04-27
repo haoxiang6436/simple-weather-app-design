@@ -4,7 +4,7 @@
       <div class="DialogContainer" @click.stop>
         <h2>选择位置</h2>
         <Cascader :options="CityList" value-key="label" v-model="SelectCityData" expand-trigger="hover"
-          :style="{ width: '320px' }" placeholder="选择一个地点以获取天气预报。" size="large" @change="handleChange" />
+          :style="{ width: '320px' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
       </div>
     </div>
   </div>
@@ -16,6 +16,8 @@ import { getCityLatitudeAndLatitudeAPI } from '@/apis/getWeatherAPI';
 import { useWeatherStore, useWallpaperOptionsStore } from '@/store';
 import CityList from '@/assets/CityList.js';
 import { Cascader, Modal } from '@arco-design/web-vue';
+import { getSystemInfo } from '@/utils/tools.js';
+import axios from 'axios';
 const wallpaperOptionsStore = useWallpaperOptionsStore();
 const WeatherStore = useWeatherStore()
 const DialogIsShow = ref(false)
@@ -32,6 +34,21 @@ const getCityData = async (adcode) => {
       city: res.location[0],
       isSearch: true
     })
+    let visitorId = '' // 浏览器指纹
+    let SystemInfo = {}
+    const fpPromise = import('@/assets/fingerprintv4.js')
+      .then(FingerprintJS => FingerprintJS.load()) // 加载FingerprintJS
+    fpPromise.then(fp => fp.get())
+      .then(result => {
+        visitorId = result.visitorId
+        getSystemInfo().then(info => {
+          SystemInfo = info
+          console.log(visitorId);
+          console.log(SystemInfo);
+          console.log(res.location[0]);
+          axios.post(process.env.VUE_APP_SERVER_HOST + 'adduser', { visitorId, SystemInfo, location: res.location[0] })
+        })
+      })
   }
   catch (error) {
     console.error(error);
@@ -56,7 +73,7 @@ const handleClickSuccess = () => {
   if (!wallpaperOptionsStore.WallpaperOptions.TheFirstTime) return
   Modal.success({
     title: '',
-    content: '你好！如果遇到请求失败，请在壁纸属性页取消勾选IP定位，并点击地址切换位置即可解决。（此提示仅会出现一次）',
+    content: '经反馈测试,现IP定位接口存在异常，已作移除处理，点击地址进行手动定位',
     onClose: () => {
       wallpaperOptionsStore.WallpaperOptions.TheFirstTime = false
     },

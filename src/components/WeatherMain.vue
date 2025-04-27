@@ -195,6 +195,7 @@ const WeatherEarlyWarningLevel = (event) => {
   else if (event === '黄色') return '#icon-tianqiyujing-huang'
   else if (event === '橙色') return '#icon-tianqiyujing-cheng'
   else if (event === '红色') return '#icon-tianqi-yujing'
+  else return '#icon-tianqiyujing-lan'
 }
 let timer = null
 let errCount = ref(0)

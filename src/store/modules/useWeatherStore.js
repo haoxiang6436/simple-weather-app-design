@@ -19,7 +19,7 @@ export const useWallpaperOptionsStore = defineStore('WallpaperOptions', () => {
   }
 }, {
   persist: {
-    key: 'WallpaperOptions-2024-6-16-00'
+    key: 'WallpaperOptions-2025-4.23'
   },
 })
 
@@ -261,6 +261,6 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
 }, {
   persist: {
-    key: 'WeatherApp-2024-6-16-00'
+    key: 'WeatherApp-2025-4-23'
   },
 })

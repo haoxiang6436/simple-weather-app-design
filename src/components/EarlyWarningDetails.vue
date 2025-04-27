@@ -2,7 +2,7 @@
     <div class="EarlyWarningDialog" @click="EarlyWarningDetailsDialog = false">
       <div class="EarlyContainer" >
         <div class="EarlyCont"  @click.stop="">
-          <div class="EarlyItem" @click.stop="" v-for="item in WeatherEarlyWarning"  :key="item.id" :style='{"--severityColor":item.severityColor,}'>
+          <div class="EarlyItem" @click.stop="" v-for="item in WeatherEarlyWarning"  :key="item.id" :style='{"--severityColor":item.severityColor?item.severityColor:"white",}'>
             <div class="title">{{ item.title }}</div>
             <div class="text">{{item.text}}</div>
             <div class="info">
