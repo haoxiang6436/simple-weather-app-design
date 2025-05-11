@@ -107,7 +107,8 @@ export const useWeatherStore = defineStore('Weather', () => {
         ...dayDateCity.value,
         city: city.adm1 === city.name ? city.adm1 : `${city.adm1}, ${city.name}`,
         location: city.id,
-        area_code: null
+        area_code: null,
+        CityDetail: city,
       }
       await getFourDayWeatherData(true)
       await getRealTimeWeather(true)

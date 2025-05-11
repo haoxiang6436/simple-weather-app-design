@@ -11,11 +11,11 @@ const { EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
 
 <template>
   <div class="App">
-      <BackgroundMain></BackgroundMain>
-      <WeatherMain></WeatherMain>
-      <transition name="Dialog" mode="out-in">
-        <EarlyWarningDetails v-if="EarlyWarningDetailsDialog"></EarlyWarningDetails>
-      </transition>
+    <BackgroundMain></BackgroundMain>
+    <WeatherMain></WeatherMain>
+    <transition name="Dialog" mode="out-in">
+      <EarlyWarningDetails v-if="EarlyWarningDetailsDialog"></EarlyWarningDetails>
+    </transition>
   </div>
 </template>
 
@@ -29,5 +29,4 @@ const { EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
 .Dialog-leave-to {
   opacity: 0;
 }
-
 </style>

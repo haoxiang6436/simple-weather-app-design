@@ -176,6 +176,7 @@
     </div>
   </div>
   <SelectLocationDialog ref="SearchLocationDialogRef"></SelectLocationDialog>
+  <welcome-modal :SelectLocationDialogFunction="SearchLocationDialogRef" :temp="666" />
 </template>
 
 <script setup>
@@ -184,6 +185,9 @@ import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useWeatherStore } from '@/store/index';
 import SelectLocationDialog from './SelectLocationDialog.vue';
+import {  shouldExecuteDaily }from '@/utils/tools'
+import WelcomeModal from '@/components/WelcomeModal.vue'
+
 const weatherStore = useWeatherStore()
 const SearchLocationDialogRef = ref(null)
 const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
@@ -215,6 +219,7 @@ const updateWeather = async () => {
     activeItem.value = FourDayWeatherData.value[0].fxDate
     ReviseState(200)
     errCount.value = 0
+    shouldExecuteDaily()
     timer = setTimeout(updateWeather, 1000 * 60)
   }
   catch (error) {

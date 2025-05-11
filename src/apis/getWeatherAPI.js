@@ -1,10 +1,11 @@
 // 导入request函数，用于发送请求
 import request from '@/utils/request'
+import { getServerHost } from '@/utils/tools'
 // import axios from 'axios'
-const getHost = () => {
-  const hostList = process.env.VUE_APP_HOSTS.split(',')
-  return hostList[1]
-}
+// const getServerHost = () => {
+//   const hostList = process.env.VUE_APP_HOSTS.split(',')
+//   return hostList[1]
+// }
 
 
 // 导出一个函数，用于获取地理位置信息
@@ -18,7 +19,7 @@ export const getCityLatitudeAndLatitudeAPI = (adcode) => {
 
   // 发送请求，获取城市纬度和经度信息
   return request({
-    url: `https://${getHost()}/geo/v2/city/lookup`,
+    url: `https://${getServerHost()}/geo/v2/city/lookup`,
     params: {
       location: adcode,
     }
@@ -29,7 +30,7 @@ export const getCityLatitudeAndLatitudeAPI = (adcode) => {
 export const get_7DaysOfWeatherAPI = (adcode) => {
   // 发送请求，获取未来7天的天气信息
   return request({
-    url: `https://${getHost()}/v7/weather/7d`,
+    url: `https://${getServerHost()}/v7/weather/7d`,
     params: {
       location: adcode,
     }
@@ -39,7 +40,7 @@ export const get_7DaysOfWeatherAPI = (adcode) => {
 export const getRealTimeWeatherAPI = (adcode) => {
   // 发送请求，获取实时天气信息
   return request({
-    url: `https://${getHost()}/v7/weather/now`,
+    url: `https://${getServerHost()}/v7/weather/now`,
     params: {
       location: adcode,
     }
@@ -49,7 +50,7 @@ export const getRealTimeWeatherAPI = (adcode) => {
 export const getWeatherEarlyWarningAPI = (adcode) => {
   // 发送请求，获取天气预警信息
   return request({
-    url: `https://${getHost()}/v7/warning/now`,
+    url: `https://${getServerHost()}/v7/warning/now`,
     params: {
       location: adcode
     }

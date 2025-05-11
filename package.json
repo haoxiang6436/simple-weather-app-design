@@ -11,6 +11,7 @@
     "@better-scroll/core": "^2.5.1",
     "@better-scroll/mouse-wheel": "^2.5.1",
     "@formkit/auto-animate": "^0.8.2",
+    "@vueuse/core": "^13.1.0",
     "axios": "^1.6.7",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.1",

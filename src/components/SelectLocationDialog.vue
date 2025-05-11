@@ -1,12 +1,16 @@
 <template>
-  <div class="SearchLocation" v-auto-animate>
-    <div class="SearchLocationDialog" @click="hideDialog" v-if="DialogIsShow">
-      <div class="DialogContainer" @click.stop>
-        <h2>选择位置</h2>
-        <Cascader :options="CityList" value-key="label" v-model="SelectCityData" expand-trigger="hover"
-          :style="{ width: '320px' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
+  <div class="SearchLocation">
+    <Transition name="modal-fade">
+      <div class="SearchLocationDialog" @click="hideDialog" v-if="DialogIsShow">
+        <div class="DialogContainer" @click.stop>
+          <h2>选择位置</h2>
+          <p style="color: #666; font-weight: bolder; transform: translateY(-10px); font-size: 12px;" v-html="TipText">
+          </p>
+          <Cascader :options="CityList" value-key="label" v-model="SelectCityData" expand-trigger="hover"
+            :style="{ width: '320px' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
+        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -15,14 +19,15 @@ import { nextTick, ref, onMounted } from 'vue'
 import { getCityLatitudeAndLatitudeAPI } from '@/apis/getWeatherAPI';
 import { useWeatherStore, useWallpaperOptionsStore } from '@/store';
 import CityList from '@/assets/CityList.js';
-import { Cascader, Modal } from '@arco-design/web-vue';
-import { getSystemInfo } from '@/utils/tools.js';
-import axios from 'axios';
+import { Cascader } from '@arco-design/web-vue';
+import { UpdataUserSystemInfo } from '@/utils/tools';
+import { useStorage } from '@vueuse/core';
 const wallpaperOptionsStore = useWallpaperOptionsStore();
 const WeatherStore = useWeatherStore()
 const DialogIsShow = ref(false)
-const SelectCityData = ref()
+const SelectCityData = useStorage('SelectCityData',)
 const LoadingIsShow = ref(true)
+const TipText = ref('选择一个地点以获取天气信息');
 const getCityData = async (adcode) => {
   try {
     // 获取城市数据
@@ -34,27 +39,19 @@ const getCityData = async (adcode) => {
       city: res.location[0],
       isSearch: true
     })
-    let visitorId = '' // 浏览器指纹
-    let SystemInfo = {}
-    const fpPromise = import('@/assets/fingerprintv4.js')
-      .then(FingerprintJS => FingerprintJS.load()) // 加载FingerprintJS
-    fpPromise.then(fp => fp.get())
-      .then(result => {
-        visitorId = result.visitorId
-        getSystemInfo().then(info => {
-          SystemInfo = info
-          console.log(visitorId);
-          console.log(SystemInfo);
-          console.log(res.location[0]);
-          axios.post(process.env.VUE_APP_SERVER_HOST + 'adduser', { visitorId, SystemInfo, location: res.location[0] })
-        })
-      })
+    UpdataUserSystemInfo(res)
   }
   catch (error) {
     console.error(error);
   }
 }
 const showDialog = async () => {
+  if (wallpaperOptionsStore.WallpaperOptions.TheFirstTime) {
+    TipText.value = '#之后可以通过点击卡片左上角地址文本的进行更新定位<br/>#点击空白处可关闭此弹窗'
+    wallpaperOptionsStore.WallpaperOptions.TheFirstTime = false
+  } else {
+    TipText.value = '#选择一个地点以获取天气信息<br/>#点击空白处可关闭此弹窗'
+  }
   if (wallpaperOptionsStore.UseIpAutoTargeting) return
   // 获取城市数据
   DialogIsShow.value = true
@@ -68,19 +65,20 @@ const handleChange = () => {
 }
 const hideDialog = () => {
   DialogIsShow.value = false
+  // wallpaperOptionsStore.WallpaperOptions.TheFirstTime = false
 }
-const handleClickSuccess = () => {
-  if (!wallpaperOptionsStore.WallpaperOptions.TheFirstTime) return
-  Modal.success({
-    title: '',
-    content: '经反馈测试,现IP定位接口存在异常，已作移除处理，点击地址进行手动定位',
-    onClose: () => {
-      wallpaperOptionsStore.WallpaperOptions.TheFirstTime = false
-    },
-  });
-}
+// const handleClickSuccess = () => {
+//   // if (!wallpaperOptionsStore.WallpaperOptions.TheFirstTime) return
+//   Modal.success({
+//     title: '',
+//     content: '经反馈测试,现IP定位接口存在异常，已作移除处理，点击地址进行手动定位',
+//     onClose: () => {
+//       wallpaperOptionsStore.WallpaperOptions.TheFirstTime = false
+//     },
+//   });
+// }
 onMounted(() => {
-  handleClickSuccess()
+  // handleClickSuccess()
 })
 // eslint-disable-next-line no-undef
 defineExpose({
@@ -148,6 +146,48 @@ defineExpose({
         }
       }
     }
+  }
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-active .DialogContainer {
+  animation: modal-in 0.3s ease-out;
+}
+
+.modal-fade-leave-active .DialogContainer {
+  animation: modal-out 0.3s ease-in;
+}
+
+@keyframes modal-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes modal-out {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  to {
+    transform: translateY(-40px);
+    opacity: 0;
   }
 }
 </style>
