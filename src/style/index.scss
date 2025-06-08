@@ -2,7 +2,7 @@
 @import url(../style/font.css);
 
 :root {
-  --gradient: linear-gradient(135deg, #72EDF2 10%, #5151E5 100%);
+  --gradient: linear-gradient(135deg, #62c6cc 10%, #494ec2 100%);
 }
 
 * {
@@ -76,7 +76,7 @@ body {
       left: 0;
       background-image: var(--gradient);
       border-radius: 2.5vw;
-      opacity: 0.8;
+      opacity: 1;
     }
 
     .date-container {

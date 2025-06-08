@@ -8,12 +8,6 @@ import { getServerHost } from '@/utils/tools'
 // }
 
 
-// 导出一个函数，用于获取地理位置信息
-export const getGeographicalLocationAPI = () => {
-  // 发送请求，获取地理位置信息
-  return request("https://api.qjqq.cn/api/Local")
-}
-
 // 导出一个函数，用于获取城市纬度和经度信息
 export const getCityLatitudeAndLatitudeAPI = (adcode) => {
 

@@ -1,20 +1,14 @@
 import { defineStore } from 'pinia'
-import { getGeographicalLocationAPI, getCityLatitudeAndLatitudeAPI, get_7DaysOfWeatherAPI, getRealTimeWeatherAPI, getWeatherEarlyWarningAPI } from '@/apis/getWeatherAPI';
+import { get_7DaysOfWeatherAPI, getRealTimeWeatherAPI, getWeatherEarlyWarningAPI } from '@/apis/getWeatherAPI';
 import { ref, computed } from 'vue';
 
 
 
 export const useWallpaperOptionsStore = defineStore('WallpaperOptions', () => {
-  const UseIpAutoTargeting = ref(false)
   const WallpaperOptions = ref({
     TheFirstTime: true,
   })
-  const SetUseIpAutoTargeting = (WhetherItIsEnabled) => {
-    UseIpAutoTargeting.value = WhetherItIsEnabled
-  }
   return {
-    UseIpAutoTargeting,
-    SetUseIpAutoTargeting,
     WallpaperOptions
   }
 }, {
@@ -28,8 +22,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   const TheWeatherDataIsLoaded = ref(100)
   // 城市日期信息
   const dayDateCity = ref({
-    day: '星期八',
-    date: '2028年8月8日',
+    day: '星期日',
+    date: '2025年6月1日',
     city: '北京市，北京',
     location: 101010100,
     area_code: null
@@ -38,7 +32,7 @@ export const useWeatherStore = defineStore('Weather', () => {
   const WeatherDataUpdatedAtATime = ref({
     FourDayWeather: 0,
     RealTimeWeather: 0,
-    nowDate: Date.now(),
+    nowDate: 0,
     EarlyWarning: 0,
   })
   // 计算天气数据更新时间与当前时间之间的差值（分钟）
@@ -97,10 +91,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   const EarlyWarningDetailsDialog = ref(false)
   // 获取位置信息
   const getLocationInformation = async (option) => {
-    const WallpaperOptions = useWallpaperOptionsStore()
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
     if (option?.isSearch) {
-      // 
       console.log('手动定位更新');
       const { city } = option
       dayDateCity.value = {
@@ -110,61 +102,37 @@ export const useWeatherStore = defineStore('Weather', () => {
         area_code: null,
         CityDetail: city,
       }
-      await getFourDayWeatherData(true)
-      await getRealTimeWeather(true)
-      await getWeatherEarlyWarning(true)
-      ReviseState(200)
-      return
-    }
-    if (WallpaperOptions.UseIpAutoTargeting) {
-      console.log('IP定位更新');
-      // 获取位置
-      const { data: { area_code } } = await getGeographicalLocationAPI();
-      // 获取location
-      if (area_code !== dayDateCity.value.area_code) {
-        console.log('位置变化');
-        const { location } = await getCityLatitudeAndLatitudeAPI(area_code);
-        dayDateCity.value = {
-          ...dayDateCity.value,
-          city: location[0].adm2 === location[0].name ? location[0].adm2 : `${location[0].adm2}, ${location[0].name}`,
-          location: location[0].id,
-          area_code: area_code
-        }
-        await getFourDayWeatherData(true)
-        await getRealTimeWeather(true)
-        await getWeatherEarlyWarning(true)
-        ReviseState(200)
-        return
-      }
+      await Promise.all([getFourDayWeatherData(true), getRealTimeWeather(true), getWeatherEarlyWarning(true)])
     }
     else {
-      await Promise.all([getFourDayWeatherData(),getRealTimeWeather(),getWeatherEarlyWarning()])
-      ReviseState(200)
-      return
+      await Promise.all([getFourDayWeatherData(), getRealTimeWeather(), getWeatherEarlyWarning()])
     }
+    ReviseState(200)
   }
   // 获取天气预警信息
   const getWeatherEarlyWarning = async (important) => {
     // 验证数据有效期
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.EarlyWarning
-    if (TimeInterval < 1000 * 60 * 5 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
-      console.log(`天气预警未过期 < 5min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_WARNING && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+      console.log(`天气预警未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
     ReviseState(100)
     // 执行请求
+    console.log(`天气预警过期、重新获取`);
     const { warning } = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
     WeatherEarlyWarning.value = warning
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
   }
-  // 获取5日天气
+  // 获取4日天气
   const getFourDayWeatherData = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.FourDayWeather
-    if (TimeInterval < 1000 * 60 * 60 * 2 && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
-      console.log(`4日天气未过期 < 2h：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_FOURDAYS && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+      console.log(`4日天气未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
     ReviseState(100)
+    console.log(`4日天气过期、重新获取`);
     const { daily } = await get_7DaysOfWeatherAPI(dayDateCity.value.location);
     FourDayWeatherData.value = daily.slice(0, 4).map((item, index) => {
       return {
@@ -189,12 +157,13 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 获取实时天气
   const getRealTimeWeather = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.RealTimeWeather
-    if (TimeInterval < 1000 * 60 * 5 && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
-      console.log(`实时天气未过期 < 5min：${(TimeInterval / 1000 / 60).toFixed(0)} 前更新`);
+    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_REALTIME && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
+      console.log(`实时天气未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
     // 获取实时天气
     ReviseState(100)
+    console.log(`实时天气过期、重新获取`,process.env.VUE_APP_WEATHER_UPDATE_REALTIME);
     const { now } = await getRealTimeWeatherAPI(dayDateCity.value.location)
     nowWeatherData.value = {
       icon: now.icon,
@@ -227,7 +196,7 @@ export const useWeatherStore = defineStore('Weather', () => {
 
 
 
-  
+
   /**
    * 0：未知错误
    * 100：加载中 
