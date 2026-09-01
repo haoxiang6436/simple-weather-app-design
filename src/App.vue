@@ -1,7 +1,7 @@
 <script setup>
-import WeatherMain from './components/WeatherMain.vue'
-import BackgroundMain from './components/Background/BackgroundMain.vue'
-import EarlyWarningDetails from './components/EarlyWarningDetails.vue';
+import WeatherMain from '@/features/weather/WeatherMain.vue'
+import BackgroundMain from '@/features/wallpaper/backgrounds/BackgroundMain.vue'
+import EarlyWarningDetails from '@/features/weather/EarlyWarningDetails.vue';
 import { useWeatherStore } from '@/store/index';
 import { storeToRefs } from 'pinia';
 const weatherStore = useWeatherStore()
@@ -22,7 +22,7 @@ const { EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
 <style scoped>
 .Dialog-enter-active,
 .Dialog-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 
 .Dialog-enter-from,

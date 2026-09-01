@@ -13,6 +13,7 @@
     "@formkit/auto-animate": "^0.8.2",
     "@vueuse/core": "^13.1.0",
     "axios": "^1.6.7",
+    "mitt": "^3.0.1",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.1",
     "qweather-icons": "^1.6.0",

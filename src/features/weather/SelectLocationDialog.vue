@@ -4,7 +4,7 @@
       <div class="SearchLocationDialog" @click="hideDialog" v-if="DialogIsShow">
         <div class="DialogContainer" @click.stop>
           <h2>选择位置</h2>
-          <p style="color: #666; font-weight: bolder; transform: translateY(-10px); font-size: 12px;" v-html="TipText">
+          <p class="tip" v-html="TipText">
           </p>
           <Cascader :options="CityList" value-key="label" v-model="SelectCityData" expand-trigger="hover"
             :style="{ width: '320px' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
@@ -16,30 +16,27 @@
 
 <script setup>
 import { nextTick, ref, onMounted } from 'vue'
-import { getCityLatitudeAndLatitudeAPI } from '@/apis/getWeatherAPI';
+import { lookupCity } from '@/api/weather';
 import { useWeatherStore, useWallpaperOptionsStore } from '@/store';
-import CityList from '@/assets/CityList.js';
+import CityList from '@/data/CityList';
 import { Cascader } from '@arco-design/web-vue';
-import { UpdataUserSystemInfo } from '@/utils/tools';
 import { useStorage } from '@vueuse/core';
 const wallpaperOptionsStore = useWallpaperOptionsStore();
 const WeatherStore = useWeatherStore()
 const DialogIsShow = ref(false)
 const SelectCityData = useStorage('SelectCityData',)
-const LoadingIsShow = ref(true)
 const TipText = ref('选择一个地点以获取天气信息');
 const getCityData = async (adcode) => {
   try {
     // 获取城市数据
-    const res = await getCityLatitudeAndLatitudeAPI(adcode)
+    const res = await lookupCity(adcode)
     if (res.location.length === 0) {
       return
     }
-    WeatherStore.getLocationInformation({
+    await WeatherStore.getLocationInformation({
       city: res.location[0],
       isSearch: true
     })
-    UpdataUserSystemInfo(res)
   }
   catch (error) {
     console.error(error);
@@ -52,7 +49,6 @@ const showDialog = async () => {
   } else {
     TipText.value = '#选择一个地点以获取天气信息<br/>#点击空白处可关闭此弹窗'
   }
-  if (wallpaperOptionsStore.UseIpAutoTargeting) return
   // 获取城市数据
   DialogIsShow.value = true
   await nextTick()
@@ -60,7 +56,6 @@ const showDialog = async () => {
 const handleChange = () => {
   getCityData(SelectCityData.value)
   hideDialog()
-  LoadingIsShow.value = false
 
 }
 const hideDialog = () => {
@@ -104,10 +99,26 @@ defineExpose({
     width: fit-content;
     max-height: 60vh;
     height: fit-content;
-    background-color: rgb(255, 255, 255);
-    border-radius: 10px;
-    padding: 30px;
+    background: rgba(18, 30, 52, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 22px;
+    padding: 32px;
     box-sizing: border-box;
+    color: var(--text-primary);
+    box-shadow: 0 28px 70px -28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+    h2 {
+      color: var(--text-primary);
+      margin: 0 0 10px;
+    }
+
+    .tip {
+      margin: 0 0 18px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 13px;
+      line-height: 1.6;
+    }
 
     .SearchResults {
       margin: 15px 0;

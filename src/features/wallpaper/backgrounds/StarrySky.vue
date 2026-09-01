@@ -13,6 +13,8 @@
 </template>
 
 <style lang="scss" scoped>
+@use 'sass:math';
+
 @function getShadows($n) {
   $shadows: '#{random(100)}vw #{random(100)}vh #fff';
 
@@ -26,7 +28,7 @@
 $duration: 1000s;
 
 @for $i from 1 through 5 {
-  $duration: $duration/2;
+  $duration: math.div($duration, 2);
   .layer#{$i} {
     $size: #{$i}px;
     position: fixed;

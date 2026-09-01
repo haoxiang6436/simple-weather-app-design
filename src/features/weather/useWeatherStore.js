@@ -1,23 +1,11 @@
 import { defineStore } from 'pinia'
-import { get_7DaysOfWeatherAPI, getRealTimeWeatherAPI, getWeatherEarlyWarningAPI } from '@/apis/getWeatherAPI';
+import { get7DayForecast, getCurrentWeather, getWeatherWarnings, getWeatherIndices as getWeatherIndicesAPI } from '@/api/weather';
+import { isNetworkError } from '@/api/errors';
 import { ref, computed } from 'vue';
 
-
-
-export const useWallpaperOptionsStore = defineStore('WallpaperOptions', () => {
-  const WallpaperOptions = ref({
-    TheFirstTime: true,
-  })
-  return {
-    WallpaperOptions
-  }
-}, {
-  persist: {
-    key: 'WallpaperOptions-2025-4.23'
-  },
-})
-
 export const useWeatherStore = defineStore('Weather', () => {
+  // 展示的生活指数类型 ID（运动/洗车/穿衣/紫外线/旅游/舒适度/感冒）
+  const INDICES_TYPES = '1,2,3,5,6,8,9'
   // 天气数据加载状态
   const TheWeatherDataIsLoaded = ref(100)
   // 城市日期信息
@@ -34,10 +22,12 @@ export const useWeatherStore = defineStore('Weather', () => {
     RealTimeWeather: 0,
     nowDate: 0,
     EarlyWarning: 0,
+    Indices: 0,
   })
   // 计算天气数据更新时间与当前时间之间的差值（分钟）
   const WeatherDataUpdatedAtATimeComputed = computed(() => {
-    return ((WeatherDataUpdatedAtATime.value.nowDate - WeatherDataUpdatedAtATime.value.RealTimeWeather) / 1000 / 60).toFixed(0)
+    const diffMinutes = (WeatherDataUpdatedAtATime.value.nowDate - WeatherDataUpdatedAtATime.value.RealTimeWeather) / 1000 / 60
+    return Number.isFinite(diffMinutes) ? diffMinutes.toFixed(0) : '0'
   })
   // 5日天气
   const FourDayWeatherData = ref(
@@ -89,9 +79,12 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 天气预警信息
   const WeatherEarlyWarning = ref([])
   const EarlyWarningDetailsDialog = ref(false)
+  // 生活指数数据
+  const WeatherIndices = ref([])
   // 获取位置信息
   const getLocationInformation = async (option) => {
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
+    const important = !!option?.isSearch
     if (option?.isSearch) {
       console.log('手动定位更新');
       const { city } = option
@@ -102,27 +95,55 @@ export const useWeatherStore = defineStore('Weather', () => {
         area_code: null,
         CityDetail: city,
       }
-      await Promise.all([getFourDayWeatherData(true), getRealTimeWeather(true), getWeatherEarlyWarning(true)])
     }
-    else {
-      await Promise.all([getFourDayWeatherData(), getRealTimeWeather(), getWeatherEarlyWarning()])
+    // 三个接口并发请求，单个失败不影响其它数据落库
+    const results = await Promise.allSettled([
+      getFourDayWeatherData(important),
+      getRealTimeWeather(important),
+      getWeatherEarlyWarning(important),
+    ])
+    // 生活指数独立请求，失败不影主状态
+    getWeatherIndices(important).catch(() => {})
+    const failed = results.filter((result) => result.status === 'rejected')
+    if (failed.length === 0) {
+      ReviseState(200)
+      return
     }
-    ReviseState(200)
+    // 部分失败：网络错误 → 400，其它错误 → 300
+    const hasNetworkError = failed.some((result) => isNetworkError(result.reason))
+    console.error('部分天气请求失败：', failed.map((result) => result.reason))
+    ReviseState(hasNetworkError ? 400 : 300)
+    throw failed[0].reason
   }
   // 获取天气预警信息
   const getWeatherEarlyWarning = async (important) => {
     // 验证数据有效期
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.EarlyWarning
-    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_WARNING && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_WARNING && WeatherDataUpdatedAtATime.value.EarlyWarning && !important) {
       console.log(`天气预警未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
     ReviseState(100)
     // 执行请求
     console.log(`天气预警过期、重新获取`);
-    const { warning } = await getWeatherEarlyWarningAPI(dayDateCity.value.location)
+    const { warning } = await getWeatherWarnings(dayDateCity.value.location)
     WeatherEarlyWarning.value = warning
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
+  }
+  // 获取生活指数
+  const getWeatherIndices = async (important) => {
+    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.Indices
+    const interval = Number(process.env.VUE_APP_WEATHER_UPDATE_INDICES) || 3600000
+    if (TimeInterval < interval && WeatherDataUpdatedAtATime.value.Indices && !important) {
+      return
+    }
+    try {
+      const { daily } = await getWeatherIndicesAPI(dayDateCity.value.location, INDICES_TYPES)
+      WeatherIndices.value = (daily || []).slice(0, 6)
+    } finally {
+      // 无论成败都记录时间，避免无权限等固定失败在每次轮询时重复请求
+      WeatherDataUpdatedAtATime.value.Indices = Date.now()
+    }
   }
   // 获取4日天气
   const getFourDayWeatherData = async (important) => {
@@ -133,7 +154,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
     ReviseState(100)
     console.log(`4日天气过期、重新获取`);
-    const { daily } = await get_7DaysOfWeatherAPI(dayDateCity.value.location);
+    const { daily } = await get7DayForecast(dayDateCity.value.location);
     FourDayWeatherData.value = daily.slice(0, 4).map((item, index) => {
       return {
         // 日期
@@ -144,6 +165,21 @@ export const useWeatherStore = defineStore('Weather', () => {
         tempMin: item.tempMin,
         // 天气图标
         iconDay: item.iconDay,
+        iconNight: item.iconNight,
+        // 白天/夜间天气文案
+        textDay: item.textDay,
+        textNight: item.textNight,
+        // 日出日落
+        sunrise: item.sunrise,
+        sunset: item.sunset,
+        // 紫外线 / 气压 / 能见度 / 云量
+        uvIndex: item.uvIndex,
+        pressure: item.pressure,
+        vis: item.vis,
+        cloud: item.cloud,
+        // 风向 / 风力
+        windDirDay: item.windDirDay,
+        windScaleDay: item.windScaleDay,
         // 降雨量
         precip: item.precip,
         // 湿度
@@ -164,11 +200,12 @@ export const useWeatherStore = defineStore('Weather', () => {
     // 获取实时天气
     ReviseState(100)
     console.log(`实时天气过期、重新获取`,process.env.VUE_APP_WEATHER_UPDATE_REALTIME);
-    const { now } = await getRealTimeWeatherAPI(dayDateCity.value.location)
+    const { now } = await getCurrentWeather(dayDateCity.value.location)
     nowWeatherData.value = {
       icon: now.icon,
       temp: now.temp,
       text: now.text,
+      feelsLike: now.feelsLike,
     }
     dayDateCity.value = {
       ...dayDateCity.value,
@@ -215,6 +252,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     getFourDayWeatherData,
     getRealTimeWeather,
     getWeatherEarlyWarning,
+    getWeatherIndices,
     // 修改天气状态
     ReviseState,
     // 城市时间日期
@@ -227,10 +265,11 @@ export const useWeatherStore = defineStore('Weather', () => {
     WeatherDataUpdatedAtATimeComputed,
     TheWeatherDataIsLoaded,
     WeatherEarlyWarning,
+    WeatherIndices,
     EarlyWarningDetailsDialog
   }
 }, {
   persist: {
-    key: 'WeatherApp-2025-4-23'
+    key: 'WeatherApp-2026-9-1'
   },
 })

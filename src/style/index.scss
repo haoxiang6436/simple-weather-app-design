@@ -2,242 +2,129 @@
 @import url(../style/font.css);
 
 :root {
-  --gradient: linear-gradient(135deg, #62c6cc 10%, #494ec2 100%);
+  /* ---- 字体 ---- */
+  --font-sans: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  /* ---- 配色（暗色玻璃） ---- */
+  --color-bg: #07192f;
+  --color-primary: #38bdf8;
+  --color-primary-strong: #0ea5e9;
+  --color-accent: #f59e0b;
+  --color-ok: #95d5ae;
+  --color-warn: #eb9b62;
+
+  /* ---- 玻璃质感 ---- */
+  --glass-bg: rgba(16, 27, 48, 0.42);
+  --glass-bg-strong: rgba(12, 22, 42, 0.66);
+  --glass-bg-soft: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-border-strong: rgba(255, 255, 255, 0.26);
+  --glass-blur: 26px;
+
+  /* ---- 文本 ---- */
+  --text-primary: #f4f7fc;
+  --text-secondary: rgba(235, 242, 251, 0.78);
+  --text-muted: rgba(235, 242, 251, 0.52);
+
+  /* ---- 圆角 / 阴影 ---- */
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-card: 0 30px 80px -30px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --shadow-panel: 0 14px 44px -20px rgba(0, 0, 0, 0.55);
+
+  /* ---- 动效 ---- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- 预警四级强调色（按当前暗色玻璃风格调校，低饱和、不刺眼） ---- */
+.sev-blue {
+  --sev: #3a9bf0;
+  --sev-bg: rgba(58, 155, 240, 0.22);
+  --sev-border: rgba(58, 155, 240, 0.62);
+  --sev-text: #b3d8ff;
+}
+
+.sev-yellow {
+  --sev: #eeb332;
+  --sev-bg: rgba(238, 179, 50, 0.20);
+  --sev-border: rgba(238, 179, 50, 0.62);
+  --sev-text: #f8de90;
+}
+
+.sev-orange {
+  --sev: #f08944;
+  --sev-bg: rgba(240, 137, 68, 0.20);
+  --sev-border: rgba(240, 137, 68, 0.62);
+  --sev-text: #ffcb9e;
+}
+
+.sev-red {
+  --sev: #ef6159;
+  --sev-bg: rgba(239, 97, 89, 0.20);
+  --sev-border: rgba(239, 97, 89, 0.62);
+  --sev-text: #ffbab5;
 }
 
 * {
   -webkit-box-sizing: border-box;
   box-sizing: border-box;
-  line-height: 1.25em;
-  letter-spacing: 0.2vw;
-  font-size: 1.5vw;
+}
 
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   margin: 0;
-  width: 100vw;
-  height: 100vh;
-  font-family: 'Montserrat', sans-serif;
-  // background-color: #343d4b;
-  background-color: #07192f;
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
-  -webkit-box-pack: center;
-  -ms-flex-pack: center;
-  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: normal;
+  color: var(--text-primary);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
-.container {
-  border-radius: 2.5vw;
-  -webkit-box-shadow: 0 0 7vw -1vw rgba(0, 0, 0, 0.2);
-  box-shadow: 0 0 7vw -1vw rgba(0, 0, 0, 0.2);
-  background-color: #222831;
-  color: #ffffff;
-  height: 40vw;
-  width: 80vw;
-  transform: scale(0.6);
-  display: flex;
-  flex-flow: row nowrap;
+#app {
   position: relative;
+}
 
-  .weather-side {
-    position: relative;
-    height: 100%;
-    width: 28vw;
-    border-radius: 2.5vw;
-    // background: url("https://images.unsplash.com/photo-1559963110-71b394e7494d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=675&q=80") no-repeat center center/cover;
-    -webkit-box-shadow: 0 0 2vw -1vw rgba(0, 0, 0, 0.2);
-    box-shadow: 0 0 2vw -1vw rgba(0, 0, 0, 0.2);
-    -webkit-transition: -webkit-transform 300ms ease;
-    transition: -webkit-transform 300ms ease;
-    -o-transition: transform 300ms ease;
-    transition: transform 300ms ease;
-    transition: transform 300ms ease, -webkit-transform 300ms ease;
-    -webkit-transform: translateZ(0) scale(1.02) perspective(100vw);
-    transform: translateZ(0) scale(1.02) perspective(100vw);
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
 
-    /* float: left; */
-    &:hover {
-      -webkit-transform: scale(1.1) perspective(150vw) rotateY(10deg);
-      transform: scale(1.1) perspective(150vw) rotateY(10deg);
-    }
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 
-    .weather-gradient {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      top: 0;
-      left: 0;
-      background-image: var(--gradient);
-      border-radius: 2.5vw;
-      opacity: 1;
-    }
+/* 键盘导航可见焦点 */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 
-    .date-container {
-      position: absolute;
-      top: 2.5vw;
-      left: 2.5vw;
-
-      .date-dayname {
-        font-size: 2.4vw;
-        margin: 0;
-      }
-
-      .date-day {
-        display: block;
-      }
-
-      .location {
-        display: inline-block;
-        margin-top: 0.5vw;
-      }
-
-      .location-icon {
-        display: inline-block;
-        height: 0.8em;
-        width: auto;
-        margin-right: 0.5vw;
-      }
-
-    }
-
-    .weather-container {
-      position: absolute;
-      bottom: 2.5vw;
-      left: 2.5vw;
-
-      .weather-icon::before {
-        font-size: 7vw;
-        margin-bottom: 0.5vw;
-      }
-
-      .weather-temp {
-        margin: 0;
-        font-weight: 700;
-        font-size: 7vw;
-      }
-
-      .weather-desc {
-        margin: 0;
-        font-size: 1.5em;
-      }
-
-    }
+/* 允许用户关闭动画/过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    -webkit-animation-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    -webkit-transition-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
-
-
-  .info-side {
-    padding: 0 2.5vw;
-    position: relative;
-    height: 100%;
-    display: flex;
-    flex-flow: column nowrap;
-    justify-content: space-around;
-    flex: 1;
-
-    .today-info-container {
-      .today-info {
-        margin: 0 2.5vw;
-        border-radius: 1vw;
-        display: flex;
-        flex-flow: column nowrap;
-        height: 11vw;
-
-        &>div {
-          display: flex;
-          flex-flow: row nowrap;
-          justify-content: space-between;
-          margin-bottom: 1.5vw;
-
-          .title {
-            font-weight: 700;
-          }
-        }
-      }
-
-
-    }
-
-    .week-container {
-      -webkit-box-shadow: 0 0 5vw -0.5vw rgba(0, 0, 0, 0.25);
-      box-shadow: 0 0 5vw -0.5vw rgba(0, 0, 0, 0.25);
-      border-radius: 1vw;
-      height: 18vw;
-      padding: 1.8vw 0;
-
-      .week-list {
-        list-style-type: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-
-        &>li {
-          padding: 1.5vw;
-          cursor: pointer;
-          -webkit-transition: 200ms ease;
-          -o-transition: 200ms ease;
-          transition: 200ms ease;
-          border-radius: 1vw;
-          height: 100%;
-          width: 9vw;
-          margin: 0 0.5vw;
-          display: flex;
-          text-align: center;
-          flex-flow: column nowrap;
-          justify-content: space-around;
-          font-size: 1.6vw;
-
-          &:hover {
-            -webkit-transform: scale(1.03);
-            -ms-transform: scale(1.03);
-            transform: scale(1.03);
-            background: #fff;
-            color: #222831;
-            -webkit-box-shadow: 0 0 4vw -0.5vw rgba(0, 0, 0, 0.2);
-            box-shadow: 0 0 4vw -0.5vw rgba(0, 0, 0, 0.2)
-          }
-
-          &.active {
-            background: #fff;
-            color: #222831;
-            border-radius: 1vw;
-          }
-
-          & .day-name {
-            display: block;
-            margin: 1vw 0 0 0;
-            text-align: center;
-          }
-
-          & .day-icon {
-            display: block;
-            width: auto;
-            margin: 0 auto;
-            font-size: 3vw;
-          }
-
-          & .day-temp {
-            display: block;
-            text-align: center;
-            margin: 1vw 0 0 0;
-            font-weight: 700;
-          }
-        }
-      }
-
-    }
-  }
-
-
-
-
 }

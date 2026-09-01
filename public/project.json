@@ -1,6 +1,6 @@
 {
 	"contentrating" : "Everyone",
-	"description" : "",
+	"description" : "<h4>🌦️ 极简天气 · 更新日志</h4><br/>📅 更新日期：2026-09-01<br/><br/>✌️ 感谢使用，本次更新内容：<br/><br/>· UI 焕新：玻璃拟态风，左右信息更均衡、更易读<br/>· 生活指数：新增穿衣 / 紫外线 / 运动 / 洗车 / 旅游等卡片<br/>· 预报详情：新增紫外线 / 气压 / 能见度 / 日出日落，点击日期切换<br/>· 预警：手风琴展开 + 拖拽滚动，四级配色 + 自动轮播 + 数量角标<br/>· 一言：每日一句，点击即可换一句<br/>· 优化：超长地名（如新疆）自适应省略，数据缓存与刷新更稳<br/><br/>🎉 天气数据来源：和风天气 QWeather",
 	"file" : "index.html",
 	"general" : 
 	{
@@ -24,7 +24,7 @@
 						"value" : "3"
 					},
 					{
-						"label" : "[实时雨滴效果]",
+						"label" : "[实时渲染雨滴]",
 						"value" : "4"
 					},
 					{
@@ -35,7 +35,7 @@
 				"order" : 101,
 				"text" : "<br/><br/>————————<br/><h4>[🖼️动态背景]<br/><small>- 选一个漂亮的背景</small></h4>————————",
 				"type" : "combo",
-				"value" : "2"
+				"value" : "4"
 			},
 			"backgroundinteraction" : 
 			{
@@ -45,6 +45,45 @@
 				"text" : "<h4>[🤺和小鸟互动]<br/><small>- 勾选上，使用鼠标干扰它们的飞行轨迹</small></h4>—————————————————<br/>",
 				"type" : "bool",
 				"value" : false
+			},
+			"showweathermain":{
+				"condition" : "backgroundindex.value === \"4\"",
+				"index" : 2,
+				"order" : 102,
+				"text" : "<h4>[🌧️沉浸式雨滴背景]<br/><small>- 隐藏天气面板<br/>- 实时渲染雨滴，可自动随天气变化</small></h4>—————————————————<br/>",
+				"type" : "bool",
+				"value" : false
+			},
+			"rainconfig":{
+				"condition" : "backgroundindex.value === \"4\"",
+				"index" : 2,
+				"order" : 103,
+				"text" : "<h4>[🌧️雨滴背景配置]<br/><small>- 雨滴背景配置</small></h4>————————<br/>",
+				"type" : "combo",
+				"value" : "auto",
+				"options" : 
+				[
+					{
+						"label" : "[自动]",
+						"value" : "auto"
+					},
+					{
+						"label" : "[大雨]",
+						"value" : "heavy"
+					},
+					{
+						"label" : "[中雨]",
+						"value" : "moderate"
+					},
+					{
+						"label" : "[小雨]",
+						"value" : "light"
+					},
+					{
+						"label" : "[雨停]",
+						"value" : "none"
+					}
+				]
 			},
 			"schemecolor" : 
 			{
@@ -65,7 +104,7 @@
 			{
 				"index" : 3,
 				"order" : 103,
-				"text" : "<br/><br/>——————————————————<br/><h4>😀ThankYou<br/><small><br/>🎉最近一次的更新:2025-6-8<br/>--加入实时渲染雨滴，可随天气变化<br/><br/>✌️感谢您的使用，使用过程中有什么问题意见，欢迎反馈<br/><br/>壁纸由<a href='https://cn.vuejs.org/'><img width='30px' height='30px' alt='【vue】' src='https://vuejs.org/images/logo.png'/></a>打造<br/>UI灵感来源于<a href='https://www.codepen.com/'><b>【codepen】</b></a><br/>3D动态背景来源<a href='https://www.vantajs.com/'><b>【vantaJS】</b></a><br/>天气服务来源<a href='https://www.qweather.com/'><b>【和风天气】</b></a></small></h4>——————————————————<br/>",
+				"text" : "<br/><br/>——————————————————<br/><h4>😀ThankYou<br/><small><br/>🎉最近一次的更新:2026-9-1<br/>--UI 焕新 / 生活指数 / 详情扩充 / 预警手风琴 / 一言<br/><br/>✌️感谢您的使用，使用过程中有什么问题意见，欢迎反馈<br/><br/>壁纸由<a href='https://cn.vuejs.org/'><img width='30px' height='30px' alt='【vue】' src='https://vuejs.org/images/logo.png'/></a>打造<br/>UI灵感来源于<a href='https://www.codepen.com/'><b>【codepen】</b></a><br/>3D动态背景来源<a href='https://www.vantajs.com/'><b>【vantaJS】</b></a><br/>天气服务来源<a href='https://www.qweather.com/'><b>【和风天气】</b></a></small></h4>——————————————————<br/>",
 				"type" : "text",
 				"value" : "0 0 0"
 			}

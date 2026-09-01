@@ -5,7 +5,10 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
+import Bus from '@/shared/Bus';
+import { getBackgroundConfig } from '@/features/wallpaper/backgroundConfig';
+import { BUS_EVENTS } from '@/features/wallpaper/constants';
 const DynamicParticleCanvas = ref(null)
 
 
@@ -13,11 +16,12 @@ let ctx = null;
 let width = window.innerWidth;
 let height = window.innerHeight;
 
-const dotsNum = 80 // 点的数量
+// 从壁纸专属配置读取（可在开发调试面板中调整）
+let dotsNum = getBackgroundConfig('3').dotsNum // 点的数量
 const radius = 1.5 // 圆的半径，连接线宽度的一半
 const fillStyle = 'rgb(255,255,255)' // 点的颜色
 const lineWidth = 1
-const connection = 150 // 连线最大距离
+let connection = getBackgroundConfig('3').connection // 连线最大距离
 const followLength = 80 // 鼠标跟随距离
 const speedFactor = 0.3 // 速度因子，值越小点移动越慢
 const elasticFactor = 0.6 // 弹射因子，值越大弹射越明显
@@ -33,10 +37,30 @@ onMounted(() => {
     addCanvasSize()
     initDots(dotsNum)
     moveDots()
-    document.onmousemove = mouseMove
-    document.onmouseout = mouseOut
-    document.onclick = mouseClick
-    window.onresize = addCanvasSize
+    document.addEventListener('mousemove', mouseMove)
+    document.addEventListener('mouseout', mouseOut)
+    document.addEventListener('click', mouseClick)
+    window.addEventListener('resize', addCanvasSize)
+    Bus.on(BUS_EVENTS.BACKGROUND_CONFIG_CHANGE, handleConfigChange)
+})
+
+function handleConfigChange(payload) {
+  if (payload.index !== '3') return
+  const cfg = getBackgroundConfig('3')
+  dotsNum = cfg.dotsNum
+  connection = cfg.connection
+  addCanvasSize()
+}
+
+onUnmounted(() => {
+  if (animationFrame) window.cancelAnimationFrame(animationFrame)
+  animationFrame = null
+  Bus.off(BUS_EVENTS.BACKGROUND_CONFIG_CHANGE, handleConfigChange)
+  document.removeEventListener('mousemove', mouseMove)
+  document.removeEventListener('mouseout', mouseOut)
+  document.removeEventListener('click', mouseClick)
+  window.removeEventListener('resize', addCanvasSize)
+  ctx = null
 })
 
 function addCanvasSize() { // 改变画布尺寸
