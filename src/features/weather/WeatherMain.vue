@@ -154,7 +154,7 @@ const WeatherMainIsShow = ref(false)
 const weatherStore = useWeatherStore()
 const SearchLocationDialogRef = ref(null)
 const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
-const { getLocationInformation, ReviseState } = weatherStore
+const { getLocationInformation, getWeatherIndices, ReviseState } = weatherStore
 const activeItem = ref('今天')
 const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item => item.fxDate === activeItem.value))
 
@@ -279,6 +279,8 @@ const indexIcon = (type) => iconSvg(ICONS[INDEX_TYPE_ICON[type] || 'uv'])
 
 const { errCount } = useWeatherRefresh({
   refresh: getLocationInformation,
+  // 生活指数错峰刷新：主周期固定 3 个请求，与多域名池（3 个域名）对齐
+  refreshIndices: getWeatherIndices,
   setState: ReviseState,
   onSuccess: () => {
     activeItem.value = FourDayWeatherData.value[0].fxDate

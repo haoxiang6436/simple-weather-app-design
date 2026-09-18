@@ -6,6 +6,34 @@ import { ref, computed } from 'vue';
 export const useWeatherStore = defineStore('Weather', () => {
   // 展示的生活指数类型 ID（运动/洗车/穿衣/紫外线/旅游/舒适度/感冒）
   const INDICES_TYPES = '1,2,3,5,6,8,9'
+  // 各接口缓存时效（毫秒），可通过 .env 覆盖
+  const CACHE_MS = {
+    // 实时天气
+    realtime: Number(process.env.VUE_APP_WEATHER_UPDATE_REALTIME) || 600000,
+    // 7 日预报（面板只取前 4 天）
+    fourDays: Number(process.env.VUE_APP_WEATHER_UPDATE_FOURDAYS) || 7200000,
+    // 天气预警
+    warning: Number(process.env.VUE_APP_WEATHER_UPDATE_WARNING) || 600000,
+    // 生活指数
+    indices: Number(process.env.VUE_APP_WEATHER_UPDATE_INDICES) || 10800000,
+  }
+  // 缓存是否仍然有效（important = 手动定位，强制刷新，不看缓存）
+  const isFresh = (updatedAt, ttl, important) =>
+    !important && !!updatedAt && Date.now() - updatedAt < ttl
+  // 同一接口 + 同一城市只保留一个在途请求：
+  // “手动选择城市”与每分钟的定时轮询撞车时，同一个接口不会重复发两次
+  const inFlightRequests = new Map()
+  const singleFlight = (key, task) => {
+    const pending = inFlightRequests.get(key)
+    if (pending) return pending
+    const request = task().finally(() => {
+      if (inFlightRequests.get(key) === request) {
+        inFlightRequests.delete(key)
+      }
+    })
+    inFlightRequests.set(key, request)
+    return request
+  }
   // 天气数据加载状态
   const TheWeatherDataIsLoaded = ref(100)
   // 城市日期信息
@@ -102,8 +130,12 @@ export const useWeatherStore = defineStore('Weather', () => {
       getRealTimeWeather(important),
       getWeatherEarlyWarning(important),
     ])
-    // 生活指数独立请求，失败不影主状态
-    getWeatherIndices(important).catch(() => {})
+    // 生活指数：手动定位时随主流程一起刷新（失败不影响主状态）；
+    // 定时轮询不在这里发，改由 useWeatherRefresh 错峰单独触发，
+    // 让每个定时周期的请求数保持为域名数的整数倍。
+    if (important) {
+      await getWeatherIndices(important).catch(() => {})
+    }
     const failed = results.filter((result) => result.status === 'rejected')
     if (failed.length === 0) {
       ReviseState(200)
@@ -116,10 +148,12 @@ export const useWeatherStore = defineStore('Weather', () => {
     throw failed[0].reason
   }
   // 获取天气预警信息
-  const getWeatherEarlyWarning = async (important) => {
+  const getWeatherEarlyWarning = (important) =>
+    singleFlight(`warning:${dayDateCity.value.location}`, () => loadWeatherEarlyWarning(important))
+  const loadWeatherEarlyWarning = async (important) => {
     // 验证数据有效期
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.EarlyWarning
-    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_WARNING && WeatherDataUpdatedAtATime.value.EarlyWarning && !important) {
+    if (isFresh(WeatherDataUpdatedAtATime.value.EarlyWarning, CACHE_MS.warning, important)) {
       console.log(`天气预警未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
@@ -131,24 +165,31 @@ export const useWeatherStore = defineStore('Weather', () => {
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
   }
   // 获取生活指数
-  const getWeatherIndices = async (important) => {
-    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.Indices
-    const interval = Number(process.env.VUE_APP_WEATHER_UPDATE_INDICES) || 3600000
-    if (TimeInterval < interval && WeatherDataUpdatedAtATime.value.Indices && !important) {
+  const getWeatherIndices = (important) =>
+    singleFlight(`indices:${dayDateCity.value.location}`, () => loadWeatherIndices(important))
+  // 生活指数失败后的重试间隔（毫秒）：既避免无权限等固定失败每次轮询都重试，
+  // 也不至于一次网络抖动就让指数停更一整个缓存周期
+  const INDICES_RETRY_MS = 300000
+  const loadWeatherIndices = async (important) => {
+    if (isFresh(WeatherDataUpdatedAtATime.value.Indices, CACHE_MS.indices, important)) {
       return
     }
     try {
       const { daily } = await getWeatherIndicesAPI(dayDateCity.value.location, INDICES_TYPES)
       WeatherIndices.value = (daily || []).slice(0, 6)
-    } finally {
-      // 无论成败都记录时间，避免无权限等固定失败在每次轮询时重复请求
       WeatherDataUpdatedAtATime.value.Indices = Date.now()
+    } catch (error) {
+      // 失败也记录时间（避免固定失败每次都重试），但只延后 INDICES_RETRY_MS
+      WeatherDataUpdatedAtATime.value.Indices = Date.now() - CACHE_MS.indices + INDICES_RETRY_MS
+      throw error
     }
   }
   // 获取4日天气
-  const getFourDayWeatherData = async (important) => {
+  const getFourDayWeatherData = (important) =>
+    singleFlight(`fourDays:${dayDateCity.value.location}`, () => loadFourDayWeatherData(important))
+  const loadFourDayWeatherData = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.FourDayWeather
-    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_FOURDAYS && WeatherDataUpdatedAtATime.value.FourDayWeather && !important) {
+    if (isFresh(WeatherDataUpdatedAtATime.value.FourDayWeather, CACHE_MS.fourDays, important)) {
       console.log(`4日天气未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
@@ -191,15 +232,17 @@ export const useWeatherStore = defineStore('Weather', () => {
     WeatherDataUpdatedAtATime.value.FourDayWeather = Date.now()
   }
   // 获取实时天气
-  const getRealTimeWeather = async (important) => {
+  const getRealTimeWeather = (important) =>
+    singleFlight(`now:${dayDateCity.value.location}`, () => loadRealTimeWeather(important))
+  const loadRealTimeWeather = async (important) => {
     const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.RealTimeWeather
-    if (TimeInterval < process.env.VUE_APP_WEATHER_UPDATE_REALTIME && WeatherDataUpdatedAtATime.value.RealTimeWeather && !important) {
+    if (isFresh(WeatherDataUpdatedAtATime.value.RealTimeWeather, CACHE_MS.realtime, important)) {
       console.log(`实时天气未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
       return
     }
     // 获取实时天气
     ReviseState(100)
-    console.log(`实时天气过期、重新获取`,process.env.VUE_APP_WEATHER_UPDATE_REALTIME);
+    console.log(`实时天气过期、重新获取`, CACHE_MS.realtime);
     const { now } = await getCurrentWeather(dayDateCity.value.location)
     nowWeatherData.value = {
       icon: now.icon,
