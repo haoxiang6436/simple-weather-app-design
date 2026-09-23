@@ -57,30 +57,30 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   z-index: 9999;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(0.625rem);
+  -webkit-backdrop-filter: blur(0.625rem);
 
   .WelcomeModal-Content {
     width: 90%;
-    max-width: 520px;
+    max-width: 32.5rem;
     background: rgba(18, 30, 52, 0.82);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 22px;
-    padding: 32px;
+    border-radius: 1.375rem;
+    padding: 2rem;
     box-sizing: border-box;
     text-align: center;
-    box-shadow: 0 28px 70px -28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
     color: var(--text-primary);
 
     .WelcomeModal-Content-Title {
-      font-size: 20px;
-      margin-bottom: 16px;
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
       font-weight: 600;
       color: var(--text-primary);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 0.5rem;
 
       .icon {
         color: var(--color-primary);
@@ -88,14 +88,21 @@ onMounted(() => {
     }
 
     .WelcomeModal-Content-Text {
-      font-size: 14px;
-      margin-bottom: 12px;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
       color: var(--text-secondary);
       line-height: 1.6;
     }
 
     .button-container {
-      margin-top: 24px;
+      margin-top: 1.5rem;
+
+      /* Arco 按钮内部尺寸是写死的 px，这里按设计基准换算成 rem，跟随全局缩放 */
+      :deep(.arco-btn) {
+        height: 2rem;
+        padding: 0 0.9375rem;
+        font-size: 0.875rem;
+      }
     }
   }
 }
@@ -120,7 +127,7 @@ onMounted(() => {
 
 @keyframes modal-in {
   from {
-    transform: translateY(40px);
+    transform: translateY(2.5rem);
     opacity: 0;
   }
   to {
@@ -135,7 +142,7 @@ onMounted(() => {
     opacity: 1;
   }
   to {
-    transform: translateY(-40px);
+    transform: translateY(-2.5rem);
     opacity: 0;
   }
 }

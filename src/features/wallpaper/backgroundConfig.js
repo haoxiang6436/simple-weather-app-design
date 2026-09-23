@@ -7,7 +7,8 @@
  *
  * 字段划分与 public/project.json 保持一致：
  *   - backgroundinteraction 是“小鸟”独占的壁纸属性（condition: backgroundindex==="1"）
- *   - showweathermain / rainconfig 是“实时雨滴”独占的壁纸属性（condition: backgroundindex==="4"）
+ *   - showweathermain 是“实时雨滴”独占的壁纸属性（condition: backgroundindex==="4"）
+ *   - rainconfig 是“实时雨滴”与“整页雨珠叠加”共用的壁纸属性（condition 见 public/project.json）
  *   - 其余为各背景的运行时效果参数（雨滴大小、粒子数量等）
  * 壁纸属性字段通过 property 标记，渲染时绑定全局壁纸属性状态并走
  * applyWallpaperProperties；运行时参数存储在本地并按背景独立生效。
@@ -62,6 +63,7 @@ export const backgroundConfigSchema = {
         property: WALLPAPER_PROPERTIES.RAIN_CONFIG,
         options: [
           { label: '自动', value: 'auto' },
+          { label: '暴雨', value: 'storm' },
           { label: '大雨', value: 'heavy' },
           { label: '中雨', value: 'moderate' },
           { label: '小雨', value: 'light' },
@@ -71,6 +73,35 @@ export const backgroundConfigSchema = {
       { key: 'dropletSize', label: '雨滴大小', type: 'range', min: 2, max: 80, step: 1, default: [10, 30] },
       { key: 'dropletsPerSeconds', label: '雨滴数量/秒', type: 'slider', min: 0, max: 2000, step: 50, default: 500 },
       { key: 'spawnLimit', label: '雨滴同时上限', type: 'slider', min: 100, max: 2000, step: 100, default: 500 },
+    ],
+  },
+  '5': {
+    label: '整页雨珠',
+    fields: [
+      {
+        key: WALLPAPER_PROPERTIES.RAIN_CONFIG,
+        label: '雨滴配置',
+        type: 'select',
+        property: WALLPAPER_PROPERTIES.RAIN_CONFIG,
+        options: [
+          { label: '自动', value: 'auto' },
+          { label: '暴雨', value: 'storm' },
+          { label: '大雨', value: 'heavy' },
+          { label: '中雨', value: 'moderate' },
+          { label: '小雨', value: 'light' },
+          { label: '雨停', value: 'none' },
+        ],
+      },
+      // 凝结水珠层（就是看着像“水渍”的那一层）：只会越积越多（仅被下落雨滴擦除，
+      // 不会自己变淡）。默认开启成小颗粒低密度（与 RainOverlayConfig.js 的四档预设一致），
+      // 只有在下落雨滴不断擦除时才会稳定；调高后注意它会持续变糊。
+      { key: 'dropletSize', label: '凝结水珠大小', type: 'range', min: 2, max: 40, step: 1, default: [2, 20] },
+      { key: 'dropletsPerSeconds', label: '凝结水珠数量/秒', type: 'slider', min: 0, max: 500, step: 10, default: 150 },
+      // 雨滴上限默认取「中雨」预设的值；只有显式调过才会覆盖各档预设，见 RainOverlayEffect.vue
+      { key: 'spawnLimit', label: '雨滴同时上限', type: 'slider', min: 40, max: 600, step: 20, default: 150 },
+      // 折射源是整页 DOM 的低分辨率快照（html2canvas），这两个参数决定快照成本
+      { key: 'snapshotScale', label: '快照分辨率', type: 'slider', min: 0.1, max: 1, step: 0.05, default: 0.25 },
+      { key: 'snapshotInterval', label: '快照间隔(ms)', type: 'slider', min: 100, max: 1000, step: 50, default: 400 },
     ],
   },
 }

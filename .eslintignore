@@ -1,0 +1,6 @@
+# 构建产物
+dist/
+node_modules/
+
+# iconfont.cn 生成的图标 symbol 注入脚本（压缩过，代码风格不符合 lint 规则）
+src/assets/iconfont.js

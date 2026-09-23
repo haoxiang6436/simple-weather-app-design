@@ -20,7 +20,8 @@
   --glass-bg-soft: rgba(255, 255, 255, 0.07);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-border-strong: rgba(255, 255, 255, 0.26);
-  --glass-blur: 26px;
+  /* 26px @设计基准；4K 以上不再等比放大（上限 40px），避免磨砂区域的 GPU 开销大幅上升 */
+  --glass-blur: min(1.625rem, 40px);
 
   /* ---- 文本 ---- */
   --text-primary: #f4f7fc;
@@ -28,14 +29,95 @@
   --text-muted: rgba(235, 242, 251, 0.52);
 
   /* ---- 圆角 / 阴影 ---- */
-  --radius-lg: 28px;
-  --radius-md: 18px;
-  --radius-sm: 12px;
-  --shadow-card: 0 30px 80px -30px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.28);
-  --shadow-panel: 0 14px 44px -20px rgba(0, 0, 0, 0.55);
+  --radius-lg: 1.75rem; /* 28px */
+  --radius-md: 1.125rem; /* 18px */
+  --radius-sm: 0.75rem; /* 12px */
+  --shadow-card: 0 1.875rem 5rem -1.875rem rgba(0, 0, 0, 0.7), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.28);
+  --shadow-panel: 0 0.875rem 2.75rem -1.25rem rgba(0, 0, 0, 0.55);
 
   /* ---- 动效 ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- 天气面板整体缩放 ----
+     由壁纸属性面板的 panelscale 通过 JS 覆盖（见 src/features/wallpaper/properties.js），
+     1 = 设计原尺寸，这里的默认值需与 constants.js 的 DEFAULT_PANEL_SCALE 一致 */
+  --panel-scale: 0.75;
+}
+
+/* ================= 全局缩放基准（多分辨率 / 系统缩放适配） =================
+   设计稿基准分辨率 1920×1080，基准 1rem = 16px，再乘以 --panel-scale（壁纸属性面板可调）。
+   0.833333vw = 16 / 1920、1.481481vh = 16 / 1080，各自再乘 --panel-scale，
+   取两者中的较小值，好处：
+     1) 界面永远按设计稿比例填满屏幕（不会在 4K 上缩成一小块，也不会在 720p 上溢出）；
+     2) 21:9 / 竖向屏等非 16:9 比例下以较短边为准，内容始终完整可见；
+     3) 系统缩放（125% / 150% / 200%）会改变 CSS 视口尺寸，同样被这套基准自动吸收。
+   最后两个兜底项（1.15vw / 1.99vh）与 --panel-scale 无关，作用是保证「面板已经占满屏幕」时
+   停止放大，而不是把卡片挤扁：
+     1.15vw  ≈ 卡片设计宽度 71.25rem 正好等于卡片自身宽度上限 82vw；
+     1.99vh  ≈ 卡片设计高度 43.06rem 加上上下留白 7rem 正好等于一屏。
+   于是任意缩放倍率下，内部排版都严格按设计稿比例，不会被压扁或裁掉。
+   clamp 的上下限：窗口极小时不小于 6px，超过约 4K 不再继续放大（40px × 缩放倍率）。
+   想改默认大小：改 :root 里的 --panel-scale；想改缩放手感：改下面两个 vw / vh 系数。 */
+html {
+  font-size: clamp(6px,
+      min(calc(0.833333vw * var(--panel-scale)),
+        calc(1.481481vh * var(--panel-scale)),
+        1.15vw,
+        1.99vh),
+      calc(40px * var(--panel-scale)));
+}
+
+/* ---- Arco 组件按设计基准缩放 ----
+   Arco 内部尺寸是写死的 px，不会跟随上面的基准缩放，这里统一换算成 rem。
+   选择位置用的 <Cascader> 在本版本里渲染成 Select 结构，且下拉弹层会被 teleport 到
+   body，所以这些覆盖必须写在全局样式里。数值括号内为设计基准下的原始 px。
+   注：arco.css 在 index.scss 之后引入，同权重会被它盖掉；这里统一加 html 前缀、
+   并按 Arco 自身的组合选择器书写，保证权重一定高于它。 */
+html .arco-select-view-single,
+html .arco-select-view-multiple {
+  padding-right: 0.75rem;
+  padding-left: 0.75rem;
+}
+
+html .arco-select-view-single.arco-select-view-size-large,
+html .arco-select-view-multiple.arco-select-view-size-large {
+  font-size: 0.875rem; /* 14px */
+}
+
+html .arco-select-view-single.arco-select-view-size-large .arco-select-view-input,
+html .arco-select-view-single.arco-select-view-size-large .arco-select-view-value {
+  padding-top: 0.375rem; /* 6px */
+  padding-bottom: 0.375rem;
+  font-size: 0.875rem;
+}
+
+html .arco-select-view-single.arco-select-view-size-large .arco-select-view-value {
+  min-height: 2.125rem; /* 34px */
+}
+
+html .arco-select-view-icon svg {
+  font-size: 0.75rem; /* 12px 箭头 */
+}
+
+html .arco-select-dropdown {
+  padding: 0.25rem 0; /* 4px */
+}
+
+html .arco-select-dropdown-list-wrapper {
+  max-height: 12.5rem; /* 200px */
+}
+
+html .arco-select-dropdown .arco-select-option {
+  height: 2.25rem; /* 36px */
+  padding: 0 0.75rem; /* 12px */
+  font-size: 0.875rem;
+  line-height: 2.25rem;
+}
+
+/* Arco 圆角 token 一并按基准缩放（默认 2px / 4px） */
+html:root {
+  --border-radius-small: 0.125rem;
+  --border-radius-medium: 0.25rem;
 }
 
 /* ---- 预警四级强调色（按当前暗色玻璃风格调校，低饱和、不刺眼） ---- */
@@ -84,7 +166,7 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.5;
   letter-spacing: normal;
   color: var(--text-primary);

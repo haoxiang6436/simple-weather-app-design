@@ -28,6 +28,10 @@
 						"value" : "4"
 					},
 					{
+						"label" : "[整页雨珠叠加]",
+						"value" : "5"
+					},
+					{
 						"label" : "[无]",
 						"value" : "0"
 					}
@@ -35,7 +39,7 @@
 				"order" : 101,
 				"text" : "<br/><br/>————————<br/><h4>[🖼️动态背景]<br/><small>- 选一个漂亮的背景</small></h4>————————",
 				"type" : "combo",
-				"value" : "4"
+				"value" : "5"
 			},
 			"backgroundinteraction" : 
 			{
@@ -55,7 +59,7 @@
 				"value" : false
 			},
 			"rainconfig":{
-				"condition" : "backgroundindex.value === \"4\"",
+				"condition" : "backgroundindex.value === \"4\" || backgroundindex.value === \"5\"",
 				"index" : 2,
 				"order" : 103,
 				"text" : "<h4>[🌧️雨滴背景配置]<br/><small>- 雨滴背景配置</small></h4>————————<br/>",
@@ -66,6 +70,10 @@
 					{
 						"label" : "[自动]",
 						"value" : "auto"
+					},
+					{
+						"label" : "[暴雨]",
+						"value" : "storm"
 					},
 					{
 						"label" : "[大雨]",
@@ -85,6 +93,15 @@
 					}
 				]
 			},
+			"text3" : 
+			{
+				"condition" : "backgroundindex.value === \"5\"",
+				"index" : 2,
+				"order" : 102,
+				"text" : "<h4>[💧整页雨珠叠加]<br/><small>- 雨珠层盖在整页之上，折射页面里的真实内容（含天气面板）<br/>- 面板照常可点，雨量随下面的配置变化</small></h4>—————————————————<br/>",
+				"type" : "text",
+				"value" : "0 0 0"
+			},
 			"schemecolor" : 
 			{
 				"order" : 1,
@@ -99,6 +116,19 @@
 				"text" : "——————————————————<br/><h4 align='center'>😥Notice<br/><small>If you are not in Chinese Mainland, the wallpaper will not work properly. Thank you for your understanding</small></h4>——————————————————<br/>",
 				"type" : "text",
 				"value" : "0 0 0"
+			},
+			"panelscale" :
+			{
+				"fraction" : true,
+				"index" : 4,
+				"max" : 1.5,
+				"min" : 0.5,
+				"order" : 100,
+				"precision" : 2,
+				"step" : 0.05,
+				"text" : "<h4>[🔍天气面板缩放]<br/><small>- 拖动调整天气面板整体大小<br/>- 100% 为设计原尺寸，默认 75%</small></h4>—————————————————<br/>",
+				"type" : "slider",
+				"value" : 0.75
 			},
 			"text2" : 
 			{

@@ -321,6 +321,9 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 </script>
 
 <style lang="scss" scoped>
+/* 尺寸全部用 rem：1rem = 设计稿(1920×1080)的 16px，
+   html 的 font-size 会随视口等比缩放（见 src/style/index.scss），
+   因此卡片在任意分辨率 / 系统缩放下都保持同一观感。1px 描边保留 px。 */
 .weather {
   position: fixed;
   inset: 0;
@@ -328,14 +331,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(16px, 4vw, 56px);
+  padding: 3.5rem;
 }
 
 .weather-card {
-  width: min(82vw, 1140px);
+  width: min(82vw, 71.25rem);
   max-height: 92vh;
   display: grid;
-  grid-template-columns: minmax(250px, 0.88fr) 1.6fr;
+  grid-template-columns: minmax(15.625rem, 0.88fr) 1.6fr;
   border-radius: var(--radius-lg);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
@@ -347,8 +350,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .weather-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 36px 90px -32px rgba(0, 0, 0, 0.75), 0 2px 8px rgba(0, 0, 0, 0.28);
+  transform: translateY(-0.1875rem);
+  box-shadow: 0 2.25rem 5.625rem -2rem rgba(0, 0, 0, 0.75), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.28);
 }
 
 /* ================= 左侧：当前天气 ================= */
@@ -357,8 +360,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: clamp(10px, 1.3vw, 18px);
-  padding: clamp(22px, 2.4vw, 34px);
+  gap: 1.125rem;
+  padding: 2.125rem;
   background: linear-gradient(155deg, rgba(14, 165, 233, 0.34), rgba(56, 189, 248, 0.10) 55%, transparent);
   overflow: hidden;
 }
@@ -377,20 +380,20 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .location {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   min-width: 0;
   flex: 0 1 auto;
-  min-height: 38px;
+  min-height: 2.375rem;
   max-width: 100%;
-  padding: 7px 13px;
+  padding: 0.4375rem 0.8125rem;
   color: var(--text-primary);
-  font-size: clamp(0.9rem, 1.1vw, 1.05rem);
+  font-size: 1.05rem;
   font-weight: 600;
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
@@ -403,8 +406,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .location-icon {
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   flex: none;
   color: var(--color-primary);
 }
@@ -423,7 +426,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .date-dayname {
   margin: 0;
-  font-size: clamp(1.3rem, 1.9vw, 1.8rem);
+  font-size: 1.8rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
@@ -432,8 +435,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .date-day {
   display: block;
-  margin-top: 5px;
-  font-size: clamp(0.85rem, 1.05vw, 0.95rem);
+  margin-top: 0.3125rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
 }
 
@@ -442,11 +445,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: clamp(8px, 1.2vw, 14px);
+  gap: 0.875rem;
 }
 
 .weather-icon {
-  font-size: clamp(2.2rem, 6vw, 4.4rem);
+  font-size: 4.4rem;
   line-height: 1;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -462,23 +465,23 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .now-temp-num {
-  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-size: 5rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 
 .now-temp-unit {
-  font-size: clamp(1rem, 1.5vw, 1.35rem);
+  font-size: 1.35rem;
   font-weight: 600;
-  margin-left: 4px;
+  margin-left: 0.25rem;
   color: var(--text-secondary);
 }
 
 .now-desc {
   position: relative;
   z-index: 1;
-  font-size: clamp(1rem, 1.4vw, 1.3rem);
+  font-size: 1.3rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -488,14 +491,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: clamp(0.78rem, 0.95vw, 0.88rem);
+  gap: 0.5rem;
+  font-size: 0.88rem;
   color: var(--text-muted);
 }
 
 .now-sub-sep {
-  width: 4px;
-  height: 4px;
+  width: 0.25rem;
+  height: 0.25rem;
   border-radius: 50%;
   background: var(--text-muted);
 }
@@ -505,12 +508,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 0.5625rem;
   width: fit-content;
-  min-height: 38px;
-  padding: 8px 14px;
+  min-height: 2.375rem;
+  padding: 0.5rem 0.875rem;
   color: #fff;
-  font-size: clamp(0.82rem, 1vw, 0.95rem);
+  font-size: 0.95rem;
   font-weight: 600;
   background: var(--sev-bg);
   border: 1px solid var(--sev-border);
@@ -533,7 +536,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .early-chip-main {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 0.5625rem;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -561,12 +564,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .chip-fade-enter-from {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(0.75rem);
 }
 
 .chip-fade-leave-to {
   opacity: 0;
-  transform: translateY(-12px);
+  transform: translateY(-0.75rem);
 }
 
 /* ================= 右侧：详情 + 指数 + 预报 ================= */
@@ -574,8 +577,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: clamp(16px, 1.8vw, 26px);
-  padding: clamp(24px, 2.6vw, 40px);
+  gap: 1.625rem;
+  padding: 2.5rem;
   background: rgba(255, 255, 255, 0.045);
 }
 
@@ -583,7 +586,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .details-info {
@@ -595,9 +598,9 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   align-items: center;
   min-height: 1.55em; /* 固定一行占位，请求期间也占住高度，避免下面卡片跳动 */
-  margin: 8px 0 0;
-  padding-left: 10px;
-  border-left: 3px solid rgba(56, 189, 248, 0.48);
+  margin: 0.5rem 0 0;
+  padding-left: 0.625rem;
+  border-left: 0.1875rem solid rgba(56, 189, 248, 0.48);
   overflow: hidden;
   cursor: pointer;
 
@@ -608,7 +611,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .quote-text {
   max-width: 100%;
-  font-size: clamp(0.85rem, 1.05vw, 0.95rem);
+  font-size: 0.95rem;
   font-style: italic;
   line-height: 1.5;
   color: var(--text-muted);
@@ -623,9 +626,9 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .quote-skeleton {
   display: block;
-  width: clamp(80px, 45%, 220px);
+  width: clamp(5rem, 45%, 13.75rem);
   height: 0.95em;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
   background-size: 200% 100%;
   animation: quote-sheen 1.2s ease infinite;
@@ -642,7 +645,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .details-day {
   display: block;
-  font-size: clamp(1.3rem, 1.9vw, 1.9rem);
+  font-size: 1.9rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -651,12 +654,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .details-temp {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 0.375rem;
   white-space: nowrap;
 }
 
 .temp-num {
-  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-size: 2rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -664,21 +667,21 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .temp-sep {
-  font-size: clamp(1rem, 1.4vw, 1.3rem);
+  font-size: 1.3rem;
   color: var(--text-muted);
 }
 
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(10px, 1.2vw, 16px);
+  gap: 1rem;
 }
 
 .stat {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: clamp(12px, 1.3vw, 16px);
+  gap: 0.375rem;
+  padding: 1rem;
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -686,24 +689,24 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .stat:hover {
-  transform: translateY(-2px);
+  transform: translateY(-0.125rem);
   border-color: var(--glass-border-strong);
 }
 
 .stat-icon {
   display: block;
-  width: clamp(1.25rem, 1.6vw, 1.55rem);
-  height: clamp(1.25rem, 1.6vw, 1.55rem);
+  width: 1.55rem;
+  height: 1.55rem;
   color: var(--text-muted);
 }
 
 .stat-label {
-  font-size: clamp(0.76rem, 0.88vw, 0.84rem);
+  font-size: 0.84rem;
   color: var(--text-muted);
 }
 
 .stat-value {
-  font-size: clamp(1.35rem, 2.2vw, 1.9rem);
+  font-size: 1.9rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
@@ -719,8 +722,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .sun-row {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: clamp(0.8rem, 0.95vw, 0.9rem);
+  gap: 0.625rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
 }
 
@@ -730,8 +733,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .sun-sep {
-  width: 4px;
-  height: 4px;
+  width: 0.25rem;
+  height: 0.25rem;
   border-radius: 50%;
   background: var(--text-muted);
 }
@@ -740,27 +743,27 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .indices {
   position: relative;
   z-index: 1;
-  margin-top: clamp(6px, 0.8vw, 10px);
+  margin-top: 0.625rem;
 }
 
 .indices-title {
-  margin-bottom: 8px;
-  font-size: clamp(0.8rem, 0.95vw, 0.9rem);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-muted);
 }
 
 .indices-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-  gap: clamp(8px, 1vw, 12px);
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+  gap: 0.75rem;
 }
 
 .index-tile {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: clamp(10px, 1.1vw, 14px) 12px;
+  gap: 0.375rem;
+  padding: 0.875rem 0.75rem;
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
@@ -768,24 +771,24 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .index-tile:hover {
-  transform: translateY(-2px);
+  transform: translateY(-0.125rem);
   border-color: var(--glass-border-strong);
 }
 
 .index-icon {
   display: block;
-  width: clamp(1.15rem, 1.4vw, 1.4rem);
-  height: clamp(1.15rem, 1.4vw, 1.4rem);
+  width: 1.4rem;
+  height: 1.4rem;
   color: var(--text-secondary);
 }
 
 .index-name {
-  font-size: clamp(0.72rem, 0.85vw, 0.8rem);
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
 .index-cat {
-  font-size: clamp(0.82rem, 1vw, 0.95rem);
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -801,15 +804,15 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .forecast-list {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: clamp(10px, 1.2vw, 16px);
+  gap: 1rem;
 }
 
 .forecast-list li {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: clamp(12px, 1.4vw, 18px) 8px;
+  gap: 0.625rem;
+  padding: 1.125rem 0.5rem;
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
@@ -820,7 +823,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .forecast-list li:hover {
   background: var(--glass-bg-soft);
-  transform: translateY(-2px);
+  transform: translateY(-0.125rem);
 }
 
 .forecast-list li.active {
@@ -831,12 +834,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .forecast-day {
-  font-size: clamp(0.8rem, 0.95vw, 0.92rem);
+  font-size: 0.92rem;
   font-weight: 600;
 }
 
 .forecast-list li i {
-  font-size: clamp(1.5rem, 2.6vw, 2.4rem);
+  font-size: 2.4rem;
   line-height: 1;
 }
 
@@ -845,7 +848,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .forecast-temp {
-  font-size: clamp(0.8rem, 1vw, 0.94rem);
+  font-size: 0.94rem;
   color: var(--text-muted);
 }
 
@@ -863,7 +866,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   }
 
   .hero {
-    gap: 16px;
+    gap: 1rem;
   }
 }
 </style>

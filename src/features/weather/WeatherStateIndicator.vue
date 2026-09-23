@@ -154,7 +154,7 @@ const updatedText = computed(() =>
 .state p {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.3125rem;
   margin: 0;
   padding: 0;
   font-size: inherit;
@@ -164,8 +164,8 @@ const updatedText = computed(() =>
 }
 
 .state .state-icon {
-  width: 13px;
-  height: 13px;
+  width: 0.8125rem;
+  height: 0.8125rem;
   object-fit: contain;
 }
 

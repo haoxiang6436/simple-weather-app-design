@@ -10,6 +10,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useStorage } from '@vueuse/core';
 import RaindropFX from './RainEffectCore.js';
 import { rainPresets } from './RainConfig.js';
+import { resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
 import { useWeatherStore } from '@/store';
 import Bus from '@/shared/Bus';
 import { getBackgroundConfig } from '@/features/wallpaper/backgroundConfig';
@@ -43,39 +44,26 @@ const applyRainConfig = (config) => {
     raindropFx.options[key] = merged[key];
   });
 }
-const autoApplyRainConfig = (str) => {
+const autoApplyRainConfig = (weather) => {
   if (!raindropFx) {
     console.warn('RaindropFX 未加载完成，无法应用配置');
     timer && clearTimeout(timer);
     timer = setTimeout(() => {
-      autoApplyRainConfig(str);
+      autoApplyRainConfig(weather);
     }, 500);
     return
   }
-  let state = 'moderate'; // 默认中雨
-  if (!/雨/.test(str)) {
-    state = 'none';
-  }
-  else {
-    if (/大/.test(str) || /暴/.test(str)) {
-      state = 'heavy'
-    }
-    if (/中/.test(str) || /阵/.test(str) || /冻/.test(str) || /降/.test(str)) {
-      state = 'moderate'
-    }
-    if (/小/.test(str) || /细/.test(str) || /毛/.test(str)) {
-      state = 'light'
-    }
-  }
+  // 实时天气 → 雨量档位（icon 代码优先，其次天气文本），见 rainIntensity.js
+  const state = resolveRainIntensity(weather);
   console.log('自动应用配置:', state);
-  applyRainConfig(rainPresets[state]);
+  applyRainConfig(rainPresets[state] || rainPresets.moderate);
 }
 const handleRainConfigChange = (str) => {
   WallpaperUserConfigRainConfig.value = str;
   if (!raindropFx) return;
   if (str === 'auto') {
-    // 自动模式：根据当前实时天气文本匹配雨量强度
-    autoApplyRainConfig(WeatherStore.nowWeatherData.text);
+    // 自动模式：根据当前实时天气匹配雨量强度
+    autoApplyRainConfig(WeatherStore.nowWeatherData);
   }
   else {
     applyRainConfig(rainPresets[str]);
@@ -85,7 +73,7 @@ const handleBackgroundConfigChange = (payload) => {
   if (payload.index !== '4' || !raindropFx) return;
   const cur = WallpaperUserConfigRainConfig.value;
   if (cur === 'auto') {
-    autoApplyRainConfig(WeatherStore.nowWeatherData.text);
+    autoApplyRainConfig(WeatherStore.nowWeatherData);
   }
   else {
     applyRainConfig(rainPresets[cur]);
@@ -94,10 +82,10 @@ const handleBackgroundConfigChange = (payload) => {
 onMounted(async () => {
   await startRain();
   stopWeatherWatch = watch(
-    () => WeatherStore.nowWeatherData.text,
-    (newVal) => {
+    () => `${WeatherStore.nowWeatherData.icon}|${WeatherStore.nowWeatherData.text}`,
+    () => {
       if (WallpaperUserConfigRainConfig.value === 'auto') {
-        autoApplyRainConfig(newVal);
+        autoApplyRainConfig(WeatherStore.nowWeatherData);
       }
       else {
         applyRainConfig(rainPresets[WallpaperUserConfigRainConfig.value]);

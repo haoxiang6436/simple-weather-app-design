@@ -7,7 +7,7 @@
           <p class="tip" v-html="TipText">
           </p>
           <Cascader :options="CityList" value-key="label" v-model="SelectCityData" expand-trigger="hover"
-            :style="{ width: '320px' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
+            :style="{ width: '20rem' }" placeholder="选择一个地点以获取天气信息" size="large" @change="handleChange" />
         </div>
       </div>
     </Transition>
@@ -93,7 +93,7 @@ defineExpose({
   display: flex;
   justify-content: center;
   align-items: center;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(0.625rem);
 
   .DialogContainer {
     width: fit-content;
@@ -101,35 +101,35 @@ defineExpose({
     height: fit-content;
     background: rgba(18, 30, 52, 0.9);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 22px;
-    padding: 32px;
+    border-radius: 1.375rem;
+    padding: 2rem;
     box-sizing: border-box;
     color: var(--text-primary);
-    box-shadow: 0 28px 70px -28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
     h2 {
       color: var(--text-primary);
-      margin: 0 0 10px;
+      margin: 0 0 0.625rem;
     }
 
     .tip {
-      margin: 0 0 18px;
+      margin: 0 0 1.125rem;
       color: var(--text-secondary);
       font-weight: 500;
-      font-size: 13px;
+      font-size: 0.8125rem;
       line-height: 1.6;
     }
 
     .SearchResults {
-      margin: 15px 0;
+      margin: 0.9375rem 0;
 
       .SearchResItem {
         display: inline-block;
         font-size: .6em;
         background-color: rgb(220, 220, 220);
-        padding: 5px 10px;
-        margin: 5px;
-        border-radius: 5px;
+        padding: 0.3125rem 0.625rem;
+        margin: 0.3125rem;
+        border-radius: 0.3125rem;
         cursor: pointer;
 
         // transition: all 0.2s ease-in-out;
@@ -146,7 +146,7 @@ defineExpose({
 .SearchLocationDialog {
   .DialogContainer {
     h2 {
-      font-size: 30px;
+      font-size: 1.875rem;
       line-height: 1em;
     }
 
@@ -180,7 +180,7 @@ defineExpose({
 
 @keyframes modal-in {
   from {
-    transform: translateY(40px);
+    transform: translateY(2.5rem);
     opacity: 0;
   }
 
@@ -197,7 +197,7 @@ defineExpose({
   }
 
   to {
-    transform: translateY(-40px);
+    transform: translateY(-2.5rem);
     opacity: 0;
   }
 }

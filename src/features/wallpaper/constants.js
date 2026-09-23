@@ -11,7 +11,23 @@ export const WALLPAPER_PROPERTIES = {
   BACKGROUND_INTERACTION: 'backgroundinteraction',
   SHOW_WEATHER_MAIN: 'showweathermain',
   RAIN_CONFIG: 'rainconfig',
+  PANEL_SCALE: 'panelscale',
 }
+
+// backgroundindex 的合法取值（与 public/project.json 的 options 一一对应）
+// 0 无 / 1 小鸟 / 2 星空 / 3 动态粒子 / 4 实时雨滴 / 5 整页雨珠叠加
+export const BACKGROUND_INDEX_OPTIONS = ['0', '1', '2', '3', '4', '5']
+// 默认背景：整页雨珠叠加
+export const DEFAULT_BACKGROUND_INDEX = '5'
+
+// rainconfig 的合法取值（与 public/project.json 的 options 一一对应）
+export const RAIN_CONFIG_OPTIONS = ['auto', 'storm', 'heavy', 'moderate', 'light', 'none']
+
+// panelscale：天气面板整体缩放（1 = 设计原尺寸）
+// 与 public/project.json 里的 min / max / value 保持一致，改一处要同步另一处
+export const PANEL_SCALE_MIN = 0.5
+export const PANEL_SCALE_MAX = 1.5
+export const DEFAULT_PANEL_SCALE = 0.75
 
 // Bus 事件名
 export const BUS_EVENTS = {

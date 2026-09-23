@@ -135,10 +135,10 @@ const DateFormat = (date) => {
   justify-content: center;
   /* 顶部固定：面板从固定 top 位置向下生长，头部不随高度变化上下晃 */
   align-items: flex-start;
-  padding-top: clamp(48px, 12vh, 110px);
+  padding-top: 6.875rem; /* 110px @设计基准 */
   background-color: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(1.125rem);
+  -webkit-backdrop-filter: blur(1.125rem);
   z-index: 60;
 }
 
@@ -149,26 +149,26 @@ const DateFormat = (date) => {
 }
 
 .EarlyWarningDialog.Dialog-enter-from .EarlyPanel {
-  transform: translateY(28px) scale(0.96);
+  transform: translateY(1.75rem) scale(0.96);
   opacity: 0;
 }
 
 .EarlyWarningDialog.Dialog-leave-to .EarlyPanel {
-  transform: translateY(20px) scale(0.97);
+  transform: translateY(1.25rem) scale(0.97);
   opacity: 0;
 }
 
 /* 面板：不写死高度，只给最大高度；内容少则自动变矮，多则封顶交给 BetterScroll 滚动 */
 .EarlyPanel {
-  width: min(62vw, 820px);
-  max-height: min(78vh, 800px);
+  width: min(62vw, 51.25rem);
+  max-height: min(78vh, 50rem);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: rgba(18, 30, 52, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 22px;
-  box-shadow: 0 28px 70px -28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-radius: 1.375rem;
+  box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .EarlyHeader {
@@ -176,15 +176,15 @@ const DateFormat = (date) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px 12px 24px;
+  padding: 1.125rem 1.25rem 0.75rem 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .EarlyHeaderTitle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: clamp(1.1rem, 1.6vw, 1.4rem);
+  gap: 0.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -196,7 +196,7 @@ const DateFormat = (date) => {
   color: var(--text-secondary);
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 2px 8px;
+  padding: 0.125rem 0.5rem;
   border-radius: 999px;
 }
 
@@ -204,8 +204,8 @@ const DateFormat = (date) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 2.25rem;
+  height: 2.25rem;
   color: var(--text-secondary);
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
@@ -225,16 +225,16 @@ const DateFormat = (date) => {
 }
 
 .EarlyContent {
-  padding: 14px 16px 18px;
+  padding: 0.875rem 1rem 1.125rem;
 }
 
 /* ===== 手风琴 ===== */
 .warning-item {
-  margin: 10px 0;
+  margin: 0.625rem 0;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--glass-border);
-  border-left: 4px solid var(--sev);
-  border-radius: 16px;
+  border-left: 0.25rem solid var(--sev);
+  border-radius: 1rem;
   overflow: hidden;
   transition: background 0.2s ease, border-color 0.2s ease, border-left-color 0.2s ease;
 
@@ -248,14 +248,14 @@ const DateFormat = (date) => {
 .warning-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
   width: 100%;
-  padding: 15px 20px;
+  padding: 0.9375rem 1.25rem;
   text-align: left;
   color: var(--text-primary);
   background: transparent;
   border: none;
-  font-size: clamp(0.95rem, 1.05vw, 1.05rem);
+  font-size: 1.05rem;
 
   &:hover {
     background: rgba(255, 255, 255, 0.04);
@@ -264,8 +264,8 @@ const DateFormat = (date) => {
 
 .warning-dot {
   flex: none;
-  width: 10px;
-  height: 10px;
+  width: 0.625rem;
+  height: 0.625rem;
   border-radius: 50%;
   background-color: var(--sev);
 }
@@ -286,7 +286,7 @@ const DateFormat = (date) => {
   color: var(--sev-text);
   background: var(--sev-bg);
   border: 1px solid var(--sev-border);
-  padding: 2px 10px;
+  padding: 0.125rem 0.625rem;
   border-radius: 999px;
 }
 
@@ -313,12 +313,12 @@ const DateFormat = (date) => {
 .warning-body-inner {
   min-height: 0;
   overflow: hidden;
-  padding: 0 20px;
+  padding: 0 1.25rem;
   text-align: left;
 }
 
 .warning-item.open .warning-body-inner {
-  padding-bottom: 16px;
+  padding-bottom: 1rem;
 }
 
 .warning-text {
@@ -328,7 +328,7 @@ const DateFormat = (date) => {
 }
 
 .warning-info {
-  margin-top: 12px;
+  margin-top: 0.75rem;
   font-size: 0.8rem;
   color: var(--text-muted);
   text-align: right;

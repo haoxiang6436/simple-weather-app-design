@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build": "vue-cli-service build && node scripts/deploy-wallpaper-engine.js",
+    "build:dist": "vue-cli-service build",
+    "deploy:we": "node scripts/deploy-wallpaper-engine.js",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {

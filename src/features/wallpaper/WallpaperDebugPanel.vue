@@ -12,6 +12,21 @@
 
       <div v-show="!collapsed" class="panel-body">
         <Space direction="vertical" fill :size="10">
+          <!-- 天气面板整体缩放（全局属性，对应 project.json 的 panelscale） -->
+          <div class="config-row">
+            <div class="config-label">
+              <span>面板缩放</span>
+              <span class="config-value">{{ Math.round(state.panelscale * 100) }}%</span>
+            </div>
+            <Slider
+              v-model="state.panelscale"
+              :min="PANEL_SCALE_MIN"
+              :max="PANEL_SCALE_MAX"
+              :step="0.05"
+              @change="applyAll"
+            />
+          </div>
+
           <!-- 背景切换（全局属性，对应 project.json 的 backgroundindex） -->
           <div class="row">
             <span class="label">背景</span>
@@ -21,6 +36,7 @@
               <Option value="2">星空</Option>
               <Option value="3">动态粒子</Option>
               <Option value="4">实时渲染雨滴</Option>
+              <Option value="5">整页雨珠叠加</Option>
             </Select>
           </div>
 
@@ -102,7 +118,14 @@ import {
   Switch,
 } from '@arco-design/web-vue'
 import Bus from '@/shared/Bus'
-import { BUS_EVENTS, STORAGE_KEYS, WALLPAPER_PROPERTIES } from './constants'
+import {
+  BUS_EVENTS,
+  DEFAULT_PANEL_SCALE,
+  PANEL_SCALE_MAX,
+  PANEL_SCALE_MIN,
+  STORAGE_KEYS,
+  WALLPAPER_PROPERTIES,
+} from './constants'
 import {
   BackgroundIndex,
   BirdInteraction,
@@ -126,6 +149,7 @@ const state = useStorage(
     backgroundinteraction: BirdInteraction.value,
     showweathermain: false,
     rainconfig: rainConfigStorage.value,
+    panelscale: DEFAULT_PANEL_SCALE,
   },
   localStorage
 )
@@ -134,6 +158,10 @@ const state = useStorage(
 if (state.value.backgroundindex !== undefined) {
   state.value.backgroundindex = String(state.value.backgroundindex)
 }
+// 兼容旧数据：早期版本没有面板缩放字段
+if (state.value.panelscale === undefined) {
+  state.value.panelscale = DEFAULT_PANEL_SCALE
+}
 
 // 转换为 Wallpaper Engine applyUserProperties 的入参结构
 const toWallpaperProperties = (p) => ({
@@ -141,6 +169,7 @@ const toWallpaperProperties = (p) => ({
   [WALLPAPER_PROPERTIES.BACKGROUND_INDEX]: { value: String(p.backgroundindex) },
   [WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN]: { value: p.showweathermain },
   [WALLPAPER_PROPERTIES.RAIN_CONFIG]: { value: p.rainconfig },
+  [WALLPAPER_PROPERTIES.PANEL_SCALE]: { value: p.panelscale },
 })
 
 const applyAll = () => {
