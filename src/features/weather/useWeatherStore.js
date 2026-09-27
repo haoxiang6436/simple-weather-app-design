@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
-import { get7DayForecast, getCurrentWeather, getWeatherWarnings, getWeatherIndices as getWeatherIndicesAPI } from '@/api/weather';
+import { get7DayForecast, getCurrentWeather, getWeatherWarnings, getWeatherIndices as getWeatherIndicesAPI, lookupCity } from '@/api/weather';
 import { isNetworkError } from '@/api/errors';
+import Bus from '@/shared/Bus';
+import { BUS_EVENTS } from '@/features/wallpaper/constants';
+import { UserApiFingerprint } from '@/api/credentials';
 import { ref, computed } from 'vue';
 
 export const useWeatherStore = defineStore('Weather', () => {
@@ -17,8 +20,11 @@ export const useWeatherStore = defineStore('Weather', () => {
     // 生活指数
     indices: Number(process.env.VUE_APP_WEATHER_UPDATE_INDICES) || 10800000,
   }
+  // 当前缓存对应的凭据指纹：用户换了域名/密钥后，旧缓存整体失效，避免继续展示别人的额度拉到的数据
+  const WeatherCacheFingerprint = ref(UserApiFingerprint.value)
   // 缓存是否仍然有效（important = 手动定位，强制刷新，不看缓存）
   const isFresh = (updatedAt, ttl, important) =>
+    WeatherCacheFingerprint.value === UserApiFingerprint.value &&
     !important && !!updatedAt && Date.now() - updatedAt < ttl
   // 同一接口 + 同一城市只保留一个在途请求：
   // “手动选择城市”与每分钟的定时轮询撞车时，同一个接口不会重复发两次
@@ -112,7 +118,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 获取位置信息
   const getLocationInformation = async (option) => {
     WeatherDataUpdatedAtATime.value.nowDate = Date.now()
-    const important = !!option?.isSearch
+    // important = 手动定位或（引导完成后）强制刷新，跳过缓存
+    const important = !!(option?.isSearch || option?.force)
     if (option?.isSearch) {
       console.log('手动定位更新');
       const { city } = option
@@ -137,15 +144,41 @@ export const useWeatherStore = defineStore('Weather', () => {
       await getWeatherIndices(important).catch(() => {})
     }
     const failed = results.filter((result) => result.status === 'rejected')
+    // 采纳当前凭据指纹：下一次请求按正常缓存时效走
+    WeatherCacheFingerprint.value = UserApiFingerprint.value
     if (failed.length === 0) {
       ReviseState(200)
       return
     }
     // 部分失败：网络错误 → 400，其它错误 → 300
     const hasNetworkError = failed.some((result) => isNetworkError(result.reason))
+    // 用户填写的域名/密钥失效（401/402/403）→ 通知引导页重新打开
+    const credentialError = failed
+      .map((result) => result.reason)
+      .find((error) => !isNetworkError(error) && ['401', '402', '403'].includes(String(error?.code)))
+    if (credentialError) {
+      Bus.emit(BUS_EVENTS.USER_API_INVALID, {
+        code: credentialError.code,
+        message: credentialError.message,
+      })
+    }
     console.error('部分天气请求失败：', failed.map((result) => result.reason))
     ReviseState(hasNetworkError ? 400 : 300)
     throw failed[0].reason
+  }
+  /**
+   * 选择位置：用静态数据里的 adcode 换取和风天气的位置对象，再拉取天气
+   * （地址选择页只传 adcode，避免把中文地名直接拼进请求）
+   * @param {string} adcode
+   */
+  const chooseLocation = async (adcode) => {
+    const res = await lookupCity(adcode)
+    const city = res?.location?.[0]
+    if (!city) {
+      throw new Error('没有找到该地区的天气数据，换一个城市试试')
+    }
+    await getLocationInformation({ city, isSearch: true })
+    return city
   }
   // 获取天气预警信息
   const getWeatherEarlyWarning = (important) =>
@@ -292,6 +325,7 @@ export const useWeatherStore = defineStore('Weather', () => {
   return {
     // 获取位置/天气
     getLocationInformation,
+    chooseLocation,
     getFourDayWeatherData,
     getRealTimeWeather,
     getWeatherEarlyWarning,
@@ -305,6 +339,8 @@ export const useWeatherStore = defineStore('Weather', () => {
     // 实时天气
     nowWeatherData,
     WeatherDataUpdatedAtATime,
+    // 当前缓存对应的凭据指纹（持久化：重载后凭据没变就可以继续用缓存）
+    WeatherCacheFingerprint,
     WeatherDataUpdatedAtATimeComputed,
     TheWeatherDataIsLoaded,
     WeatherEarlyWarning,

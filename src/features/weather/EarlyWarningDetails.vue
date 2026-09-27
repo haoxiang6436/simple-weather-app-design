@@ -39,14 +39,13 @@
 </template>
 
 <script setup>
-import BetterScroll from '@better-scroll/core';
-import MouseWheel from '@better-scroll/mouse-wheel';
+import BetterScroll, { useMouseWheelPlugin } from './betterScroll';
 import { nextTick, onMounted, onUnmounted, watch, ref } from 'vue';
 import { useWeatherStore } from '@/store/index';
 import { storeToRefs } from 'pinia';
 const weatherStore = useWeatherStore()
 const { EarlyWarningDetailsDialog, WeatherEarlyWarning } = storeToRefs(weatherStore)
-BetterScroll.use(MouseWheel)
+useMouseWheelPlugin()
 
 // 手风琴：一次只展开一条，默认展开第一条
 const expandedId = ref(null)

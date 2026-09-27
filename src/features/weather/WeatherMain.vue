@@ -1,6 +1,11 @@
 <template>
-  <div class="weather">
-    <section v-if="!WeatherMainIsShow" class="weather-card">
+  <div class="weather weather-layer">
+    <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
+    <OnboardingPanel v-if="panelView === 'onboarding'" />
+    <!-- 地址选择页：日常换城市走这里（与天气卡同尺寸、同层级） -->
+    <LocationPicker v-else-if="panelView === 'location'" dismissable @close="LocationPickerOpen = false"
+      @selected="LocationPickerOpen = false" />
+    <section v-else-if="!WeatherMainIsShow" class="weather-card weather-panel">
       <!-- 左侧：当前天气（紧凑） -->
       <header class="hero">
         <div class="hero-top">
@@ -13,8 +18,17 @@
             </svg>
             <span class="location-name">{{ dayDateCity.city }}</span>
           </button>
-          <WeatherStateIndicator :state="TheWeatherDataIsLoaded"
-            :updated-minutes-ago="Number(WeatherDataUpdatedAtATimeComputed)" :err-count="errCount" />
+          <div class="hero-top-right">
+            <WeatherStateIndicator :state="TheWeatherDataIsLoaded"
+              :updated-minutes-ago="Number(WeatherDataUpdatedAtATimeComputed)" :err-count="errCount" />
+            <button class="api-entry" type="button" title="域名与密钥设置" @click="openOnboarding()">
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M14.5 9.5a3.5 3.5 0 1 0-3.2 3.49l-1.3 1.3v1.9H8.1v1.9H6.2v-1.9l4.9-4.9a3.5 3.5 0 0 1 3.4-1.79z" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="hero-date">
@@ -133,8 +147,6 @@
       </main>
     </section>
 
-    <SelectLocationDialog ref="SearchLocationDialogRef"></SelectLocationDialog>
-    <welcome-modal :open-select-location="openSelectLocationDialog" />
   </div>
 </template>
 
@@ -143,20 +155,31 @@ import 'qweather-icons/font/qweather-icons.css'
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useWeatherStore } from '@/store/index';
-import SelectLocationDialog from './SelectLocationDialog.vue';
-import WelcomeModal from './WelcomeModal.vue'
 import WeatherStateIndicator from './WeatherStateIndicator.vue'
+import LocationPicker from './LocationPicker.vue'
+import OnboardingPanel from '@/features/onboarding/OnboardingPanel.vue'
+import { OnboardingOpen, WeatherReady, openOnboarding } from '@/features/onboarding/onboardingState'
+import { WallpaperPropertiesReady } from '@/features/wallpaper/properties'
 import Bus from '@/shared/Bus';
 import { BUS_EVENTS } from '@/features/wallpaper/constants';
 import { useWeatherRefresh } from './useWeatherRefresh';
 
 const WeatherMainIsShow = ref(false)
 const weatherStore = useWeatherStore()
-const SearchLocationDialogRef = ref(null)
 const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
 const { getLocationInformation, getWeatherIndices, ReviseState } = weatherStore
 const activeItem = ref('今天')
 const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item => item.fxDate === activeItem.value))
+
+// 面板视图：引导 → 地址选择 → 天气卡（三者尺寸/层级一致，见 style/weather-panel.scss）
+const LocationPickerOpen = ref(false)
+const panelView = computed(() => {
+  // 壁纸引擎下发的属性还没补发完成 → 先什么都不显示，避免闪一下引导页
+  if (!WallpaperPropertiesReady.value) return 'loading'
+  if (OnboardingOpen.value) return 'onboarding'
+  if (LocationPickerOpen.value) return 'location'
+  return 'weather'
+})
 
 // 一言（名言）模块：右侧“今天”下方
 const hitokoto = ref('')
@@ -282,13 +305,15 @@ const { errCount } = useWeatherRefresh({
   // 生活指数错峰刷新：主周期固定 3 个请求，与多域名池（3 个域名）对齐
   refreshIndices: getWeatherIndices,
   setState: ReviseState,
+  // 引导未完成（没有可用的域名/密钥）时不发任何请求
+  enabled: WeatherReady,
   onSuccess: () => {
     activeItem.value = FourDayWeatherData.value[0].fxDate
     ReviseState(200)
   },
 })
 const openSelectLocationDialog = () => {
-  SearchLocationDialogRef.value?.showDialog()
+  LocationPickerOpen.value = true
 }
 const handleShowWeatherMain = (val) => {
   WeatherMainIsShow.value = val
@@ -324,28 +349,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 /* 尺寸全部用 rem：1rem = 设计稿(1920×1080)的 16px，
    html 的 font-size 会随视口等比缩放（见 src/style/index.scss），
    因此卡片在任意分辨率 / 系统缩放下都保持同一观感。1px 描边保留 px。 */
-.weather {
-  position: fixed;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3.5rem;
-}
-
+/* 层级与尺寸由 .weather-layer / .weather-panel 提供（见 src/style/weather-panel.scss），
+   引导面板与地址页共用同一套，保证三者一样大、同一显示层级 */
 .weather-card {
-  width: min(82vw, 71.25rem);
-  max-height: 92vh;
   display: grid;
   grid-template-columns: minmax(15.625rem, 0.88fr) 1.6fr;
-  border-radius: var(--radius-lg);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
 }
 
@@ -381,6 +389,32 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.hero-top-right {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* API 设置入口：重新打开新用户引导（查看/修改域名与密钥的说明与检测结果） */
+.api-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--text-muted);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  transition: color 0.2s ease, background 0.2s ease;
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--glass-border);
+  }
 }
 
 .location {

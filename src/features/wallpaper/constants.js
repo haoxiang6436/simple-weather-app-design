@@ -12,6 +12,9 @@ export const WALLPAPER_PROPERTIES = {
   SHOW_WEATHER_MAIN: 'showweathermain',
   RAIN_CONFIG: 'rainconfig',
   PANEL_SCALE: 'panelscale',
+  // 用户自带的 和风天气 API 域名 / 密钥（textinput）
+  QWEATHER_HOST: 'qweatherhost',
+  QWEATHER_KEY: 'qweatherkey',
 }
 
 // backgroundindex 的合法取值（与 public/project.json 的 options 一一对应）
@@ -35,6 +38,8 @@ export const BUS_EVENTS = {
   BACKGROUND_INDEX_CHANGE: 'BackgroundIndexChange',
   RAIN_CONFIG_CHANGE: 'RainConfigChange',
   BACKGROUND_CONFIG_CHANGE: 'BackgroundConfigChange',
+  // 运行中请求返回 401/402/403：用户填写的密钥失效/超额，需要重新打开引导页
+  USER_API_INVALID: 'UserApiInvalid',
 }
 
 // 本地存储 key

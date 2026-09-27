@@ -1,5 +1,7 @@
 /* @import url('https://fonts.googleapis.com/css?family=Montserrat:400,700,900&display=swap'); */
 @import url(../style/font.css);
+/* 天气卡 / 引导面板 / 地址页共用的层级与尺寸外壳 */
+@import './weather-panel.scss';
 
 :root {
   /* ---- 字体 ---- */

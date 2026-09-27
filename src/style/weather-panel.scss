@@ -1,0 +1,42 @@
+/* ================= 面板外壳（天气卡 / 引导面板 / 地址页共用） =================
+   引导界面要求和天气面板「一样大、同一显示层级」，所以尺寸与层级只在这里定义一次，
+   三处都挂 .weather-layer / .weather-panel，避免各写一套导致两个面板对不齐。 */
+
+.weather-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem;
+}
+
+.weather-panel {
+  width: min(82vw, 71.25rem);
+  /* 43.06rem 是设计稿里天气卡本身的高度（见 index.scss 的说明），
+     固定成同一高度，天气卡 / 引导页 / 地址页三者大小完全一致 */
+  height: min(43.06rem, 92vh);
+  max-height: 92vh;
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  /* 不使用 fill-mode：动画结束后让 transform 交还给常规样式（天气卡的 hover 抬升） */
+  animation: panel-in 0.36s var(--ease);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.25rem) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -2,6 +2,12 @@ import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import Bus from '@/shared/Bus'
 import {
+  UserApiHostRaw,
+  UserApiKeyRaw,
+  setUserApiFromProperties,
+} from '@/api/credentials'
+import { markWallpaperEngineEvent } from '@/shared/env'
+import {
   BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
   DEFAULT_BACKGROUND_INDEX,
@@ -41,6 +47,10 @@ export const BirdInteraction = ref(false)
 
 // 天气面板整体缩放（panelscale，1 = 设计原尺寸）
 export const PanelScale = ref(DEFAULT_PANEL_SCALE)
+
+// 壁纸引擎的属性是否已经补发完成。
+// 引导页要等这个标志为 true 再判断"有没有填域名/密钥"，否则首帧会先闪一下引导页。
+export const WallpaperPropertiesReady = ref(false)
 
 /**
  * 应用面板缩放：写入 CSS 变量 --panel-scale
@@ -119,6 +129,25 @@ export const applyWallpaperProperties = (properties) => {
   if (panelScale !== undefined) {
     applyPanelScale(panelScale)
   }
+  // 用户自带的 和风天气 API 域名 / 密钥
+  // 引擎只会下发「发生变化」的属性，所以要带上去一次收到的值补齐另一个字段
+  const apiHost = readPropertyValue(properties, WALLPAPER_PROPERTIES.QWEATHER_HOST)
+  const apiKey = readPropertyValue(properties, WALLPAPER_PROPERTIES.QWEATHER_KEY)
+  if (apiHost !== undefined || apiKey !== undefined) {
+    setUserApiFromProperties(
+      apiHost !== undefined ? apiHost : UserApiHostRaw.value,
+      apiKey !== undefined ? apiKey : UserApiKeyRaw.value
+    )
+  }
+}
+
+/**
+ * 壁纸引擎下发的属性统一入口
+ * 先标记"这是引擎事件"（用于区分浏览器调试环境），再交给 applyWallpaperProperties
+ */
+const handleEngineProperties = (properties) => {
+  markWallpaperEngineEvent()
+  applyWallpaperProperties(properties)
 }
 
 /**
@@ -140,16 +169,18 @@ export const setupWallpaperPropertyListener = () => {
   if (!Array.isArray(listeners) || !window.wallpaperPropertyListener) {
     // 兜底：没有提前注册时直接创建监听器（仍然是官方文档要求的全局对象写法）
     window.wallpaperPropertyListener = {
-      applyUserProperties: applyWallpaperProperties,
+      applyUserProperties: handleEngineProperties,
     }
+    WallpaperPropertiesReady.value = true
     return false
   }
 
   // 幂等：重复调用不会重复补发、也不会重复挂载
-  if (listeners.includes(applyWallpaperProperties)) return true
+  if (listeners.includes(handleEngineProperties)) return true
 
   const pending = Array.isArray(queue) ? queue.splice(0) : []
-  pending.forEach((properties) => applyWallpaperProperties(properties))
-  listeners.push(applyWallpaperProperties)
+  pending.forEach((properties) => handleEngineProperties(properties))
+  listeners.push(handleEngineProperties)
+  WallpaperPropertiesReady.value = true
   return true
 }

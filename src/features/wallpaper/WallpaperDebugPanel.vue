@@ -12,6 +12,24 @@
 
       <div v-show="!collapsed" class="panel-body">
         <Space direction="vertical" fill :size="10">
+          <!-- 用户自带的域名/密钥（对应 project.json 的 qweatherhost / qweatherkey）
+               壁纸引擎里由属性面板下发，开发环境（Edge 浏览器）在这里直接输入 -->
+          <div class="section-title">域名与密钥（用户自带）</div>
+          <div class="row">
+            <span class="label">域名</span>
+            <Input v-model="apiHost" size="small" class="control" placeholder="xxxx.re.qweatherapi.com" />
+          </div>
+          <div class="row">
+            <span class="label">密钥</span>
+            <Input v-model="apiKey" size="small" class="control" placeholder="Web API Key" />
+          </div>
+          <div class="api-status">{{ checkStatusText }}</div>
+          <Space :size="8">
+            <Button size="mini" @click="openOnboarding">打开引导页</Button>
+            <Button size="mini" @click="resetOnboarding">模拟首次使用</Button>
+          </Space>
+          <Divider style="margin: 2px 0" />
+
           <!-- 天气面板整体缩放（全局属性，对应 project.json 的 panelscale） -->
           <div class="config-row">
             <div class="config-label">
@@ -111,6 +129,7 @@ import {
   Button,
   Card,
   Divider,
+  Input,
   Option,
   Select,
   Slider,
@@ -137,9 +156,51 @@ import {
   resetBackgroundConfig,
   setBackgroundConfig,
 } from './backgroundConfig'
+import { UserApiHostRaw, UserApiKeyRaw, setUserApiFromBrowser } from '@/api/credentials'
+import {
+  ChosenLocationPath,
+  CheckStatus,
+  CheckSummary,
+  ForceOpen,
+  LocationChosenAt,
+  VerifiedFingerprint,
+  openOnboarding,
+} from '@/features/onboarding/onboardingState'
 
 const collapsed = ref(false)
 const rainConfigStorage = useStorage(STORAGE_KEYS.WALLPAPER_USER_RAIN_CONFIG, 'auto', localStorage)
+
+// 用户自带的 API 域名/密钥：与引导面板共用同一份状态（见 api/credentials.js）
+const apiHost = ref(UserApiHostRaw.value)
+const apiKey = ref(UserApiKeyRaw.value)
+let apiTimer = null
+watch([apiHost, apiKey], ([host, key]) => {
+  clearTimeout(apiTimer)
+  apiTimer = setTimeout(() => setUserApiFromBrowser(host, key), 300)
+})
+watch([UserApiHostRaw, UserApiKeyRaw], ([host, key]) => {
+  if (apiHost.value !== host) apiHost.value = host
+  if (apiKey.value !== key) apiKey.value = key
+})
+
+const checkStatusText = computed(() => {
+  const status = CheckStatus.value
+  if (status === 'checking') return '检测中…'
+  if (status === 'ok') return `可用：${CheckSummary.value}`
+  if (status === 'error') return `不可用：${CheckSummary.value}`
+  return '等待填写域名/密钥'
+})
+
+// 模拟新用户：清掉凭据、验证结果与已选位置，强制打开引导页
+const resetOnboarding = () => {
+  apiHost.value = ''
+  apiKey.value = ''
+  setUserApiFromBrowser('', '')
+  VerifiedFingerprint.value = ''
+  LocationChosenAt.value = 0
+  ChosenLocationPath.value = []
+  ForceOpen.value = true
+}
 
 // 调试属性直接持久化到 localStorage，修改即保存，无需手动读写
 const state = useStorage(
@@ -255,6 +316,12 @@ onMounted(() => {
   .section-title {
     font-size: 13px;
     font-weight: 600;
+  }
+
+  .api-status {
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 0.7;
   }
 
   .config-row {

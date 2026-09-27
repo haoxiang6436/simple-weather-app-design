@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, unref, watch } from 'vue'
 
 /**
  * 天气数据定时刷新与重试
@@ -14,6 +14,8 @@ import { onMounted, onUnmounted, ref } from 'vue'
  * @param {Function} options.setState       更新加载状态（0/100/200/300/400）
  * @param {Function} options.onSuccess      刷新成功后的回调
  * @param {number} [options.indicesOffset]  生活指数首次触发延迟（毫秒）
+ * @param {import('vue').Ref<boolean>|Function} [options.enabled]
+ *        是否允许请求（新用户引导未完成时不允许，避免用空的域名/密钥发请求）
  */
 export const useWeatherRefresh = ({
   refresh,
@@ -21,10 +23,12 @@ export const useWeatherRefresh = ({
   setState,
   onSuccess,
   indicesOffset = 1000 * 30,
+  enabled = null,
 }) => {
   let timer = null
   let indicesTimer = null
   const errCount = ref(0)
+  const isEnabled = () => (enabled ? !!unref(enabled) : true)
 
   const clearTimer = () => {
     clearTimeout(timer)
@@ -38,6 +42,7 @@ export const useWeatherRefresh = ({
 
   const updateWeather = async () => {
     clearTimer()
+    if (!isEnabled()) return
     if (!window.navigator.onLine) {
       setState(400)
       window.addEventListener('online', updateWeather)
@@ -65,6 +70,7 @@ export const useWeatherRefresh = ({
   // 生活指数：独立节拍 + 与主周期错峰，保证定时请求数与域名池大小对齐
   const updateIndices = async () => {
     clearIndicesTimer()
+    if (!isEnabled()) return
     if (refreshIndices && window.navigator.onLine) {
       try {
         await refreshIndices()
@@ -77,6 +83,7 @@ export const useWeatherRefresh = ({
   }
 
   onMounted(() => {
+    if (!isEnabled()) return
     updateWeather()
     if (refreshIndices) {
       indicesTimer = setTimeout(updateIndices, indicesOffset)
@@ -87,6 +94,25 @@ export const useWeatherRefresh = ({
     clearIndicesTimer()
     window.removeEventListener('online', updateWeather)
   })
+
+  // 引导完成（拿到可用的域名/密钥）后开始轮询；凭据失效被清空时暂停
+  if (enabled) {
+    watch(
+      () => !!unref(enabled),
+      (value) => {
+        if (value) {
+          updateWeather()
+          if (refreshIndices) {
+            clearIndicesTimer()
+            indicesTimer = setTimeout(updateIndices, indicesOffset)
+          }
+        } else {
+          clearTimer()
+          clearIndicesTimer()
+        }
+      }
+    )
+  }
 
   return { errCount, updateWeather }
 }
