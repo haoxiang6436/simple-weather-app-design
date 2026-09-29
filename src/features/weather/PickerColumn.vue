@@ -20,8 +20,7 @@
       </div>
       <!-- 自绘滚动条：可拖拽、可点轨道 -->
       <div ref="barEl" class="pc-bar" :class="{ 'is-visible': bar.visible }" @mousedown="handleTrackDown">
-        <div class="pc-thumb" :style="{ top: bar.top + 'px', height: bar.height + 'px' }"
-          @mousedown.stop="handleThumbDown"></div>
+        <div ref="thumbEl" class="pc-thumb" @mousedown.stop="handleThumbDown"></div>
       </div>
     </div>
   </div>
@@ -43,46 +42,63 @@ const emit = defineEmits(['select'])
 
 const scrollEl = ref(null)
 const barEl = ref(null)
-const bar = reactive({ top: 0, height: 0, visible: false })
+const thumbEl = ref(null)
+// 只把"是否显示滚动条"交给响应式；滑块位置直接写 DOM，
+// 否则滚动过程中每帧都会重渲染整个列表（Wallpaper Engine 里会明显掉帧）
+const bar = reactive({ visible: false })
 
 let scroll = null
 let dragState = null
+let thumbHeight = 0
 
-const contentHeight = () => scrollEl.value?.firstElementChild?.offsetHeight || 0
-const wrapperHeight = () => scrollEl.value?.clientHeight || 0
-const maxScroll = () => Math.max(contentHeight() - wrapperHeight(), 0)
+// 滚动时不再读 DOM（避免每帧强制重排），尺寸只在 refresh / resize 时量一次
+const metrics = { wrapper: 0, content: 0, track: 0 }
+
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
+
+const measure = () => {
+  metrics.wrapper = scrollEl.value?.clientHeight || 0
+  metrics.content = scrollEl.value?.firstElementChild?.offsetHeight || 0
+  metrics.track = barEl.value?.clientHeight || metrics.wrapper
+}
+
+const maxScroll = () => Math.max(metrics.content - metrics.wrapper, 0)
+const currentScroll = () => clamp(-(scroll?.y || 0), 0, maxScroll())
 
 const updateBar = () => {
-  const wrapper = wrapperHeight()
-  const content = contentHeight()
+  const { wrapper, content, track } = metrics
   const range = Math.max(content - wrapper, 0)
-  if (!range || !wrapper) {
+  if (!range || !wrapper || !track) {
+    thumbHeight = 0
     bar.visible = false
-    bar.top = 0
-    bar.height = wrapper
     return
   }
-  const height = Math.max((wrapper / content) * wrapper, 28)
-  const y = Math.min(Math.max(-(scroll?.y || 0), 0), range)
-  bar.visible = true
-  bar.height = height
-  bar.top = (y / range) * (wrapper - height)
+  // 滑块最小 28px，保证短列表里也抓得住
+  thumbHeight = Math.max((wrapper / content) * track, 28)
+  const offset = (currentScroll() / range) * Math.max(track - thumbHeight, 0)
+  if (thumbEl.value) {
+    thumbEl.value.style.height = `${thumbHeight}px`
+    thumbEl.value.style.transform = `translateY(${offset}px)`
+  }
+  if (!bar.visible) bar.visible = true
 }
 
 const refresh = async () => {
   await nextTick()
   scroll?.refresh()
+  measure()
   updateBar()
 }
 
 const handleSelect = (item) => emit('select', item)
 
 const handleThumbDown = (event) => {
-  if (!bar.visible) return
+  if (!bar.visible || !scroll) return
+  event.preventDefault()
   dragState = {
     startY: event.clientY,
-    startScroll: Math.min(Math.max(-(scroll?.y || 0), 0), maxScroll()),
-    range: Math.max(wrapperHeight() - bar.height, 0),
+    startScroll: currentScroll(),
+    range: Math.max(metrics.track - thumbHeight, 0),
     max: maxScroll(),
   }
   window.addEventListener('mousemove', handleDragMove)
@@ -93,7 +109,7 @@ const handleDragMove = (event) => {
   if (!dragState || !scroll) return
   const delta = event.clientY - dragState.startY
   const ratio = dragState.range ? delta / dragState.range : 0
-  const next = Math.min(Math.max(dragState.startScroll + ratio * dragState.max, 0), dragState.max)
+  const next = clamp(dragState.startScroll + ratio * dragState.max, 0, dragState.max)
   scroll.scrollTo(0, -next, 0)
   updateBar()
 }
@@ -102,16 +118,18 @@ const handleDragEnd = () => {
   dragState = null
   window.removeEventListener('mousemove', handleDragMove)
   window.removeEventListener('mouseup', handleDragEnd)
+  updateBar()
 }
 
 const handleTrackDown = (event) => {
   if (!bar.visible || !scroll) return
+  const range = Math.max(metrics.track - thumbHeight, 0)
   const barRect = barEl.value?.getBoundingClientRect()
-  if (!barRect) return
+  if (!range || !barRect) return
+  event.preventDefault()
   const max = maxScroll()
-  const offset = event.clientY - barRect.top - bar.height / 2
-  const range = Math.max(barRect.height - bar.height, 0)
-  const ratio = range ? Math.min(Math.max(offset / range, 0), 1) : 0
+  const offset = event.clientY - barRect.top - thumbHeight / 2
+  const ratio = clamp(offset / range, 0, 1)
   scroll.scrollTo(0, -ratio * max, 200)
 }
 
@@ -125,9 +143,13 @@ onMounted(async () => {
       scrollY: true,
       click: true,
       bounce: false,
+      // probeType 3：拖拽与惯性滚动过程中持续派发 scroll 事件。
+      // 默认值 0 只在滚动结束时派发（甚至不派发），自绘滚动条就会一直停在原地。
+      probeType: 3,
       mouseWheel: { speed: 18, easeTime: 200 },
     })
     scroll.on('scroll', updateBar)
+    scroll.on('scrollEnd', updateBar)
   }
   refresh()
   window.addEventListener('resize', onResize)
@@ -259,6 +281,7 @@ watch(
 
 /* 自绘滚动条（Wallpaper Engine 里唯一可见的滚动提示） */
 .pc-bar {
+  position: relative; /* 滑块绝对定位的参照，缺了这行 top/transform 就全被忽略 */
   flex: none;
   width: 0.375rem;
   margin: 0.5rem 0.25rem 0.5rem 0;
@@ -273,6 +296,9 @@ watch(
 }
 
 .pc-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   border-radius: 999px;
   background: rgba(235, 242, 251, 0.42);

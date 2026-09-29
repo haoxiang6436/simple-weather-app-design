@@ -1,11 +1,7 @@
 import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import Bus from '@/shared/Bus'
-import {
-  UserApiHostRaw,
-  UserApiKeyRaw,
-  setUserApiFromProperties,
-} from '@/api/credentials'
+import { setUserApiFromProperties } from '@/api/credentials'
 import { markWallpaperEngineEvent } from '@/shared/env'
 import {
   BACKGROUND_INDEX_OPTIONS,
@@ -48,6 +44,42 @@ export const BirdInteraction = ref(false)
 // 天气面板整体缩放（panelscale，1 = 设计原尺寸）
 export const PanelScale = ref(DEFAULT_PANEL_SCALE)
 
+// 引擎上一次下发过的属性快照（不含域名/密钥 —— 那两项在 api/credentials.js 里单独缓存）。
+// 壁纸引擎只在页面加载时下发一次属性，页面重载（换背景会主动 location.reload、部署新版本后
+// 引擎也会重载页面）或切换壁纸后偶尔不再补发；只靠内存就会出现「面板缩放、小鸟互动、
+// 背景编号全被重置」。这里同步落一份盘，加载时先当兜底基线，再用引擎这次真正下发的值覆盖。
+export const WallpaperPropertySnapshot = useStorage(
+  STORAGE_KEYS.WALLPAPER_PROPERTY_SNAPSHOT, {}, localStorage, { flush: 'sync' }
+)
+
+// 参与快照的属性（= 引擎属性面板里除域名/密钥之外的字段）
+const SNAPSHOT_PROPERTY_KEYS = [
+  WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION,
+  WALLPAPER_PROPERTIES.BACKGROUND_INDEX,
+  WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN,
+  WALLPAPER_PROPERTIES.RAIN_CONFIG,
+  WALLPAPER_PROPERTIES.PANEL_SCALE,
+]
+
+const rememberProperties = (properties) => {
+  const patch = {}
+  SNAPSHOT_PROPERTY_KEYS.forEach((key) => {
+    const value = readPropertyValue(properties, key)
+    if (value !== undefined) patch[key] = { value }
+  })
+  if (Object.keys(patch).length) {
+    WallpaperPropertySnapshot.value = { ...WallpaperPropertySnapshot.value, ...patch }
+  }
+}
+
+/**
+ * 页面加载后的一小段时间内收到的下发的都是「加载时的属性快照」，之后才是用户在面板里的改动。
+ * 域名/密钥要靠它区分「引擎没读到属性」和「用户主动清空」（见 api/credentials.js）
+ */
+const LOAD_PHASE_MS = 3000
+const pageStartedAt = Date.now()
+const inLoadPhase = () => Date.now() - pageStartedAt < LOAD_PHASE_MS
+
 // 壁纸引擎的属性是否已经补发完成。
 // 引导页要等这个标志为 true 再判断"有没有填域名/密钥"，否则首帧会先闪一下引导页。
 export const WallpaperPropertiesReady = ref(false)
@@ -87,8 +119,10 @@ const readPropertyValue = (properties, key) => {
  * 应用壁纸属性变更
  * @param {Object} properties Wallpaper Engine applyUserProperties 入参结构
  *                            { 属性名: { value: 属性值 } }，只包含发生变化的属性
+ * @param {Object} [options]
+ * @param {boolean} [options.remember=true] 是否把这次的值记进快照（补发快照本身时不用再记一遍）
  */
-export const applyWallpaperProperties = (properties) => {
+export const applyWallpaperProperties = (properties, { remember = true } = {}) => {
   if (!properties || typeof properties !== 'object') return
   // 便于在壁纸引擎里自查：壁纸引擎设置 → 常规 → CEF devtools port（建议 8080），
   // 浏览器打开 localhost:8080 选中壁纸页面，就能在控制台看到每次下发的属性
@@ -130,15 +164,15 @@ export const applyWallpaperProperties = (properties) => {
     applyPanelScale(panelScale)
   }
   // 用户自带的 和风天气 API 域名 / 密钥
-  // 引擎只会下发「发生变化」的属性，所以要带上去一次收到的值补齐另一个字段
+  // 引擎只会下发「发生变化」的属性；没带上的字段由 credentials.js 保留原值，
+  // 加载阶段下发的空值也交给它判断（那里会把空值当作"引擎没读到"，不覆盖缓存）
   const apiHost = readPropertyValue(properties, WALLPAPER_PROPERTIES.QWEATHER_HOST)
   const apiKey = readPropertyValue(properties, WALLPAPER_PROPERTIES.QWEATHER_KEY)
   if (apiHost !== undefined || apiKey !== undefined) {
-    setUserApiFromProperties(
-      apiHost !== undefined ? apiHost : UserApiHostRaw.value,
-      apiKey !== undefined ? apiKey : UserApiKeyRaw.value
-    )
+    setUserApiFromProperties(apiHost, apiKey, { fromLoad: inLoadPhase() })
   }
+
+  if (remember) rememberProperties(properties)
 }
 
 /**
@@ -148,6 +182,19 @@ export const applyWallpaperProperties = (properties) => {
 const handleEngineProperties = (properties) => {
   markWallpaperEngineEvent()
   applyWallpaperProperties(properties)
+}
+
+/**
+ * 用上次的属性快照兜底
+ *
+ * 引擎这次可能会「什么都不下发」（页面重载后偶发），这时界面就只剩默认值了：
+ * 先把上次的快照铺一遍当基线，紧接着再补发引擎这次真正下发的属性，引擎的值始终优先。
+ */
+const replaySnapshot = () => {
+  const snapshot = WallpaperPropertySnapshot.value
+  if (!snapshot || !Object.keys(snapshot).length) return
+  console.log('[Wallpaper] 先用上次的属性快照兜底', snapshot)
+  applyWallpaperProperties(snapshot, { remember: false })
 }
 
 /**
@@ -171,6 +218,7 @@ export const setupWallpaperPropertyListener = () => {
     window.wallpaperPropertyListener = {
       applyUserProperties: handleEngineProperties,
     }
+    replaySnapshot()
     WallpaperPropertiesReady.value = true
     return false
   }
@@ -178,6 +226,7 @@ export const setupWallpaperPropertyListener = () => {
   // 幂等：重复调用不会重复补发、也不会重复挂载
   if (listeners.includes(handleEngineProperties)) return true
 
+  replaySnapshot()
   const pending = Array.isArray(queue) ? queue.splice(0) : []
   pending.forEach((properties) => handleEngineProperties(properties))
   listeners.push(handleEngineProperties)

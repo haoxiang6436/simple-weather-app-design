@@ -39,6 +39,10 @@
 
   /* ---- 动效 ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* 进场：起步就有速度、收尾稳稳停住（expo-out），比通用 ease-out 更"跟手" */
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  /* 出场：起步慢、越走越快，让旧内容尽快让位，不拖住新内容 */
+  --ease-leave: cubic-bezier(0.4, 0, 1, 1);
 
   /* ---- 天气面板整体缩放 ----
      由壁纸属性面板的 panelscale 通过 JS 覆盖（见 src/features/wallpaper/properties.js），

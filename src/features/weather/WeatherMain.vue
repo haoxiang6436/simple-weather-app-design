@@ -1,13 +1,21 @@
 <template>
   <div class="weather weather-layer">
-    <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
-    <OnboardingPanel v-if="panelView === 'onboarding'" />
-    <!-- 地址选择页：日常换城市走这里（与天气卡同尺寸、同层级） -->
-    <LocationPicker v-else-if="panelView === 'location'" dismissable @close="LocationPickerOpen = false"
-      @selected="LocationPickerOpen = false" />
-    <section v-else-if="!WeatherMainIsShow" class="weather-card weather-panel">
+    <!-- 卡片外壳常驻，切换的是壳里的内容（动效定义见 style/weather-panel.scss） -->
+    <Transition name="panel-in" appear>
+     <div v-if="shellVisible" class="weather-shell" :class="{ 'weather-shell-card': panelView === 'weather' }">
+        <!-- 不要用 mode="out-in"：引导页内部（第 1 步 ↔ 第 2 步）也有过渡，
+             两者会在同一帧里争抢同一个元素的离场回调，导致外层收不到 transitionend、
+             状态卡在"正在离场"，新内容永远进不来（外壳只剩一张空卡）。
+             改用交叉淡入淡出，两个面板在外壳里叠在同一格，见 style/weather-panel.scss -->
+        <Transition name="panel-swap">
+          <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
+          <OnboardingPanel v-if="panelView === 'onboarding'" />
+          <!-- 地址选择页：日常换城市走这里（与天气卡同尺寸、同层级） -->
+          <LocationPicker v-else-if="panelView === 'location'" dismissable @close="LocationPickerOpen = false"
+            @selected="LocationPickerOpen = false" />
+          <section v-else-if="!WeatherMainIsShow" class="weather-card panel-view">
       <!-- 左侧：当前天气（紧凑） -->
-      <header class="hero">
+      <header class="hero" :class="{ 'hero-warning': WeatherEarlyWarning.length }">
         <div class="hero-top">
           <button class="location" type="button" :title="dayDateCity.city" @click="openSelectLocationDialog">
             <svg class="location-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16"
@@ -144,9 +152,11 @@
             <span class="forecast-temp"><b>{{ item.tempMax }}</b>/{{ item.tempMin }}°</span>
           </li>
         </ul>
-      </main>
-    </section>
-
+        </main>
+          </section>
+        </Transition>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -180,6 +190,11 @@ const panelView = computed(() => {
   if (LocationPickerOpen.value) return 'location'
   return 'weather'
 })
+
+// 卡片外壳是否出现：属性没就绪、或用户关掉了天气卡时，整张卡都不显示
+const shellVisible = computed(
+  () => panelView.value !== 'loading' && !(panelView.value === 'weather' && WeatherMainIsShow.value)
+)
 
 // 一言（名言）模块：右侧“今天”下方
 const hitokoto = ref('')
@@ -349,17 +364,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 /* 尺寸全部用 rem：1rem = 设计稿(1920×1080)的 16px，
    html 的 font-size 会随视口等比缩放（见 src/style/index.scss），
    因此卡片在任意分辨率 / 系统缩放下都保持同一观感。1px 描边保留 px。 */
-/* 层级与尺寸由 .weather-layer / .weather-panel 提供（见 src/style/weather-panel.scss），
-   引导面板与地址页共用同一套，保证三者一样大、同一显示层级 */
+/* 外壳尺寸、玻璃底、投影以及 hover 抬升都由 .weather-shell 提供（见 src/style/weather-panel.scss），
+   这里只负责天气卡内部的栅格排版 */
 .weather-card {
   display: grid;
   grid-template-columns: minmax(15.625rem, 0.88fr) 1.6fr;
-  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
-}
-
-.weather-card:hover {
-  transform: translateY(-0.1875rem);
-  box-shadow: 0 2.25rem 5.625rem -2rem rgba(0, 0, 0, 0.75), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.28);
 }
 
 /* ================= 左侧：当前天气 ================= */
@@ -380,6 +389,23 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   inset: 0;
   background: radial-gradient(120% 90% at 18% -10%, rgba(56, 189, 248, 0.30), transparent 60%);
   pointer-events: none;
+}
+
+/* 左栏出现天气预警 chip 时，比没有预警时多占一行（chip 本身 + 一个 gap）。
+   面板高度有限（见 style/weather-panel.scss），这里把左栏间距和指数卡内边距收紧一点，
+   把省下来的高度让给 chip，保证 6 个生活指数卡完整落在面板内而不是被顶到下沿外。
+   实测（1920×1080、panelscale 0.75）：不收紧时左栏内容比面板高 12px，指数卡底边离面板下沿只剩 8px；
+   收紧后指数卡底部还有约 35px 余量（完全没有预警时约 50px）。 */
+.hero.hero-warning {
+  gap: 0.875rem;
+}
+
+.hero.hero-warning .indices {
+  margin-top: 0.375rem;
+}
+
+.hero.hero-warning .index-tile {
+  padding: 0.75rem 0.6875rem;
 }
 
 .hero-top {

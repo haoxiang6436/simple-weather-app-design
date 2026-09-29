@@ -1,5 +1,5 @@
 <template>
-  <div class="weather-panel LocationPicker">
+  <div class="panel-view LocationPicker">
     <header class="lp-head">
       <div class="lp-head-text">
         <h2 class="lp-title">{{ dismissable ? '选择位置' : '第 2 步 · 选择你所在的位置' }}</h2>

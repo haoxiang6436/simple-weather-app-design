@@ -137,6 +137,10 @@ export const markLocationChosen = (path) => {
   if (Array.isArray(path) && path.length) {
     ChosenLocationPath.value = path.map((node) => ({ value: node.value, label: node.label }))
   }
+  // 流程已经走完，引导页该让位了。
+  // 用户是点天气卡上的入口/「模拟首次使用」手动打开引导页时 ForceOpen 为 true，
+  // 不清掉的话即使选好位置也会一直被它按住在引导页上。
+  ForceOpen.value = false
 }
 
 /** 凭据齐备且已通过检测（或已选择继续） */

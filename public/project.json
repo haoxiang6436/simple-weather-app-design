@@ -65,7 +65,7 @@
 						"value" : "4"
 					},
 					{
-						"label" : "[整页雨珠叠加]",
+						"label" : "[整页雨珠叠加][测试]",
 						"value" : "5"
 					},
 					{
@@ -76,7 +76,7 @@
 				"order" : 5,
 				"text" : "<br/><br/>————————<br/><h4>[🖼️动态背景]<br/><small>- 选一个漂亮的背景</small></h4>————————",
 				"type" : "combo",
-				"value" : "5"
+				"value" : "4"
 			},
 			"backgroundinteraction" : 
 			{

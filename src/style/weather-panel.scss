@@ -1,18 +1,29 @@
 /* ================= 面板外壳（天气卡 / 引导面板 / 地址页共用） =================
-   引导界面要求和天气面板「一样大、同一显示层级」，所以尺寸与层级只在这里定义一次，
-   三处都挂 .weather-layer / .weather-panel，避免各写一套导致两个面板对不齐。 */
+   引导界面要求和天气面板「一样大、同一显示层级」，所以尺寸与层级只在这里定义一次。
+   外壳（.weather-shell）是常驻的，切换时换的是外壳里的内容（.panel-view）：
+   屏幕上任何时刻都只有一张卡，也不会出现「卡整块消失」的空屏。 */
 
 .weather-layer {
   position: fixed;
   inset: 0;
   z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   padding: 3.5rem;
 }
 
-.weather-panel {
+/* 兜底：万一同时存在多个子元素，让它们叠在同一个单元格里 */
+.weather-layer > * {
+  grid-area: 1 / 1;
+}
+
+.weather-shell {
+  /* 同一时刻可能有两个面板（切换时的淡出 + 淡入），让它们叠在同一格里，
+     否则两块内容会上下排开、把外壳撑出可见的跳动 */
+  display: grid;
+  /* 行高锁死在外壳高度上：默认的 auto 行会被内容撑高，
+     地址页那种「列表面板」能把外壳顶到两倍高 */
+  grid-template-rows: minmax(0, 1fr);
   width: min(82vw, 71.25rem);
   /* 43.06rem 是设计稿里天气卡本身的高度（见 index.scss 的说明），
      固定成同一高度，天气卡 / 引导页 / 地址页三者大小完全一致 */
@@ -25,18 +36,71 @@
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  /* 不使用 fill-mode：动画结束后让 transform 交还给常规样式（天气卡的 hover 抬升） */
-  animation: panel-in 0.36s var(--ease);
 }
 
-@keyframes panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(1.25rem) scale(0.985);
-  }
+/* 叠放：全部子节点共用左上角那一格 */
+.weather-shell > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+}
 
-  to {
-    opacity: 1;
-    transform: none;
+/* 只有天气卡会「抬起来」，引导页 / 地址页保持静止 */
+.weather-shell-card {
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+
+  &:hover {
+    transform: translateY(-0.1875rem);
+    box-shadow: 0 2.25rem 5.625rem -2rem rgba(0, 0, 0, 0.75), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.28);
   }
+}
+
+/* 外壳里的内容统一填满外壳，各自只管内部排版 */
+.panel-view {
+  width: 100%;
+  height: 100%;
+}
+
+/* ================= 面板 / 步骤切换动效 =================
+   写在这里而不是组件内：切换的两端可能属于不同组件，作用域样式命中不到对方的根节点。
+   panel-in  ：外壳自身首次出现（首屏 / 从「未就绪」到就绪）
+   panel-swap：外壳内部换内容。不能用 mode="out-in"：引导页第 1 步 ↔ 第 2 步也有过渡，
+               两者会在同一帧争抢同一个元素的离场回调，外层就再也收不到 transitionend，
+               状态永远停在"正在离场"，新内容进不来（外壳只剩空卡）。
+               所以这里走交叉淡入淡出，两个面板在外壳里叠在同一格（见 .weather-shell）。 */
+.panel-in-enter-active {
+  transition: opacity 0.26s var(--ease-enter), transform 0.3s var(--ease-enter);
+}
+
+.panel-in-enter-from {
+  opacity: 0;
+  transform: translateY(1.25rem) scale(0.985);
+}
+
+.panel-in-leave-active {
+  transition: opacity 0.12s var(--ease-leave), transform 0.16s var(--ease-leave);
+}
+
+.panel-in-leave-to {
+  opacity: 0;
+  transform: translateY(-0.75rem) scale(0.99);
+}
+
+/* 出场比进场快：旧内容尽快让位，视线自然落到新内容上 */
+.panel-swap-leave-active {
+  transition: opacity 0.14s var(--ease-leave), transform 0.18s var(--ease-leave);
+}
+
+.panel-swap-leave-to {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+.panel-swap-enter-active {
+  transition: opacity 0.16s var(--ease-enter), transform 0.2s var(--ease-enter);
+}
+
+.panel-swap-enter-from {
+  opacity: 0;
+  transform: translateY(0.625rem);
 }
