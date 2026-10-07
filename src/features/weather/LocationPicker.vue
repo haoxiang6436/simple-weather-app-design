@@ -295,6 +295,8 @@ const applyIds = async (ids) => {
   max-width: 22rem;
   font-size: 0.82rem;
   color: #ffbab5;
+  /* 错误提示可能带换行，保留换行符 */
+  white-space: pre-line;
 }
 
 .lp-confirm {

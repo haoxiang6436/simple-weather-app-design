@@ -10,7 +10,7 @@ import { useStorage } from '@vueuse/core'
 import Bus from '@/shared/Bus'
 import { BUS_EVENTS } from '@/features/wallpaper/constants'
 import { checkApiEntry } from '@/api/weather'
-import { isNetworkError } from '@/api/errors'
+import { isNetworkError, getWeatherErrorInfo } from '@/api/errors'
 import {
   UserApiEntries,
   UserApiFingerprint,
@@ -25,6 +25,8 @@ const LOCATION_CHOSEN_STORAGE_KEY = 'WeatherLocationChosenAt'
 const LOCATION_PATH_STORAGE_KEY = 'WeatherLocationPath'
 // 自动检测的去抖时间：壁纸引擎可能逐字符下发 textinput
 const CHECK_DEBOUNCE_MS = 700
+// 检测失败后的自动重测间隔：网络抖动 / 服务端 5xx 这类失败会自己恢复，不用用户一直守着
+const CHECK_RETRY_MS = 5000
 
 // 上次检测通过的凭据指纹（只存哈希，不存密钥）
 export const VerifiedFingerprint = useStorage(VERIFIED_STORAGE_KEY, '')
@@ -51,26 +53,71 @@ const classifyCheckError = (error) => {
       code: error?.code || 'NETWORK_ERROR',
       message: timeout ? '请求超时' : '网络不可用',
       soft: true,
+      retryable: true,
     }
   }
   const code = String(error?.code || '')
+  // 统一走 @/api/errors 的错误码提示表：
+  // 403 会按 error.type 细分为「额度不足 / API Host 错误 / 账号冻结」等不同提示
+  const info = getWeatherErrorInfo({
+    code,
+    type: error?.type,
+    title: error?.title,
+  })
   const table = {
-    401: { kind: 'auth', message: '密钥无效或类型不对（需要 Web API Key）' },
-    402: { kind: 'quota', message: '额度不足或已超限' },
-    403: { kind: 'forbidden', message: '密钥未绑定这个域名，或没有该接口的权限' },
-    404: { kind: 'notfound', message: '接口不存在，域名可能填错了' },
-    429: { kind: 'rate', message: '请求过于频繁，稍后再试' },
+    400: 'param',
+    401: 'auth',
+    402: 'quota',
+    403: 'permission',
+    404: 'notfound',
+    405: 'api',
+    429: 'rate',
   }
-  if (table[code]) return { ...table[code], code, soft: false }
+  if (table[code]) {
+    return {
+      kind: table[code],
+      code,
+      message: info.message,
+      detail: info.tip,
+      soft: false,
+      reauth: info.reauth,
+      retryable: info.retryable === true,
+    }
+  }
   if (/^5\d\d$/.test(code)) {
-    return { kind: 'server', code, message: `接口服务异常（HTTP ${code}）`, soft: true }
+    return {
+      kind: 'server',
+      code,
+      message: info.message,
+      detail: info.tip,
+      soft: true,
+      reauth: info.reauth,
+      retryable: info.retryable === true,
+    }
   }
   return {
     kind: 'unknown',
     code,
-    message: error?.message || '检测失败，请检查域名与密钥',
+    message: info.message || error?.message || '检测失败，请检查域名与密钥',
+    detail: info.tip,
     soft: false,
+    reauth: info.reauth,
+    retryable: info.retryable === true,
   }
+}
+
+// 自动重测用的定时器（只在「值得重试」的失败上挂）
+let retryTimer = null
+const clearRetry = () => {
+  clearTimeout(retryTimer)
+  retryTimer = null
+}
+const scheduleRetry = () => {
+  clearRetry()
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    runApiCheck()
+  }, CHECK_RETRY_MS)
 }
 
 /** 逐组检测域名/密钥；只要有一组可用就认为可以通过（失败的域名会被轮询跳过） */
@@ -80,6 +127,7 @@ export const runApiCheck = async () => {
   if (UserApiState.value !== 'ok' || !entries.length) return
   if (CheckStatus.value === 'checking') return
 
+  clearRetry()
   CheckStatus.value = 'checking'
   const results = await Promise.all(
     entries.map(async (entry) => {
@@ -108,7 +156,14 @@ export const runApiCheck = async () => {
       : '域名与密钥可用'
   } else {
     CheckStatus.value = 'error'
-    CheckSummary.value = failed[0]?.message || '检测失败，请检查域名与密钥'
+    // 主状态区展示完整的多行提示；逐组列表只用第一行短句
+    CheckSummary.value = failed[0]?.detail || failed[0]?.message || '检测失败，请检查域名与密钥'
+    // 网络 / 超时 / 5xx 这类失败会自己恢复，每 5 秒自动重测一次；
+    // 域名、密钥本身的问题（401/403/404…）重测多少次都一样，等用户改完凭据自然会触发新一轮检测；
+    // 限流（429）更不能催 —— 越催恢复越慢，留给用户手动点「重新检测」。
+    if (failed.every((item) => item.retryable && item.kind !== 'rate')) {
+      scheduleRetry()
+    }
   }
 }
 
@@ -119,6 +174,7 @@ export const canContinueWithoutCheck = computed(() => {
 })
 
 export const continueWithoutCheck = () => {
+  clearRetry()
   NetworkOverride.value = UserApiFingerprint.value
   // 用户手动确认继续 → 引导页的"强制打开"状态也随之结束
   ForceOpen.value = false
@@ -179,6 +235,7 @@ watch(
   [UserApiFingerprint, UserApiState],
   ([fingerprint, state]) => {
     clearTimeout(checkTimer)
+    clearRetry()
     if (state !== 'ok' || !fingerprint) {
       CheckStatus.value = 'idle'
       CheckResults.value = []
@@ -204,6 +261,7 @@ watch(
 
 // 运行中请求返回 401/402/403：用户填的密钥失效/超额 → 重新打开引导页
 Bus.on(BUS_EVENTS.USER_API_INVALID, (payload) => {
+  clearRetry()
   VerifiedFingerprint.value = ''
   setRejectedHosts(UserApiFingerprint.value, [])
   CheckResults.value = []

@@ -2,6 +2,8 @@
 @import url(../style/font.css);
 /* 天气卡 / 引导面板 / 地址页共用的层级与尺寸外壳 */
 @import './weather-panel.scss';
+/* 全站切换动效（进场 / 离场 / 轮播）都定义在这一个文件里 */
+@import './transitions.scss';
 
 :root {
   /* ---- 字体 ---- */

@@ -1,0 +1,103 @@
+/* ================= 切换动效（全站唯一定义处） =================
+   所有 <Transition> 的类名都定义在这里，改手感只改这个文件。
+
+   方向约定「从上渐入、往下渐出」：
+     新内容从上方 -0.75rem 处落位，旧内容向下 +0.75rem 沉出去。
+   配合模板上的 mode="out-in"（旧的走完再让新的进来），两段内容不会同时叠在同一块地方。
+
+   ⚠️ 这些类必须保持全局（不要挪进组件的 scoped 样式）：
+      一次切换的两端常常分属不同组件，scoped 的作用域命中不到对方。
+   ⚠️ 用到的 <Transition> 都要写 mode="out-in"，否则两段内容会同时出现。
+   ⚠️ 嵌套切换（如引导页第 1 步 ↔ 第 2 步）时，内层元素的根节点必须是普通元素，
+      不能直接是 <Transition> —— 否则外层 out-in 会取不到元素、卡在"正在离场"（只剩一张空壳卡）。
+
+   谁用哪个名字：
+     panel-in   —— 天气卡外壳首次出现（.weather-shell）
+     panel-swap —— 外壳内部换面板：引导页 ↔ 地址页 ↔ 天气卡；引导页内部换步骤也用它
+     index-swap —— 生活指数聚焦卡换条目
+     chip-fade  —— 天气预警 chip 轮播（刻意保留原作者的反方向「从下往上」，要统一就改这一处）
+     Dialog     —— 全屏弹层（预警详情）的淡入淡出；面板自身的缩放动效在组件里
+*/
+
+/* 「换内容」的通用手感：旧的向下沉出，新的从上方落下。
+   $gap 是进场的延迟 —— 把它设成和 $leave 一样，就得到「旧的走完、新的才进来」的
+   顺序感（相当于 mode="out-in" 的观感），但元素始终留在文档流里，
+   不会碰到 out-in 在嵌套/组件切换时卡在"正在离场"的问题。 */
+@mixin swap-down($leave: 0.3s, $enter: 0.35s, $travel: 0.75rem, $gap: 0s) {
+  &-enter-active {
+    transition: opacity $enter ease $gap, transform $enter var(--ease) $gap;
+  }
+
+  &-leave-active {
+    transition: opacity $leave ease, transform $leave var(--ease-leave);
+  }
+
+  &-enter-from {
+    opacity: 0;
+    transform: translateY(-$travel);
+  }
+
+  &-leave-to {
+    opacity: 0;
+    transform: translateY($travel);
+  }
+}
+
+/* 外壳内部换面板：引导页 ↔ 地址页 ↔ 天气卡；引导页内部换步骤也用它。
+   用「离场 + 进场延迟」实现先出后进（原因见上面 $gap 的说明）：
+   旧的 0.3s 向下沉出，新的从 0.3s 起、用 0.35s 从上方落位。 */
+.panel-swap {
+  @include swap-down(0.3s, 0.35s, 0.75rem, 0.3s);
+}
+
+/* 生活指数聚焦卡换条目：卡片小、文字短，用和面板一样的节奏就够了（一出一进约 0.65s） */
+.index-swap {
+  @include swap-down(0.3s, 0.35s);
+}
+
+/* 外壳首次出现：淡入 + 轻微上抬（不是"换内容"，所以不套上面的 mixin） */
+.panel-in-enter-active {
+  transition: opacity 0.26s var(--ease-enter), transform 0.3s var(--ease-enter);
+}
+
+.panel-in-enter-from {
+  opacity: 0;
+  transform: translateY(1.25rem) scale(0.985);
+}
+
+.panel-in-leave-active {
+  transition: opacity 0.12s var(--ease-leave), transform 0.16s var(--ease-leave);
+}
+
+.panel-in-leave-to {
+  opacity: 0;
+  transform: translateY(-0.75rem) scale(0.99);
+}
+
+/* 天气预警 chip 轮播：原作者设计的方向，与上面相反（从下往上）。
+   想统一成「从上渐入、往下渐出」的话，把下面两个 transform 的正负号对调即可。 */
+.chip-fade-enter-active,
+.chip-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s var(--ease);
+}
+
+.chip-fade-enter-from {
+  opacity: 0;
+  transform: translateY(0.75rem);
+}
+
+.chip-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-0.75rem);
+}
+
+/* 全屏弹层：整层只做淡入淡出（面板自身的位移/缩放见 EarlyWarningDetails.vue） */
+.Dialog-enter-active,
+.Dialog-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.Dialog-enter-from,
+.Dialog-leave-to {
+  opacity: 0;
+}

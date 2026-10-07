@@ -10,7 +10,8 @@
       <LocationPicker v-if="showLocationStep" @selected="handleLocationSelected" />
 
       <!-- 第 1 步：说明 + 实时读取用户填写的域名/密钥 + 检测结果 -->
-      <div v-else class="panel-view OnboardingPanel">
+      <!-- 页面里任何一次点击 / 按键都说明用户在场，立刻停掉自动前进（见下方 autoSecondsLeft） -->
+      <div v-else class="panel-view OnboardingPanel" @pointerdown="stopAutoAdvance" @keydown="stopAutoAdvance">
         <section class="onb-left">
           <div class="onb-aura" aria-hidden="true"></div>
 
@@ -46,9 +47,13 @@
 
             <div class="onb-actions">
               <button v-if="primaryAction" class="onb-btn primary" type="button" :disabled="primaryAction.disabled"
-                @click="primaryAction.run()">{{ primaryAction.label }}</button>
+                @click="primaryAction.run()">{{ primaryLabel }}</button>
               <button v-if="secondaryAction" class="onb-btn ghost" type="button" :disabled="secondaryAction.disabled"
                 @click="secondaryAction.run()">{{ secondaryAction.label }}</button>
+              <div v-if="autoSecondsLeft > 0" class="onb-auto">
+                <span>不想自动继续？</span>
+                <button class="onb-auto-cancel" type="button" @click="stopAutoAdvance">留在此页</button>
+              </div>
               <button class="onb-help" type="button" @click="showHelp = true">
                 <svg class="onb-help-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
@@ -90,8 +95,8 @@
               <li>
                 <span class="onb-step-no">3</span>
                 <div class="onb-step-body">
-                  <div class="onb-step-title">检测通过 → 下一步选择位置</div>
-                  <p class="onb-step-text">出现「下一步」按钮后选好城市，就会显示天气</p>
+                  <div class="onb-step-title">检测通过 → 选好城市，显示天气</div>
+                  <p class="onb-step-text">检测通过后会倒数几秒自动继续；也可以直接点按钮马上走</p>
                 </div>
               </li>
             </ol>
@@ -149,7 +154,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LocationPicker from '@/features/weather/LocationPicker.vue'
 import ApiHelpPanel from './ApiHelpPanel.vue'
 import {
@@ -207,11 +212,15 @@ const canClose = computed(() => CredentialsReady.value && !NeedsLocation.value)
 
 /**
  * 两个按钮槽位各只放最该点的那一个，避免一排按钮让人不知道点哪个
- * 主按钮：下一步（检测通过）> 返回天气（已可用）> 网络异常仍然继续
+ * 主按钮：下一步（凭据可用但还没选位置）> 返回天气（已可用）> 网络异常仍然继续
  * 次按钮：检测中 / 重新检测（填写过才出现）
+ *
+ * 这里用 CredentialsReady 而不是 CheckStatus === 'ok'：网络异常时用户点了
+ * 「仍然继续」，凭据也已经是「可用」状态（NetworkOverride），只是还没选位置；
+ * 只看 CheckStatus 的话按钮会一直停在「网络异常，仍然继续」上，怎么点都没反应。
  */
 const primaryAction = computed(() => {
-  if (CheckStatus.value === 'ok' && NeedsLocation.value) {
+  if (CredentialsReady.value && NeedsLocation.value) {
     return { label: '下一步 · 选择所在位置', run: goToLocationStep }
   }
   if (canClose.value) return { label: '返回天气', run: closeOnboarding }
@@ -225,8 +234,88 @@ const secondaryAction = computed(() => {
   return { label: '重新检测', run: runApiCheck }
 })
 
-// 底部步骤条：检测通过后第 1 步点亮，顺带把下一步动作说清楚
-const stepDone = computed(() => CheckStatus.value === 'ok')
+/**
+ * 检测通过后自动前进：倒计时结束后直接触发「当前」主按钮（未选位置是下一步，已选过位置是返回天气）。
+ * 这里刻意不区分是不是首次使用 —— 按钮本来就会随状态变，倒计时只负责点它。
+ *
+ * 这里不看引导页是怎么打开的（首次使用、密钥失效、还是用户点钥匙图标回来看设置都一样）：
+ * 只要检测通过、还停在第 1 步，就倒数几秒自动点当前主按钮。
+ * 用户真要留在这一页时，界面内任何一次点击 / 按键都会立刻停掉倒计时，
+ * 按钮下面也留了「留在此页」的出口 —— 自动跳转必须让人看得见、能取消。
+ */
+const AUTO_ADVANCE_SECONDS = 9
+// 倒计时的计时心跳。这里不用页面里的 setInterval：壁纸引擎进全屏 / 切走窗口时页面会被隐藏，
+// 页面定时器会被节流（项目里的预警轮播、指数轮播都因为这个改用了 Worker），
+// 倒计时会停在那儿不动。用 Worker 计时，再按时间戳算剩余秒数，睡多久都能补回来。
+const AUTO_TICK_MS = 500
+const autoSecondsLeft = ref(0)
+let autoTicker = null
+let autoTickerUrl = ''
+let autoDeadline = 0
+
+const stopAutoAdvance = () => {
+  autoTicker?.terminate()
+  autoTicker = null
+  if (autoTickerUrl) {
+    URL.revokeObjectURL(autoTickerUrl)
+    autoTickerUrl = ''
+  }
+  autoSecondsLeft.value = 0
+}
+
+// 「检测通过 + 还停在第 1 步」就自动走
+const canAutoAdvance = computed(
+  () => CheckStatus.value === 'ok' && !showLocationStep.value
+)
+
+// 倒计时直接写在主按钮上：用户盯的是按钮，秒数出现在别处等于没提示
+const primaryLabel = computed(() => {
+  const label = primaryAction.value?.label || ''
+  if (autoSecondsLeft.value <= 0) return label
+  return `${label}（${autoSecondsLeft.value} 秒后自动）`
+})
+
+const tickAutoAdvance = () => {
+  if (!autoTicker) return
+  autoSecondsLeft.value = Math.max(0, Math.ceil((autoDeadline - Date.now()) / 1000))
+  if (autoSecondsLeft.value > 0) return
+  stopAutoAdvance()
+  // 到点了再取一次当前主按钮：这几秒里状态可能已经变了
+  if (!canAutoAdvance.value) return
+  const action = primaryAction.value
+  if (action && !action.disabled) action.run()
+}
+
+const startAutoAdvance = () => {
+  if (autoTicker) return
+  if (!canAutoAdvance.value || !primaryAction.value || primaryAction.value.disabled) return
+  autoDeadline = Date.now() + AUTO_ADVANCE_SECONDS * 1000
+  autoSecondsLeft.value = AUTO_ADVANCE_SECONDS
+  const blob = new Blob([`setInterval(function(){postMessage(1)},${AUTO_TICK_MS})`], {
+    type: 'application/javascript',
+  })
+  autoTickerUrl = URL.createObjectURL(blob)
+  autoTicker = new Worker(autoTickerUrl)
+  autoTicker.onmessage = tickAutoAdvance
+}
+
+// 条件成立就起表、不成立就收表，两种情况共用同一个 watch，避免多处漏清理
+watch(canAutoAdvance, (ok) => (ok ? startAutoAdvance() : stopAutoAdvance()), { immediate: true })
+
+// 壁纸引擎进入全屏游戏等场景会把页面挂起，页面里的定时器会被节流：
+// 回到可见时补算一次，避免倒计时停在那儿不动
+const handleAutoVisibility = () => {
+  if (document.visibilityState === 'visible') tickAutoAdvance()
+}
+onMounted(() => document.addEventListener('visibilitychange', handleAutoVisibility))
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleAutoVisibility)
+  stopAutoAdvance()
+})
+
+// 底部步骤条：凭据可用（检测通过，或网络异常时用户选择继续）后第 1 步点亮，
+// 和主按钮用同一个判据，避免「按钮已经能进下一步、步骤条还说没检测完」
+const stepDone = computed(() => CredentialsReady.value)
 const stepHint = computed(() =>
   stepDone.value ? '第 1 步已完成 · 下一步：选择所在位置' : '第 1 步 · 填写并检测域名与密钥'
 )
@@ -256,6 +345,7 @@ watch([UserApiHostRaw, UserApiKeyRaw], ([host, key]) => {
 
 // 凭据被改动 → 退回第 1 步，重新看过检测结果再决定要不要继续
 watch(UserApiFingerprint, () => {
+  stopAutoAdvance()
   nextStepRequested.value = false
 })
 
@@ -507,6 +597,8 @@ const handleLocationSelected = () => {
   font-size: 0.8rem;
   line-height: 1.55;
   color: var(--text-secondary);
+  /* 错误提示可能带换行（如「主体 + 建议」多行），保留换行符 */
+  white-space: pre-line;
 }
 
 /* 多域名时逐组列出：小圆点区分可用 / 不可用，域名过长省略 */
@@ -573,10 +665,13 @@ const handleLocationSelected = () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 0.4375rem;
   padding: 0.625rem 1rem;
   font-size: 0.85rem;
   font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
   color: var(--text-secondary);
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
@@ -606,6 +701,34 @@ const handleLocationSelected = () => {
       border-color: transparent;
       filter: brightness(1.07);
     }
+  }
+}
+
+/* 自动前进的出口：秒数已经写在主按钮上，这里只留一句「别自动走」的退路 */
+.onb-auto {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4375rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.onb-auto-cancel {
+  padding: 0;
+  font: inherit;
+  color: #8ed3f7;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 0.1875rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #bae6fd;
   }
 }
 

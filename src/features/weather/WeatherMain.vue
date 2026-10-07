@@ -3,10 +3,10 @@
     <!-- 卡片外壳常驻，切换的是壳里的内容（动效定义见 style/weather-panel.scss） -->
     <Transition name="panel-in" appear>
      <div v-if="shellVisible" class="weather-shell" :class="{ 'weather-shell-card': panelView === 'weather' }">
-        <!-- 不要用 mode="out-in"：引导页内部（第 1 步 ↔ 第 2 步）也有过渡，
-             两者会在同一帧里争抢同一个元素的离场回调，导致外层收不到 transitionend、
-             状态卡在"正在离场"，新内容永远进不来（外壳只剩一张空卡）。
-             改用交叉淡入淡出，两个面板在外壳里叠在同一格，见 style/weather-panel.scss -->
+        <!-- 这里不用 mode="out-in"：外壳面板切换时 Vue 的 out-in 会卡在"正在离场"
+             （isLeaving 复位不了、新面板永不挂载，实测外壳会变成一张空卡，清空内层过渡也一样）。
+             改用"离场 + 进场延迟"达到同样的「先出后进」观感 —— 见 src/style/transitions.scss。
+             两块面板叠在外壳的同一格里（.weather-shell > * { grid-area: 1/1 }）。 -->
         <Transition name="panel-swap">
           <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
           <OnboardingPanel v-if="panelView === 'onboarding'" />
@@ -72,16 +72,34 @@
           <span v-if="WeatherEarlyWarning.length > 1" class="early-count">×{{ WeatherEarlyWarning.length }}</span>
         </button>
 
-        <div v-if="WeatherIndices.length" class="indices">
+        <div v-if="displayedIndices.length" class="indices">
           <div class="indices-title">生活指数</div>
-          <ul class="indices-grid">
-            <li v-for="idx in WeatherIndices" :key="idx.type" class="index-tile"
-              :class="'idx-' + indexTone(idx.category)">
-              <span class="index-icon" v-html="indexIcon(idx.type)"></span>
-              <span class="index-name">{{ idx.name.replace('指数', '') }}</span>
-              <span class="index-cat">{{ idx.category }}</span>
-            </li>
-          </ul>
+          <!-- 选择器：4 列 2 行（7 条 → 4+3），图标 + 名称各一行；点哪条下面就讲哪条。
+               末行恰好 3 个时拉伸填满整行（.stretch-last），右下角不留缺口 -->
+          <div class="indices-picker" :class="{ 'stretch-last': stretchLastRow }">
+            <button v-for="idx in displayedIndices" :key="idx.type" type="button" class="index-cell"
+              :class="['tone-' + indexTone(idx.category), { active: activeIndexType === idx.type }]"
+              :aria-pressed="activeIndexType === idx.type" :title="idx.name"
+              @click="selectIndex(idx.type)">
+              <span class="index-cell-icon" v-html="indexIcon(idx.type)"></span>
+              <span class="index-cell-name">{{ idx.name.replace('指数', '') }}</span>
+            </button>
+          </div>
+          <!-- 聚焦卡：选中指数的分类 + 完整说明（正文固定 2 行高，切换不跳） -->
+          <div v-if="activeIndex" class="index-focus" :class="'tone-' + indexTone(activeIndex.category)">
+            <!-- mode="out-in"：旧的先走完再让新的进来，两段文字不会同时出现在卡片里 -->
+            <Transition name="index-swap" mode="out-in">
+              <div :key="activeIndex.type">
+                <div class="index-focus-head">
+                  <span class="index-focus-icon" v-html="indexIcon(activeIndex.type)"></span>
+                  <span class="index-focus-name">{{ activeIndex.name }}</span>
+                  <span class="index-focus-sep">·</span>
+                  <span class="index-focus-cat">{{ activeIndex.category }}</span>
+                </div>
+                <p class="index-focus-text">{{ activeIndex.text }}</p>
+              </div>
+            </Transition>
+          </div>
         </div>
       </header>
 
@@ -315,6 +333,77 @@ const statIcon = (key) => iconSvg(ICONS[key] || '')
 const INDEX_TYPE_ICON = { 1: 'sport', 2: 'wash', 3: 'dress', 5: 'uv', 6: 'travel', 8: 'comfort', 9: 'flu' }
 const indexIcon = (type) => iconSvg(ICONS[INDEX_TYPE_ICON[type] || 'uv'])
 
+/* 生活指数：选择器 + 聚焦卡。
+   左栏空间实测很紧（1920×1080、panelscale 0.75 时整栏只剩 30px，出现预警 chip 时只剩 15px），
+   所以选择器固定 4 列 × 2 行（7 条 → 4+3），聚焦卡正文固定预留 3 行高：
+   两行选择器 81px + 聚焦卡 84px ≈ 194px，与原版 6 张卡（192px）基本持平，
+   整栏余量约 28px（出现预警 chip 时约 10px，且是恒定下界 —— 更长的正文由 line-clamp 截断）。 */
+// 展示顺序：按「出行 / 健康」分两行 —— 第一行运动 / 洗车 / 旅游 / 舒适度，第二行穿衣 / 紫外线 / 感冒。
+// 接口返回顺序不保证稳定，所以按 type 显式排一次；未知 type 排在最后，保留其原有相对顺序。
+const INDEX_DISPLAY_ORDER = ['1', '2', '6', '8', '3', '5', '9']
+const indexRank = (idx) => {
+  const i = INDEX_DISPLAY_ORDER.indexOf(String(idx.type))
+  return i === -1 ? INDEX_DISPLAY_ORDER.length : i
+}
+const displayedIndices = computed(() =>
+  WeatherIndices.value
+    .map((idx, order) => ({ idx, order }))
+    .sort((a, b) => indexRank(a.idx) - indexRank(b.idx) || a.order - b.order)
+    .map((item) => item.idx)
+)
+// 4 列布下末行恰好 3 个才拉伸填满（每个约 80px，和上一行 58px 的差距还能接受）；
+// 末行只剩 1~2 个时拉伸会把格子撑到 120px 以上，那两种情况继续走居中
+const stretchLastRow = computed(() => displayedIndices.value.length % 4 === 3)
+
+const activeIndexType = ref(null)
+const activeIndex = computed(
+  () => displayedIndices.value.find((idx) => idx.type === activeIndexType.value) || displayedIndices.value[0] || null
+)
+// 默认选中「最需要注意」的那条（较不宜 / 强 / 易发…），没有就选第一条
+const defaultIndexType = (list) => (list.find((idx) => indexTone(idx.category) === 'warn') || list[0])?.type ?? null
+watch(
+  WeatherIndices,
+  () => {
+    const list = displayedIndices.value
+    if (!list.length) {
+      activeIndexType.value = null
+      return
+    }
+    // 数据刷新后尽量保留用户当前选中的那条，只有它不在新数据里时才重算默认值
+    if (!list.some((idx) => idx.type === activeIndexType.value)) {
+      activeIndexType.value = defaultIndexType(list)
+    }
+  },
+  { immediate: true }
+)
+
+/* 生活指数轮播：动效方向与预警 chip 相反 —— 新的一条从上方渐入、旧的一条向下渐出（见 .index-swap-*）。
+   和预警一样用 Worker 计时 —— 壁纸引擎进全屏后页面会被隐藏，页面里的 setInterval 会被节流。 */
+const INDEX_ROTATE_INTERVAL = 1000 * 12
+let indexRotateWorker = null
+const stopIndexRotate = () => {
+  indexRotateWorker?.terminate()
+  indexRotateWorker = null
+}
+const startIndexRotate = () => {
+  stopIndexRotate()
+  const blob = new Blob([`setInterval(function(){postMessage(1)},${INDEX_ROTATE_INTERVAL})`], {
+    type: 'application/javascript'
+  })
+  indexRotateWorker = new Worker(URL.createObjectURL(blob))
+  indexRotateWorker.onmessage = () => {
+    const list = displayedIndices.value
+    if (list.length < 2) return
+    const current = list.findIndex((idx) => idx.type === activeIndexType.value)
+    activeIndexType.value = list[(current + 1) % list.length].type
+  }
+}
+// 手动点某条：立刻切过去，并重新计时 —— 让这条完整停留一个周期再继续轮播
+const selectIndex = (type) => {
+  activeIndexType.value = type
+  startIndexRotate()
+}
+
 const { errCount } = useWeatherRefresh({
   refresh: getLocationInformation,
   // 生活指数错峰刷新：主周期固定 3 个请求，与多域名池（3 个域名）对齐
@@ -343,6 +432,7 @@ onMounted(() => {
   Bus.on(BUS_EVENTS.SHOW_WEATHER_MAIN, handleShowWeatherMain)
   Bus.on(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, handleBackgroundIndexChange)
   ensureRotateWorker()
+  startIndexRotate()
   fetchHitokoto()
   startHitokotoAuto()
 })
@@ -351,6 +441,7 @@ onUnmounted(() => {
   Bus.off(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, handleBackgroundIndexChange)
   rotateWorker?.terminate()
   rotateWorker = null
+  stopIndexRotate()
   clearInterval(hitokotoAutoTimer)
 })
 
@@ -392,10 +483,10 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 /* 左栏出现天气预警 chip 时，比没有预警时多占一行（chip 本身 + 一个 gap）。
-   面板高度有限（见 style/weather-panel.scss），这里把左栏间距和指数卡内边距收紧一点，
-   把省下来的高度让给 chip，保证 6 个生活指数卡完整落在面板内而不是被顶到下沿外。
-   实测（1920×1080、panelscale 0.75）：不收紧时左栏内容比面板高 12px，指数卡底边离面板下沿只剩 8px；
-   收紧后指数卡底部还有约 35px 余量（完全没有预警时约 50px）。 */
+   面板高度有限（见 style/weather-panel.scss），这里把左栏间距和指数选择器内边距收紧一点，
+   把省下来的高度让给 chip，保证生活指数区完整落在面板内而不是被顶到下沿外。
+   实测（1920×1080、panelscale 0.75）：6 张指数卡的老版式用完只剩 15px 余量；
+   改成「4 列选择器 + 聚焦卡」后还剩 10px（没有预警时约 28px）。 */
 .hero.hero-warning {
   gap: 0.875rem;
 }
@@ -404,8 +495,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   margin-top: 0.375rem;
 }
 
-.hero.hero-warning .index-tile {
-  padding: 0.75rem 0.6875rem;
+.hero.hero-warning .index-cell {
+  padding: 0.3125rem 0.25rem;
 }
 
 .hero-top {
@@ -617,21 +708,6 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   border-radius: 999px;
 }
 
-.chip-fade-enter-active,
-.chip-fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s var(--ease);
-}
-
-.chip-fade-enter-from {
-  opacity: 0;
-  transform: translateY(0.75rem);
-}
-
-.chip-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-0.75rem);
-}
-
 /* ================= 右侧：详情 + 指数 + 预报 ================= */
 .details {
   display: flex;
@@ -745,11 +821,10 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
 .stat:hover {
-  transform: translateY(-0.125rem);
   border-color: var(--glass-border-strong);
 }
 
@@ -813,52 +888,143 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   color: var(--text-muted);
 }
 
-.indices-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
-  gap: 0.75rem;
+/* 选择器：4 列 × 2 行（7 条 → 4+3）。图标用语气色，让「较不宜 / 强 / 易发…」
+   这些需要注意的条目在缩略状态下也能被一眼看到。
+   用 flex 而不是 grid：7 条时最后一行只有 3 个，justify-content 会把它们居中，
+   缺口从「右下角」变成左右各半个格子的对称留白；6 条时同样自动居中，不用分情况写死。 */
+.indices-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
-.index-tile {
+.index-cell {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  padding: 0.875rem 0.75rem;
+  align-items: center;
+  gap: 0.25rem;
+  /* 固定 4 列宽度：3 个 gap 占 1.5rem，剩下的四等分。
+     末尾减 0.01px 抵消亚像素误差，避免第 4 个格子被挤到下一行、变成 3 列。 */
+  flex: 0 0 calc((100% - 1.5rem) / 4 - 0.01px);
+  min-width: 0;
+  padding: 0.375rem 0.25rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.index-tile:hover {
-  transform: translateY(-0.125rem);
+.index-cell:hover {
   border-color: var(--glass-border-strong);
 }
 
-.index-icon {
+.index-cell.active {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--glass-border-strong);
+}
+
+.index-cell-icon {
   display: block;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.15rem;
+  height: 1.15rem;
   color: var(--text-secondary);
 }
 
-.index-name {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.index-cat {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.index-tile.idx-ok .index-cat {
+.index-cell.tone-ok .index-cell-icon {
   color: var(--color-ok);
 }
 
-.index-tile.idx-warn .index-cat {
+.index-cell.tone-warn .index-cell-icon {
   color: var(--color-warn);
+}
+
+.index-cell-name {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 末行恰好 3 个（7 条时是第 5 个起）→ 拉伸填满整行，右下角不留缺口。
+   拉伸后每个约 80px，与上一行的 58px 差距在可接受范围内；不满足条件时保持居中。 */
+.indices-picker.stretch-last .index-cell:nth-child(n + 5) {
+  flex-grow: 1;
+}
+
+/* 聚焦卡：选中指数的分类 + 完整说明。
+   正文固定 2 行高（min-height），否则各条文字长短不同，切换时整栏会上下跳。 */
+.index-focus {
+  /* 内边距提成变量，改一处就够 */
+  --focus-pad-x: 0.875rem;
+  --focus-pad-y: 0.625rem;
+  position: relative;
+  margin-top: 0.5rem;
+  /* out-in 换条时旧内容已移除、新内容还没插入，中间有一帧是空的：
+     兜一个高度（= 内边距 + 标题行 + 3 行正文 ≈ 实测的 84.2px），
+     卡片就不会在换条的一瞬间塌下去 */
+  min-height: 7rem;
+  padding: var(--focus-pad-y) var(--focus-pad-x);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  border-left: 0.1875rem solid var(--tone-color, var(--glass-border-strong));
+  border-radius: var(--radius-sm);
+  /* 轮播时离场的那份会向上滑出，裁掉它才能干净地"从卡片里滑走"，
+     而不是飘到上面的选择器上面去 */
+  overflow: hidden;
+  transition: border-left-color 0.2s ease;
+}
+
+.index-focus.tone-ok {
+  --tone-color: var(--color-ok);
+}
+
+.index-focus.tone-warn {
+  --tone-color: var(--color-warn);
+}
+
+.index-focus-head {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.index-focus-icon {
+  display: block;
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--tone-color, var(--text-secondary));
+}
+
+.index-focus-sep {
+  color: var(--text-muted);
+}
+
+.index-focus-cat {
+  color: var(--tone-color, var(--text-secondary));
+}
+
+.index-focus-text {
+  /* 预留 3 行（行高 1.6）：实测最长的一条（洗车，48 字）会折成 3 行，
+     只预留 2 行的话卡片会跟着文字长短长高变矮 —— 轮播时每 12 秒抖一次。
+     再长的正文由下面的 line-clamp 截断，卡片高度恒定。 */
+  min-height: 4.8em;
+  margin: 0.375rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* 兜底：极端长的正文最多 3 行，不会把左栏顶出去 */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .forecast-list {
@@ -878,12 +1044,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .forecast-list li:hover {
   background: var(--glass-bg-soft);
-  transform: translateY(-0.125rem);
 }
 
 .forecast-list li.active {

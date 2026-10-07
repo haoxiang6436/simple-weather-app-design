@@ -18,15 +18,3 @@ const { EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
     </transition>
   </div>
 </template>
-
-<style scoped>
-.Dialog-enter-active,
-.Dialog-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.Dialog-enter-from,
-.Dialog-leave-to {
-  opacity: 0;
-}
-</style>

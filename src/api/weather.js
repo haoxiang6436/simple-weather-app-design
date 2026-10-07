@@ -42,9 +42,21 @@ export const get7DayForecast = (location) =>
 export const getCurrentWeather = (location) =>
   requestWeather('/v7/weather/now', { location });
 
-// 天气预警
-export const getWeatherWarnings = (location) =>
-  requestWeather('/v7/warning/now', { location });
+// 经纬度按官方要求裁到两位小数（文档：十进制，最多支持小数点后两位）
+const round2 = (value) => Number(value).toFixed(2)
+
+/**
+ * 实时天气预警（新版接口）
+ *
+ * 旧接口 GET /v7/warning/now 已被官方下线，任何账号调用都返回
+ * 403 #deprecated（"This API has been deprecated and is no longer available"），
+ * 新版按经纬度查询：GET /weatheralert/v1/current/{latitude}/{longitude}
+ * 认证方式不变，仍然是查询参数里的 key。
+ *
+ * @param {{lat: string|number, lon: string|number}} coord 查询地点的经纬度
+ */
+export const getWeatherWarnings = ({ lat, lon }) =>
+  requestWeather(`/weatheralert/v1/current/${round2(lat)}/${round2(lon)}`);
 
 // 生活指数（type 必填：多个类型用英文逗号分隔，如 '1,3,5,9'）
 export const getWeatherIndices = (location, type) =>

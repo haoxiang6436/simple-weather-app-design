@@ -1,6 +1,6 @@
 {
 	"contentrating" : "Everyone",
-	"description" : "<h4>🌦️ 极简天气 · 更新日志</h4><br/>📅 更新日期：2026-09-01<br/><br/>✌️ 感谢使用，本次更新内容：<br/><br/>· UI 焕新：玻璃拟态风，左右信息更均衡、更易读<br/>· 生活指数：新增穿衣 / 紫外线 / 运动 / 洗车 / 旅游等卡片<br/>· 预报详情：新增紫外线 / 气压 / 能见度 / 日出日落，点击日期切换<br/>· 预警：手风琴展开 + 拖拽滚动，四级配色 + 自动轮播 + 数量角标<br/>· 一言：每日一句，点击即可换一句<br/>· 优化：超长地名（如新疆）自适应省略，数据缓存与刷新更稳<br/><br/>🎉 天气数据来源：和风天气 QWeather",
+	"description" : "<h4>QWeather🌦️和风天气[测试] · 更新日志</h4><br/>🚧 <b>测试阶段说明：本壁纸目前仍处于测试阶段（Beta），并非正式稳定版本</b>。功能和界面可能随时调整，也可能存在尚未发现的 Bug；欢迎在创意工坊留言反馈问题与建议，帮助我们把它做得更好。<br/><br/>📅 更新日期：2026-10-06<br/><br/>❗ 使用前须知：本壁纸的天气数据来自和风天气，需要你拥有自己的 <b>和风天气开发者账号</b>（可免费注册），并在「壁纸属性」面板里填入自己控制台的 API 域名与 Web API Key；本壁纸不提供公共密钥，未填写将无法显示天气。<br/><br/>✌️ 感谢使用，本次更新内容：<br/><br/>· 全新引导：首次使用自动进入引导页，手把手教你在和风天气控制台创建项目、获取 API 域名与密钥，并填入「壁纸属性」<br/>· 用户自带密钥：天气请求一律使用你自己填写的域名 + 密钥，支持多组（英文逗号分隔、按顺序配对）轮询，不再消耗作者额度<br/>· 地址选择页：全新的省 / 市 / 区三级点选页，含热门城市与最近选择，鼠标拖拽滚动 + 自绘滚动条<br/>· 整页雨珠叠加：新增第 5 种动态背景，雨珠层盖在整页之上并折射真实页面内容（含天气面板）<br/>· 体验优化：面板外壳常驻与切换动效、凭据校验防呆、缓存兜底、超长地名省略<br/>· 上一版回顾：玻璃拟态 UI、生活指数（穿衣 / 紫外线 / 运动 / 洗车 / 旅游等）、预报详情扩充、预警手风琴 + 自动轮播、每日一言<br/><br/>🎉 天气数据来源：和风天气 QWeather",
 	"file" : "index.html",
 	"general" : 
 	{
@@ -153,7 +153,7 @@
 			{
 				"index" : 10,
 				"order" : 11,
-				"text" : "<br/><br/>——————————————————<br/><h4>😀ThankYou<br/><small><br/>🎉最近一次的更新:2026-9-1<br/>--UI 焕新 / 生活指数 / 详情扩充 / 预警手风琴 / 一言<br/><br/>✌️感谢您的使用，使用过程中有什么问题意见，欢迎反馈<br/><br/>📄 本壁纸为开源项目（无盈利），源码：github.com/haoxiang6436/simple-weather-app-design<br/><br/>壁纸由<a href='https://cn.vuejs.org/'><img width='30px' height='30px' alt='【vue】' src='https://vuejs.org/images/logo.png'/></a>打造<br/>UI灵感来源于<a href='https://www.codepen.com/'><b>【codepen】</b></a><br/>3D动态背景来源<a href='https://www.vantajs.com/'><b>【vantaJS】</b></a><br/>天气服务来源<a href='https://www.qweather.com/'><b>【和风天气】</b></a></small></h4>——————————————————<br/>",
+				"text" : "<br/><br/>——————————————————<br/><h4>😀ThankYou<br/><small><br/>🎉最近一次的更新:2026-10-06<br/>🚧 本壁纸仍处于测试阶段（Beta），功能与界面可能继续调整<br/>--全新引导 / 用户自带域名密钥 / 地址选择页 / 整页雨珠叠加 / 面板切换动效<br/><br/>✌️感谢您的使用，使用过程中有什么问题意见，欢迎反馈<br/><br/>📄 本壁纸为开源项目（无盈利），源码：github.com/haoxiang6436/simple-weather-app-design<br/><br/>壁纸由<a href='https://cn.vuejs.org/'><img width='30px' height='30px' alt='【vue】' src='https://vuejs.org/images/logo.png'/></a>打造<br/>UI灵感来源于<a href='https://www.codepen.com/'><b>【codepen】</b></a><br/>3D动态背景来源<a href='https://www.vantajs.com/'><b>【vantaJS】</b></a><br/>天气服务来源<a href='https://www.qweather.com/'><b>【和风天气】</b></a></small></h4>——————————————————<br/>",
 				"type" : "text",
 				"value" : "0 0 0"
 			}
@@ -163,7 +163,7 @@
 	"ratingsex" : "none",
 	"ratingviolence" : "none",
 	"tags" : [ "Relaxing" ],
-	"title" : "极简天气🌦️QWeather",
+	"title" : "QWeather🌦️和风天气[测试]",
 	"type" : "web",
 	"version" : 25,
 	"visibility" : "public",
