@@ -1,9 +1,13 @@
 /**
- * 用户自带的 和风天气 API 域名 / 密钥
+ * 用户自带的 API 凭据
+ *
+ * 分两组：
+ * 1. 和风天气的域名 / 密钥（天气数据本身，必填，没填就没有天气）；
+ * 2. 高德「Web服务」key（可选，只影响地图选点处的路名，见文件末尾）。
  *
  * 数据来源：
  * - Wallpaper Engine：属性面板里的 textinput，由 features/wallpaper/properties.js 下发；
- * - 普通浏览器（Edge 开发 / 直接打开 dist）：引导面板里的输入框，本地持久化。
+ * - 普通浏览器（Edge 开发 / 直接打开 dist）：右上角调试悬浮块里的输入框，本地持久化。
  *
  * 两个来源都归一化成 entries：[{ host, key }]。多个域名/密钥用英文逗号分隔、按顺序一一配对，
  * 与旧版 VUE_APP_HOSTS / VUE_APP_KEYS 的规则保持一致，轮询分流逻辑完全复用。
@@ -196,5 +200,61 @@ export const setUserApiFromBrowser = (host, key) => {
   if (isBrowserRuntime()) {
     DevHost.value = UserApiHostRaw.value
     DevKey.value = UserApiKeyRaw.value
+  }
+}
+
+/* ---------------- 高德「Web服务」key（可选） ----------------
+ *
+ * 只用于地图选点处的逆地理编码（坐标 → 最近道路名，见 features/weather/reverseGeocode.js），
+ * 不参与天气请求。做成用户属性的原因：高德 Web服务 key 没有域名/Referer 白名单，
+ * 只要写进前端包就等于公开，谁都能拆包拿去刷额度；所以发布版包里不带任何 key，
+ * 填不填完全交给用户：
+ *   - 填了：地图选点后显示「最近的道路名」，主界面地址也用它（如「黄岩区 中学路」）；
+ *   - 不填：地址退回和风 GeoAPI 的区县反查（见 features/weather/placeLookup.js），
+ *     显示「xx附近」；选点、确认、查天气一切照常，不报错、不弹提示。
+ *
+ * 读写路径与上面的和风凭据完全一致：引擎下发 → 落一份缓存兜底；
+ * 浏览器里则写 localStorage，方便开发时刷新页面不丢。
+ */
+const AMAP_STORAGE_KEY = {
+  DEV: 'WallpaperUserAmapKey',
+  CACHE: 'WallpaperUserAmapKeyCached',
+}
+
+// 开发环境（浏览器）持久化
+const DevAmapKey = useStorage(AMAP_STORAGE_KEY.DEV, '')
+// 引擎上一次成功下发的 key：页面重载 / 引擎偶发不下发时兜底（理由同上面的和风凭据）
+const CachedAmapKey = useStorage(AMAP_STORAGE_KEY.CACHE, '', localStorage, { flush: 'sync' })
+
+const initialAmapKey = isBrowserRuntime()
+  ? String(DevAmapKey.value || '')
+  : String(CachedAmapKey.value || '')
+
+// 原文（用户敲进去的样子，可能带首尾空格）
+export const AmapKeyRaw = ref(initialAmapKey)
+// 去掉首尾空格后的 key；空字符串 = 用户没填，等价于「关闭路名功能」
+export const AmapKey = computed(() => String(AmapKeyRaw.value || '').trim())
+
+/**
+ * 壁纸引擎下发的 key
+ * @param {string|undefined} value 本次下发里的 key；这次没带上时传 undefined
+ * @param {Object} [options]
+ * @param {boolean} [options.fromLoad] 是否加载阶段的全量快照：加载阶段的空值当作
+ *   「引擎没读到」，保留缓存里的旧值；运行中的空值才是用户真的清空了输入框
+ */
+export const setAmapKeyFromProperties = (value, { fromLoad = false } = {}) => {
+  if (value === undefined) return
+  const text = String(value ?? '')
+  if (fromLoad && !text.trim()) return
+  AmapKeyRaw.value = text
+  CachedAmapKey.value = text
+}
+
+/** 浏览器调试用：写入并持久化 */
+export const setAmapKeyFromBrowser = (value) => {
+  AmapKeyRaw.value = String(value ?? '')
+  CachedAmapKey.value = AmapKeyRaw.value
+  if (isBrowserRuntime()) {
+    DevAmapKey.value = AmapKeyRaw.value
   }
 }

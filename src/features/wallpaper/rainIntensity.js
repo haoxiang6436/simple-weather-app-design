@@ -1,11 +1,15 @@
 /**
- * 「实时天气 → 雨量档位」的共用映射
+ * 「天气数据 → 雨量档位」的共用映射
  *
  * 供两个雨滴背景共用：
  *   - rain/RainEffect.vue（backgroundindex = 4，自带背景图的全屏后处理）
  *   - rain-overlay/RainOverlayEffect.vue（backgroundindex = 5，整页雨珠叠加）
  *
- * 优先级：先用和风天气的 icon 代码（数字最稳），icon 缺失或未知时再退回文本匹配。
+ * 自动档的数据源优先级：
+ *   1. 分钟级降水的第一条 —— 它就是最近这个 5 分钟段，见 resolveMinutelyIntensity；
+ *   2. 分钟级不可用（境外 / 请求失败 / 尚未加载）时，回退实时天气：
+ *      先用和风天气的 icon 代码（数字最稳），icon 缺失或未知时再退回文本匹配。
+ *
  * 返回 'storm' | 'heavy' | 'moderate' | 'light' | 'none'，各背景用自己的预设表取参数。
  *
  * 和风图标代码（3xx 全是降雨）：
@@ -14,6 +18,8 @@
  *   阵雨 350   强阵雨 303/351   雷阵雨 304   冻雨 313
  *   大到暴雨 316   暴雨到大暴雨 317   大暴雨到特大暴雨 318
  */
+
+import { isWetPrecip, precipToRate, rateLevel } from '@/features/weather/minutelyRain'
 
 const ICON_STORM = ['308', '310', '311', '312', '316', '317', '318']
 const ICON_HEAVY = ['302', '303', '307', '315', '351']
@@ -42,6 +48,28 @@ export const resolveRainIntensity = (weather) => {
   if (TEXT_MODERATE.test(text)) return 'moderate'
   if (TEXT_LIGHT.test(text)) return 'light'
   return 'none'
+}
+
+/**
+ * 「分钟级降水的第一条」→ 雨量档位
+ *
+ * 第一条就是最近这个 5 分钟段，所以这里不按时间索引：数据每 5 分钟刷新一次，
+ * 刷新后 `points[0]` 自然换成新的当前段，背景跟着变即可。
+ * 严格说它是 nowcast（未来 5 分钟），不是观测值；用来驱动「现在多大雨」足够。
+ *
+ * @param {{ points?: Array<{ precip?: number|string, type?: string }> }|null} minutely
+ *   store 里的 MinutelyPrecipitation
+ * @returns {'storm'|'heavy'|'moderate'|'light'|'none'|null}
+ *   null = 没有可用数据（境外 / 请求失败 / 尚未加载），调用方回退实时天气
+ */
+export const resolveMinutelyIntensity = (minutely) => {
+  const first = minutely?.points?.[0]
+  if (!first) return null
+  // 雪不交给雨滴背景：与原来 icon 4xx → 无雨的策略保持一致
+  if (first.type === 'snow') return 'none'
+  // 小于 WET_MM 的降水当作没下（rateLevel(0) 会返回「小雨」）
+  if (!isWetPrecip(first.precip)) return 'none'
+  return rateLevel(precipToRate(first.precip), first.type).key
 }
 
 export default resolveRainIntensity

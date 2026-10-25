@@ -25,9 +25,19 @@
           </div>
           <div class="api-status">{{ checkStatusText }}</div>
           <Space :size="8">
-            <Button size="mini" @click="openOnboarding">打开引导页</Button>
+            <Button size="mini" @click="openSettings">打开设置页</Button>
+            <Button size="mini" @click="openOnboarding()">打开引导页</Button>
             <Button size="mini" @click="resetOnboarding">模拟首次使用</Button>
           </Space>
+
+          <!-- 可选的高德密钥（对应 project.json 的 amapkey）
+               填了显示「最近道路名」；留空时地址退回和风区县反查（「xx附近」），照常使用 -->
+          <div class="section-title">高德密钥（选填）</div>
+          <div class="row">
+            <span class="label">Key</span>
+            <Input v-model="amapKey" size="small" class="control" placeholder="留空 = 显示区县附近" />
+          </div>
+          <div class="api-status">{{ amapStatusText }}</div>
           <Divider style="margin: 2px 0" />
 
           <!-- 天气面板整体缩放（全局属性，对应 project.json 的 panelscale） -->
@@ -50,9 +60,6 @@
             <span class="label">背景</span>
             <Select v-model="state.backgroundindex" size="small" class="control" @change="applyAll">
               <Option value="0">无</Option>
-              <Option value="1">小鸟</Option>
-              <Option value="2">星空</Option>
-              <Option value="3">动态粒子</Option>
               <Option value="4">实时渲染雨滴</Option>
               <Option value="5">整页雨珠叠加</Option>
             </Select>
@@ -125,6 +132,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
+import { useWeatherStore } from '@/store'
 import {
   Button,
   Card,
@@ -138,7 +146,9 @@ import {
 } from '@arco-design/web-vue'
 import Bus from '@/shared/Bus'
 import {
+  BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
+  DEFAULT_BACKGROUND_INDEX,
   DEFAULT_PANEL_SCALE,
   PANEL_SCALE_MAX,
   PANEL_SCALE_MIN,
@@ -147,7 +157,6 @@ import {
 } from './constants'
 import {
   BackgroundIndex,
-  BirdInteraction,
   applyWallpaperProperties,
 } from './properties'
 import {
@@ -156,15 +165,21 @@ import {
   resetBackgroundConfig,
   setBackgroundConfig,
 } from './backgroundConfig'
-import { UserApiHostRaw, UserApiKeyRaw, setUserApiFromBrowser } from '@/api/credentials'
+import {
+  AmapKeyRaw,
+  UserApiHostRaw,
+  UserApiKeyRaw,
+  setAmapKeyFromBrowser,
+  setUserApiFromBrowser,
+} from '@/api/credentials'
 import {
   ChosenLocationPath,
   CheckStatus,
   CheckSummary,
-  ForceOpen,
   LocationChosenAt,
   VerifiedFingerprint,
   openOnboarding,
+  openSettings,
 } from '@/features/onboarding/onboardingState'
 
 const collapsed = ref(false)
@@ -183,6 +198,23 @@ watch([UserApiHostRaw, UserApiKeyRaw], ([host, key]) => {
   if (apiKey.value !== key) apiKey.value = key
 })
 
+// 可选的高德密钥：只在开发环境用得上（发布版包里不带 key，用户在属性面板自己填）。
+// 与凭据模块双向同步，同样带去抖，避免逐字符落盘
+const amapKey = ref(AmapKeyRaw.value)
+let amapTimer = null
+watch(amapKey, (value) => {
+  clearTimeout(amapTimer)
+  amapTimer = setTimeout(() => setAmapKeyFromBrowser(value), 300)
+})
+watch(AmapKeyRaw, (value) => {
+  if (amapKey.value !== value) amapKey.value = value
+})
+const amapStatusText = computed(() => (
+  String(AmapKeyRaw.value || '').trim()
+    ? '已填写：地图选点会显示最近的道路名'
+    : '未填写：地址改用和风区县反查，显示「xx附近」'
+))
+
 const checkStatusText = computed(() => {
   const status = CheckStatus.value
   if (status === 'checking') return '检测中…'
@@ -192,6 +224,7 @@ const checkStatusText = computed(() => {
 })
 
 // 模拟新用户：清掉凭据、验证结果与已选位置，强制打开引导页
+const weatherStore = useWeatherStore()
 const resetOnboarding = () => {
   apiHost.value = ''
   apiKey.value = ''
@@ -199,7 +232,11 @@ const resetOnboarding = () => {
   VerifiedFingerprint.value = ''
   LocationChosenAt.value = 0
   ChosenLocationPath.value = []
-  ForceOpen.value = true
+  // 上一次地图点选的坐标也要清掉：只清「是否选过」和路径的话，地址页会把这份
+  // 残留坐标当成「当前位置」，一进去就跳过三列直接开地图、按钮直接是「就用这里」，
+  // 于是「模拟首次使用」压根不是首次。
+  weatherStore.dayDateCity = { ...weatherStore.dayDateCity, point: null }
+  openOnboarding()
 }
 
 // 调试属性直接持久化到 localStorage，修改即保存，无需手动读写
@@ -207,7 +244,6 @@ const state = useStorage(
   STORAGE_KEYS.WALLPAPER_DEBUG_PROPERTIES,
   {
     backgroundindex: BackgroundIndex.value,
-    backgroundinteraction: BirdInteraction.value,
     showweathermain: false,
     rainconfig: rainConfigStorage.value,
     panelscale: DEFAULT_PANEL_SCALE,
@@ -219,6 +255,10 @@ const state = useStorage(
 if (state.value.backgroundindex !== undefined) {
   state.value.backgroundindex = String(state.value.backgroundindex)
 }
+// 兼容旧数据：1/2/3 背景已移除，残留的序号回退到默认背景
+if (!BACKGROUND_INDEX_OPTIONS.includes(state.value.backgroundindex)) {
+  state.value.backgroundindex = DEFAULT_BACKGROUND_INDEX
+}
 // 兼容旧数据：早期版本没有面板缩放字段
 if (state.value.panelscale === undefined) {
   state.value.panelscale = DEFAULT_PANEL_SCALE
@@ -226,7 +266,6 @@ if (state.value.panelscale === undefined) {
 
 // 转换为 Wallpaper Engine applyUserProperties 的入参结构
 const toWallpaperProperties = (p) => ({
-  [WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION]: { value: p.backgroundinteraction },
   [WALLPAPER_PROPERTIES.BACKGROUND_INDEX]: { value: String(p.backgroundindex) },
   [WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN]: { value: p.showweathermain },
   [WALLPAPER_PROPERTIES.RAIN_CONFIG]: { value: p.rainconfig },

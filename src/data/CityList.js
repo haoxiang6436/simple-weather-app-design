@@ -13573,11 +13573,1506 @@ export default [
             }
         ]
     },
+    // 台湾省：和风城市库里没有台湾的 adcode（传 710000 / 710100 会返回 400），
+    // 所以这一支的 value 直接用和风官方 LocationID（台北市 101340101、中正区 15FC8…），
+    // 三级列表选出来的依然是和风能直接定位的串，lookupCity() 无需改动。
+    // 数据用 node scripts/sync-taiwan-city-list.js <和风官方城市列表.csv> 刷新。
     {
         "value": "710000",
         "label": "台湾省",
-        "children":[
-            {"value":"1","label":"（敬请期待）","children":[]}
+        "children": [
+            {
+                "value": "101340101",
+                "label": "台北市",
+                "children": [
+                    {
+                        "value": "34272",
+                        "label": "北投区"
+                    },
+                    {
+                        "value": "77922",
+                        "label": "大安区"
+                    },
+                    {
+                        "value": "B4131",
+                        "label": "大同区"
+                    },
+                    {
+                        "value": "74604",
+                        "label": "南港区"
+                    },
+                    {
+                        "value": "D54D9",
+                        "label": "内湖区"
+                    },
+                    {
+                        "value": "215EB",
+                        "label": "士林区"
+                    },
+                    {
+                        "value": "A033A",
+                        "label": "松山区"
+                    },
+                    {
+                        "value": "8296C",
+                        "label": "万华区"
+                    },
+                    {
+                        "value": "3981F",
+                        "label": "文山区"
+                    },
+                    {
+                        "value": "D13AC",
+                        "label": "信义区"
+                    },
+                    {
+                        "value": "C346",
+                        "label": "中山区"
+                    },
+                    {
+                        "value": "15FC8",
+                        "label": "中正区"
+                    }
+                ]
+            },
+            {
+                "value": "79754",
+                "label": "新北市",
+                "children": [
+                    {
+                        "value": "50460",
+                        "label": "八里区"
+                    },
+                    {
+                        "value": "D96E9",
+                        "label": "板桥区"
+                    },
+                    {
+                        "value": "BFA38",
+                        "label": "淡水区"
+                    },
+                    {
+                        "value": "B28D3",
+                        "label": "贡寮区"
+                    },
+                    {
+                        "value": "5A624",
+                        "label": "金山区"
+                    },
+                    {
+                        "value": "1353E",
+                        "label": "林口区"
+                    },
+                    {
+                        "value": "D9469",
+                        "label": "芦洲区"
+                    },
+                    {
+                        "value": "5DE8A",
+                        "label": "平溪区"
+                    },
+                    {
+                        "value": "72D3F",
+                        "label": "坪林区"
+                    },
+                    {
+                        "value": "39A9E",
+                        "label": "瑞芳区"
+                    },
+                    {
+                        "value": "1CB96",
+                        "label": "三峡区"
+                    },
+                    {
+                        "value": "BDA5B",
+                        "label": "三芝区"
+                    },
+                    {
+                        "value": "95B3C",
+                        "label": "三重区"
+                    },
+                    {
+                        "value": "1F906",
+                        "label": "深坑区"
+                    },
+                    {
+                        "value": "D0B00",
+                        "label": "石碇区"
+                    },
+                    {
+                        "value": "62C94",
+                        "label": "石门区"
+                    },
+                    {
+                        "value": "4F7B8",
+                        "label": "树林区"
+                    },
+                    {
+                        "value": "F21E4",
+                        "label": "双溪区"
+                    },
+                    {
+                        "value": "BCAE1",
+                        "label": "泰山区"
+                    },
+                    {
+                        "value": "2BF61",
+                        "label": "土城区"
+                    },
+                    {
+                        "value": "618B3",
+                        "label": "万里区"
+                    },
+                    {
+                        "value": "9B92A",
+                        "label": "乌来区"
+                    },
+                    {
+                        "value": "8B37C",
+                        "label": "五股区"
+                    },
+                    {
+                        "value": "6A009",
+                        "label": "汐止区"
+                    },
+                    {
+                        "value": "EFBAC",
+                        "label": "新店区"
+                    },
+                    {
+                        "value": "E9DC2",
+                        "label": "新庄区"
+                    },
+                    {
+                        "value": "1A131",
+                        "label": "莺歌区"
+                    },
+                    {
+                        "value": "9D3E5",
+                        "label": "永和区"
+                    },
+                    {
+                        "value": "36039",
+                        "label": "中和区"
+                    }
+                ]
+            },
+            {
+                "value": "101340102",
+                "label": "桃园市",
+                "children": [
+                    {
+                        "value": "4297D",
+                        "label": "八德区"
+                    },
+                    {
+                        "value": "ED785",
+                        "label": "大溪区"
+                    },
+                    {
+                        "value": "8A667",
+                        "label": "大园区"
+                    },
+                    {
+                        "value": "490B9",
+                        "label": "复兴区"
+                    },
+                    {
+                        "value": "62622",
+                        "label": "观音区"
+                    },
+                    {
+                        "value": "5327F",
+                        "label": "龟山区"
+                    },
+                    {
+                        "value": "C4BED",
+                        "label": "龙潭区"
+                    },
+                    {
+                        "value": "28C50",
+                        "label": "芦竹区"
+                    },
+                    {
+                        "value": "2A17C",
+                        "label": "平镇区"
+                    },
+                    {
+                        "value": "F69B",
+                        "label": "新屋区"
+                    },
+                    {
+                        "value": "4E71A",
+                        "label": "杨梅区"
+                    },
+                    {
+                        "value": "D6C2D",
+                        "label": "中坜区"
+                    }
+                ]
+            },
+            {
+                "value": "101340401",
+                "label": "台中市",
+                "children": [
+                    {
+                        "value": "DCECC",
+                        "label": "北区"
+                    },
+                    {
+                        "value": "3BD59",
+                        "label": "北屯区"
+                    },
+                    {
+                        "value": "1BD97",
+                        "label": "大安区"
+                    },
+                    {
+                        "value": "274A6",
+                        "label": "大肚区"
+                    },
+                    {
+                        "value": "77B7",
+                        "label": "大甲区"
+                    },
+                    {
+                        "value": "3B30D",
+                        "label": "大里区"
+                    },
+                    {
+                        "value": "B99C9",
+                        "label": "大雅区"
+                    },
+                    {
+                        "value": "7AD1B",
+                        "label": "东区"
+                    },
+                    {
+                        "value": "B1954",
+                        "label": "东势区"
+                    },
+                    {
+                        "value": "E8BA8",
+                        "label": "丰原区"
+                    },
+                    {
+                        "value": "EED7A",
+                        "label": "和平区"
+                    },
+                    {
+                        "value": "12705",
+                        "label": "后里区"
+                    },
+                    {
+                        "value": "232B2",
+                        "label": "龙井区"
+                    },
+                    {
+                        "value": "65B59",
+                        "label": "南区"
+                    },
+                    {
+                        "value": "BD890",
+                        "label": "南屯区"
+                    },
+                    {
+                        "value": "1C370",
+                        "label": "清水区"
+                    },
+                    {
+                        "value": "B263B",
+                        "label": "沙鹿区"
+                    },
+                    {
+                        "value": "F2FA2",
+                        "label": "神冈区"
+                    },
+                    {
+                        "value": "7F7CD",
+                        "label": "石冈区"
+                    },
+                    {
+                        "value": "14A62",
+                        "label": "太平区"
+                    },
+                    {
+                        "value": "44BC2",
+                        "label": "潭子区"
+                    },
+                    {
+                        "value": "C532F",
+                        "label": "外埔区"
+                    },
+                    {
+                        "value": "22E50",
+                        "label": "乌日区"
+                    },
+                    {
+                        "value": "BBB19",
+                        "label": "梧栖区"
+                    },
+                    {
+                        "value": "A7B14",
+                        "label": "雾峰区"
+                    },
+                    {
+                        "value": "6DB7C",
+                        "label": "西区"
+                    },
+                    {
+                        "value": "88DAC",
+                        "label": "西屯区"
+                    },
+                    {
+                        "value": "95178",
+                        "label": "新社区"
+                    },
+                    {
+                        "value": "75272",
+                        "label": "中区"
+                    }
+                ]
+            },
+            {
+                "value": "101340203",
+                "label": "台南市",
+                "children": [
+                    {
+                        "value": "A3EFD",
+                        "label": "安定区"
+                    },
+                    {
+                        "value": "485D2",
+                        "label": "安南区"
+                    },
+                    {
+                        "value": "3A428",
+                        "label": "安平区"
+                    },
+                    {
+                        "value": "7B4D7",
+                        "label": "白河区"
+                    },
+                    {
+                        "value": "BFFEA",
+                        "label": "北门区"
+                    },
+                    {
+                        "value": "9B388",
+                        "label": "北区"
+                    },
+                    {
+                        "value": "98EF7",
+                        "label": "大内区"
+                    },
+                    {
+                        "value": "DED29",
+                        "label": "东区"
+                    },
+                    {
+                        "value": "4FC38",
+                        "label": "东山区"
+                    },
+                    {
+                        "value": "2DF8D",
+                        "label": "关庙区"
+                    },
+                    {
+                        "value": "2B8F1",
+                        "label": "官田区"
+                    },
+                    {
+                        "value": "F0DE1",
+                        "label": "归仁区"
+                    },
+                    {
+                        "value": "AF42E",
+                        "label": "后壁区"
+                    },
+                    {
+                        "value": "4D572",
+                        "label": "佳里区"
+                    },
+                    {
+                        "value": "640E",
+                        "label": "将军区"
+                    },
+                    {
+                        "value": "5D1AC",
+                        "label": "柳营区"
+                    },
+                    {
+                        "value": "CB526",
+                        "label": "六甲区"
+                    },
+                    {
+                        "value": "7527B",
+                        "label": "龙崎区"
+                    },
+                    {
+                        "value": "7E91B",
+                        "label": "麻豆区"
+                    },
+                    {
+                        "value": "2ADEC",
+                        "label": "南化区"
+                    },
+                    {
+                        "value": "4EE12",
+                        "label": "南区"
+                    },
+                    {
+                        "value": "1131A",
+                        "label": "楠西区"
+                    },
+                    {
+                        "value": "3FC8E",
+                        "label": "七股区"
+                    },
+                    {
+                        "value": "30712",
+                        "label": "仁德区"
+                    },
+                    {
+                        "value": "9DAAA",
+                        "label": "山上区"
+                    },
+                    {
+                        "value": "CB5C1",
+                        "label": "善化区"
+                    },
+                    {
+                        "value": "65449",
+                        "label": "西港区"
+                    },
+                    {
+                        "value": "E4AB6",
+                        "label": "下营区"
+                    },
+                    {
+                        "value": "9E358",
+                        "label": "新化区"
+                    },
+                    {
+                        "value": "B345C",
+                        "label": "新市区"
+                    },
+                    {
+                        "value": "955CC",
+                        "label": "新营区"
+                    },
+                    {
+                        "value": "81AE3",
+                        "label": "学甲区"
+                    },
+                    {
+                        "value": "6F8E8",
+                        "label": "盐水区"
+                    },
+                    {
+                        "value": "48D19",
+                        "label": "永康区"
+                    },
+                    {
+                        "value": "601C9",
+                        "label": "玉井区"
+                    },
+                    {
+                        "value": "16946",
+                        "label": "中西区"
+                    },
+                    {
+                        "value": "E5098",
+                        "label": "左镇区"
+                    }
+                ]
+            },
+            {
+                "value": "101340201",
+                "label": "高雄市",
+                "children": [
+                    {
+                        "value": "1FCAC",
+                        "label": "阿莲区"
+                    },
+                    {
+                        "value": "69041",
+                        "label": "大寮区"
+                    },
+                    {
+                        "value": "B25DD",
+                        "label": "大社区"
+                    },
+                    {
+                        "value": "786AD",
+                        "label": "大树区"
+                    },
+                    {
+                        "value": "AEA05",
+                        "label": "凤山区"
+                    },
+                    {
+                        "value": "8E183",
+                        "label": "冈山区"
+                    },
+                    {
+                        "value": "ED37A",
+                        "label": "鼓山区"
+                    },
+                    {
+                        "value": "7F2B8",
+                        "label": "湖内区"
+                    },
+                    {
+                        "value": "E9D4F",
+                        "label": "茄萣区"
+                    },
+                    {
+                        "value": "D8B7D",
+                        "label": "甲仙区"
+                    },
+                    {
+                        "value": "685A4",
+                        "label": "林园区"
+                    },
+                    {
+                        "value": "1860C",
+                        "label": "苓雅区"
+                    },
+                    {
+                        "value": "A7AA7",
+                        "label": "六龟区"
+                    },
+                    {
+                        "value": "60C6E",
+                        "label": "路竹区"
+                    },
+                    {
+                        "value": "1D33",
+                        "label": "茂林区"
+                    },
+                    {
+                        "value": "4D0CD",
+                        "label": "美浓区"
+                    },
+                    {
+                        "value": "AACF5",
+                        "label": "弥陀区"
+                    },
+                    {
+                        "value": "E3120",
+                        "label": "那玛夏区"
+                    },
+                    {
+                        "value": "394EA",
+                        "label": "楠梓区"
+                    },
+                    {
+                        "value": "9346C",
+                        "label": "内门区"
+                    },
+                    {
+                        "value": "12AC3",
+                        "label": "鸟松区"
+                    },
+                    {
+                        "value": "7AC37",
+                        "label": "旗津区"
+                    },
+                    {
+                        "value": "6946C",
+                        "label": "旗山区"
+                    },
+                    {
+                        "value": "64DF4",
+                        "label": "前金区"
+                    },
+                    {
+                        "value": "7EF65",
+                        "label": "前镇区"
+                    },
+                    {
+                        "value": "F178D",
+                        "label": "桥头区"
+                    },
+                    {
+                        "value": "EDE8C",
+                        "label": "仁武区"
+                    },
+                    {
+                        "value": "CAE8D",
+                        "label": "三民区"
+                    },
+                    {
+                        "value": "74A65",
+                        "label": "杉林区"
+                    },
+                    {
+                        "value": "442FB",
+                        "label": "桃源区"
+                    },
+                    {
+                        "value": "2787E",
+                        "label": "田寮区"
+                    },
+                    {
+                        "value": "BEA9E",
+                        "label": "小港区"
+                    },
+                    {
+                        "value": "B93FB",
+                        "label": "新兴区"
+                    },
+                    {
+                        "value": "89FCB",
+                        "label": "盐埕区"
+                    },
+                    {
+                        "value": "5B14E",
+                        "label": "燕巢区"
+                    },
+                    {
+                        "value": "522A8",
+                        "label": "永安区"
+                    },
+                    {
+                        "value": "2A7A9",
+                        "label": "梓官区"
+                    },
+                    {
+                        "value": "CD807",
+                        "label": "左营区"
+                    }
+                ]
+            },
+            {
+                "value": "A9E1",
+                "label": "基隆市",
+                "children": [
+                    {
+                        "value": "D3A0D",
+                        "label": "安乐区"
+                    },
+                    {
+                        "value": "2CA40",
+                        "label": "暖暖区"
+                    },
+                    {
+                        "value": "4A9E4",
+                        "label": "七堵区"
+                    },
+                    {
+                        "value": "F116A",
+                        "label": "仁爱区"
+                    },
+                    {
+                        "value": "5FA11",
+                        "label": "信义区"
+                    },
+                    {
+                        "value": "4D45B",
+                        "label": "中山区"
+                    },
+                    {
+                        "value": "D3A1D",
+                        "label": "中正区"
+                    }
+                ]
+            },
+            {
+                "value": "101340103",
+                "label": "新竹市",
+                "children": [
+                    {
+                        "value": "300A2",
+                        "label": "香山区"
+                    }
+                ]
+            },
+            {
+                "value": "101340202",
+                "label": "嘉义市",
+                "children": [
+                ]
+            },
+            {
+                "value": "C30C",
+                "label": "新竹县",
+                "children": [
+                    {
+                        "value": "70E52",
+                        "label": "宝山乡"
+                    },
+                    {
+                        "value": "CF68C",
+                        "label": "北埔乡"
+                    },
+                    {
+                        "value": "198CA",
+                        "label": "峨眉乡"
+                    },
+                    {
+                        "value": "EE328",
+                        "label": "关西镇"
+                    },
+                    {
+                        "value": "7412D",
+                        "label": "横山乡"
+                    },
+                    {
+                        "value": "DE3B7",
+                        "label": "湖口乡"
+                    },
+                    {
+                        "value": "8647F",
+                        "label": "尖石乡"
+                    },
+                    {
+                        "value": "DA4C5",
+                        "label": "芎林乡"
+                    },
+                    {
+                        "value": "C87FF",
+                        "label": "五峰乡"
+                    },
+                    {
+                        "value": "2CEDF",
+                        "label": "新埔镇"
+                    },
+                    {
+                        "value": "60301",
+                        "label": "新丰乡"
+                    },
+                    {
+                        "value": "96E31",
+                        "label": "竹东镇"
+                    }
+                ]
+            },
+            {
+                "value": "101340402",
+                "label": "苗栗县",
+                "children": [
+                    {
+                        "value": "545BD",
+                        "label": "大湖乡"
+                    },
+                    {
+                        "value": "92813",
+                        "label": "公馆乡"
+                    },
+                    {
+                        "value": "97B1A",
+                        "label": "后龙镇"
+                    },
+                    {
+                        "value": "DE049",
+                        "label": "南庄乡"
+                    },
+                    {
+                        "value": "6F1CA",
+                        "label": "三湾乡"
+                    },
+                    {
+                        "value": "B57C7",
+                        "label": "三义乡"
+                    },
+                    {
+                        "value": "4515E",
+                        "label": "狮潭乡"
+                    },
+                    {
+                        "value": "3561E",
+                        "label": "泰安乡"
+                    },
+                    {
+                        "value": "A503E",
+                        "label": "通霄镇"
+                    },
+                    {
+                        "value": "DACF8",
+                        "label": "铜锣乡"
+                    },
+                    {
+                        "value": "CA3",
+                        "label": "头份镇"
+                    },
+                    {
+                        "value": "E00DD",
+                        "label": "头屋乡"
+                    },
+                    {
+                        "value": "4B6DC",
+                        "label": "西湖乡"
+                    },
+                    {
+                        "value": "954F5",
+                        "label": "苑里镇"
+                    },
+                    {
+                        "value": "AF6DE",
+                        "label": "造桥乡"
+                    },
+                    {
+                        "value": "D257A",
+                        "label": "竹南镇"
+                    },
+                    {
+                        "value": "7CD4B",
+                        "label": "卓兰镇"
+                    }
+                ]
+            },
+            {
+                "value": "101340403",
+                "label": "彰化县",
+                "children": [
+                    {
+                        "value": "87DA",
+                        "label": "北斗镇"
+                    },
+                    {
+                        "value": "27297",
+                        "label": "埔心乡"
+                    },
+                    {
+                        "value": "849C0",
+                        "label": "埔盐乡"
+                    },
+                    {
+                        "value": "46843",
+                        "label": "大城乡"
+                    },
+                    {
+                        "value": "37981",
+                        "label": "大村乡"
+                    },
+                    {
+                        "value": "86AEC",
+                        "label": "二林镇"
+                    },
+                    {
+                        "value": "3ED2D",
+                        "label": "二水乡"
+                    },
+                    {
+                        "value": "56FB2",
+                        "label": "芳苑乡"
+                    },
+                    {
+                        "value": "9E5DD",
+                        "label": "芬园乡"
+                    },
+                    {
+                        "value": "E8B22",
+                        "label": "福兴乡"
+                    },
+                    {
+                        "value": "4CA1B",
+                        "label": "和美镇"
+                    },
+                    {
+                        "value": "E6107",
+                        "label": "花坛乡"
+                    },
+                    {
+                        "value": "AD033",
+                        "label": "鹿港镇"
+                    },
+                    {
+                        "value": "2F677",
+                        "label": "埤头乡"
+                    },
+                    {
+                        "value": "9F928",
+                        "label": "社头乡"
+                    },
+                    {
+                        "value": "2045E",
+                        "label": "伸港乡"
+                    },
+                    {
+                        "value": "A9903",
+                        "label": "田尾乡"
+                    },
+                    {
+                        "value": "55AF3",
+                        "label": "田中镇"
+                    },
+                    {
+                        "value": "441DA",
+                        "label": "西湖乡"
+                    },
+                    {
+                        "value": "9DD7F",
+                        "label": "溪州乡"
+                    },
+                    {
+                        "value": "97F69",
+                        "label": "线西乡"
+                    },
+                    {
+                        "value": "86861",
+                        "label": "秀水乡"
+                    },
+                    {
+                        "value": "50886",
+                        "label": "永靖乡"
+                    },
+                    {
+                        "value": "AD179",
+                        "label": "员林镇"
+                    },
+                    {
+                        "value": "8D63C",
+                        "label": "竹塘乡"
+                    }
+                ]
+            },
+            {
+                "value": "101340404",
+                "label": "南投县",
+                "children": [
+                    {
+                        "value": "78C5D",
+                        "label": "埔里镇"
+                    },
+                    {
+                        "value": "83F45",
+                        "label": "草屯镇"
+                    },
+                    {
+                        "value": "53937",
+                        "label": "国姓乡"
+                    },
+                    {
+                        "value": "36375",
+                        "label": "集集镇"
+                    },
+                    {
+                        "value": "D7481",
+                        "label": "鹿谷乡"
+                    },
+                    {
+                        "value": "4D55F",
+                        "label": "名间乡"
+                    },
+                    {
+                        "value": "1F7E2",
+                        "label": "仁爱乡"
+                    },
+                    {
+                        "value": "BF01C",
+                        "label": "水里乡"
+                    },
+                    {
+                        "value": "B82B7",
+                        "label": "信义乡"
+                    },
+                    {
+                        "value": "EB721",
+                        "label": "鱼池乡"
+                    },
+                    {
+                        "value": "DB374",
+                        "label": "中寮乡"
+                    },
+                    {
+                        "value": "B7B31",
+                        "label": "竹山镇"
+                    }
+                ]
+            },
+            {
+                "value": "884E",
+                "label": "云林县",
+                "children": [
+                    {
+                        "value": "BBE60",
+                        "label": "褒忠乡"
+                    },
+                    {
+                        "value": "F35CF",
+                        "label": "北港镇"
+                    },
+                    {
+                        "value": "5F054",
+                        "label": "莿桐乡"
+                    },
+                    {
+                        "value": "98DE7",
+                        "label": "大埤乡"
+                    },
+                    {
+                        "value": "CFCC4",
+                        "label": "东势乡"
+                    },
+                    {
+                        "value": "5F767",
+                        "label": "斗南镇"
+                    },
+                    {
+                        "value": "DBA28",
+                        "label": "二仑乡"
+                    },
+                    {
+                        "value": "4A86F",
+                        "label": "古坑乡"
+                    },
+                    {
+                        "value": "E5452",
+                        "label": "虎尾镇"
+                    },
+                    {
+                        "value": "2DD33",
+                        "label": "口湖乡"
+                    },
+                    {
+                        "value": "8C73A",
+                        "label": "林内乡"
+                    },
+                    {
+                        "value": "3EC6B",
+                        "label": "仑背乡"
+                    },
+                    {
+                        "value": "503D8",
+                        "label": "麦寮乡"
+                    },
+                    {
+                        "value": "2897F",
+                        "label": "水林乡"
+                    },
+                    {
+                        "value": "B40F3",
+                        "label": "四湖乡"
+                    },
+                    {
+                        "value": "9AB11",
+                        "label": "台西乡"
+                    },
+                    {
+                        "value": "5029C",
+                        "label": "土库镇"
+                    },
+                    {
+                        "value": "BAD4D",
+                        "label": "西螺镇"
+                    },
+                    {
+                        "value": "B4967",
+                        "label": "元长乡"
+                    }
+                ]
+            },
+            {
+                "value": "4EB49",
+                "label": "嘉义县",
+                "children": [
+                    {
+                        "value": "34B85",
+                        "label": "阿里山乡"
+                    },
+                    {
+                        "value": "5B01A",
+                        "label": "布袋镇"
+                    },
+                    {
+                        "value": "64722",
+                        "label": "大埔乡"
+                    },
+                    {
+                        "value": "D9B1A",
+                        "label": "大林镇"
+                    },
+                    {
+                        "value": "2008A",
+                        "label": "东势乡"
+                    },
+                    {
+                        "value": "4E999",
+                        "label": "番路乡"
+                    },
+                    {
+                        "value": "3D16B",
+                        "label": "六脚乡"
+                    },
+                    {
+                        "value": "D4650",
+                        "label": "鹿草乡"
+                    },
+                    {
+                        "value": "44BA1",
+                        "label": "梅山乡"
+                    },
+                    {
+                        "value": "D05D7",
+                        "label": "民雄乡"
+                    },
+                    {
+                        "value": "1851B",
+                        "label": "朴子市"
+                    },
+                    {
+                        "value": "C5473",
+                        "label": "水上乡"
+                    },
+                    {
+                        "value": "42F72",
+                        "label": "溪口乡"
+                    },
+                    {
+                        "value": "707A5",
+                        "label": "新港乡"
+                    },
+                    {
+                        "value": "607B7",
+                        "label": "义竹乡"
+                    },
+                    {
+                        "value": "3B81C",
+                        "label": "中埔乡"
+                    },
+                    {
+                        "value": "2A0EA",
+                        "label": "竹崎乡"
+                    }
+                ]
+            },
+            {
+                "value": "101340205",
+                "label": "屏东县",
+                "children": [
+                    {
+                        "value": "6C288",
+                        "label": "潮州镇"
+                    },
+                    {
+                        "value": "42F75",
+                        "label": "车城乡"
+                    },
+                    {
+                        "value": "BA103",
+                        "label": "春日乡"
+                    },
+                    {
+                        "value": "B509A",
+                        "label": "东港镇"
+                    },
+                    {
+                        "value": "B8DEC",
+                        "label": "枋寮乡"
+                    },
+                    {
+                        "value": "82644",
+                        "label": "枋山乡"
+                    },
+                    {
+                        "value": "1EA6F",
+                        "label": "高树乡"
+                    },
+                    {
+                        "value": "77836",
+                        "label": "恒春镇"
+                    },
+                    {
+                        "value": "6D813",
+                        "label": "佳冬乡"
+                    },
+                    {
+                        "value": "1ECA0",
+                        "label": "九如乡"
+                    },
+                    {
+                        "value": "4786",
+                        "label": "崁顶乡"
+                    },
+                    {
+                        "value": "1064D",
+                        "label": "来义乡"
+                    },
+                    {
+                        "value": "43E4E",
+                        "label": "里港乡"
+                    },
+                    {
+                        "value": "B1B72",
+                        "label": "林边乡"
+                    },
+                    {
+                        "value": "AACD9",
+                        "label": "麟洛乡"
+                    },
+                    {
+                        "value": "EC5FB",
+                        "label": "琉球乡"
+                    },
+                    {
+                        "value": "C1078",
+                        "label": "玛家乡"
+                    },
+                    {
+                        "value": "3A2F4",
+                        "label": "满州乡"
+                    },
+                    {
+                        "value": "2BD74",
+                        "label": "牡丹乡"
+                    },
+                    {
+                        "value": "93143",
+                        "label": "南州乡"
+                    },
+                    {
+                        "value": "C4AF1",
+                        "label": "内埔乡"
+                    },
+                    {
+                        "value": "8ECB0",
+                        "label": "三地门乡"
+                    },
+                    {
+                        "value": "6781C",
+                        "label": "狮子乡"
+                    },
+                    {
+                        "value": "DFB95",
+                        "label": "泰武乡"
+                    },
+                    {
+                        "value": "8E9AA",
+                        "label": "万丹乡"
+                    },
+                    {
+                        "value": "AD515",
+                        "label": "万峦乡"
+                    },
+                    {
+                        "value": "963DA",
+                        "label": "雾台乡"
+                    },
+                    {
+                        "value": "E9D19",
+                        "label": "新埤乡"
+                    },
+                    {
+                        "value": "A9C2C",
+                        "label": "新园乡"
+                    },
+                    {
+                        "value": "F4F1",
+                        "label": "盐埔乡"
+                    },
+                    {
+                        "value": "35EA",
+                        "label": "长治乡"
+                    },
+                    {
+                        "value": "5DCD0",
+                        "label": "竹田乡"
+                    }
+                ]
+            },
+            {
+                "value": "101340104",
+                "label": "宜兰县",
+                "children": [
+                    {
+                        "value": "EBC37",
+                        "label": "大同乡"
+                    },
+                    {
+                        "value": "101231001",
+                        "label": "钓鱼岛"
+                    },
+                    {
+                        "value": "125A0",
+                        "label": "冬山乡"
+                    },
+                    {
+                        "value": "52116",
+                        "label": "礁溪乡"
+                    },
+                    {
+                        "value": "C5445",
+                        "label": "罗东镇"
+                    },
+                    {
+                        "value": "71A41",
+                        "label": "南澳乡"
+                    },
+                    {
+                        "value": "E427E",
+                        "label": "三星乡"
+                    },
+                    {
+                        "value": "30EB5",
+                        "label": "苏澳镇"
+                    },
+                    {
+                        "value": "7AC15",
+                        "label": "头城镇"
+                    },
+                    {
+                        "value": "25B67",
+                        "label": "五结乡"
+                    },
+                    {
+                        "value": "4FB12",
+                        "label": "员山乡"
+                    },
+                    {
+                        "value": "AE2EB",
+                        "label": "壮围乡"
+                    }
+                ]
+            },
+            {
+                "value": "101340405",
+                "label": "花莲县",
+                "children": [
+                    {
+                        "value": "1AFB5",
+                        "label": "丰滨乡"
+                    },
+                    {
+                        "value": "CA83B",
+                        "label": "凤林镇"
+                    },
+                    {
+                        "value": "EA346",
+                        "label": "富里乡"
+                    },
+                    {
+                        "value": "BB61B",
+                        "label": "光复乡"
+                    },
+                    {
+                        "value": "687D9",
+                        "label": "吉安乡"
+                    },
+                    {
+                        "value": "69C7D",
+                        "label": "瑞穗乡"
+                    },
+                    {
+                        "value": "B7A02",
+                        "label": "寿丰乡"
+                    },
+                    {
+                        "value": "77487",
+                        "label": "万荣乡"
+                    },
+                    {
+                        "value": "7CE62",
+                        "label": "新城乡"
+                    },
+                    {
+                        "value": "14B6",
+                        "label": "秀林乡"
+                    },
+                    {
+                        "value": "EBCEC",
+                        "label": "玉里镇"
+                    },
+                    {
+                        "value": "B75BB",
+                        "label": "卓溪乡"
+                    }
+                ]
+            },
+            {
+                "value": "101340204",
+                "label": "台东县",
+                "children": [
+                    {
+                        "value": "1C2F9",
+                        "label": "卑南乡"
+                    },
+                    {
+                        "value": "DE8A4",
+                        "label": "成功镇"
+                    },
+                    {
+                        "value": "6149A",
+                        "label": "池上乡"
+                    },
+                    {
+                        "value": "96121",
+                        "label": "达仁乡"
+                    },
+                    {
+                        "value": "BE9AC",
+                        "label": "大武乡"
+                    },
+                    {
+                        "value": "D7D8E",
+                        "label": "东河乡"
+                    },
+                    {
+                        "value": "15F5F",
+                        "label": "关山镇"
+                    },
+                    {
+                        "value": "33D54",
+                        "label": "海端乡"
+                    },
+                    {
+                        "value": "528C1",
+                        "label": "金峰乡"
+                    },
+                    {
+                        "value": "A9A12",
+                        "label": "兰屿乡"
+                    },
+                    {
+                        "value": "97619",
+                        "label": "鹿野乡"
+                    },
+                    {
+                        "value": "53C0D",
+                        "label": "绿岛乡"
+                    },
+                    {
+                        "value": "5FFC8",
+                        "label": "太麻里乡"
+                    },
+                    {
+                        "value": "EE096",
+                        "label": "延平乡"
+                    },
+                    {
+                        "value": "2E301",
+                        "label": "长滨乡"
+                    }
+                ]
+            },
+            {
+                "value": "753A2",
+                "label": "澎湖县",
+                "children": [
+                    {
+                        "value": "BCF10",
+                        "label": "白沙乡"
+                    },
+                    {
+                        "value": "A06E6",
+                        "label": "湖西乡"
+                    },
+                    {
+                        "value": "D2EBD",
+                        "label": "七美乡"
+                    },
+                    {
+                        "value": "9C6B3",
+                        "label": "望安乡"
+                    },
+                    {
+                        "value": "D0809",
+                        "label": "西屿乡"
+                    }
+                ]
+            }
         ]
     },
     {

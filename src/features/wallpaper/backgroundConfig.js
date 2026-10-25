@@ -6,10 +6,9 @@
  * 在运行时读取同一份持久化配置。
  *
  * 字段划分与 public/project.json 保持一致：
- *   - backgroundinteraction 是“小鸟”独占的壁纸属性（condition: backgroundindex==="1"）
  *   - showweathermain 是“实时雨滴”独占的壁纸属性（condition: backgroundindex==="4"）
  *   - rainconfig 是“实时雨滴”与“整页雨珠叠加”共用的壁纸属性（condition 见 public/project.json）
- *   - 其余为各背景的运行时效果参数（雨滴大小、粒子数量等）
+ *   - 其余为各背景的运行时效果参数（雨滴大小、数量等）
  * 壁纸属性字段通过 property 标记，渲染时绑定全局壁纸属性状态并走
  * applyWallpaperProperties；运行时参数存储在本地并按背景独立生效。
  *
@@ -23,30 +22,8 @@ import { STORAGE_KEYS, WALLPAPER_PROPERTIES } from './constants'
 // 全部背景配置（持久化到 localStorage，替换时整体写入）
 const backgroundConfigs = useStorage(STORAGE_KEYS.WALLPAPER_BACKGROUND_CONFIGS, {}, localStorage)
 
-// 各背景的可配置字段定义
+// 各背景的可配置字段定义（1-小鸟 / 2-星空 / 3-动态粒子 已移除）
 export const backgroundConfigSchema = {
-  '1': {
-    label: '小鸟',
-    fields: [
-      {
-        key: WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION,
-        label: '小鸟互动',
-        type: 'boolean',
-        property: WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION,
-      },
-    ],
-  },
-  '2': {
-    label: '星空',
-    fields: [],
-  },
-  '3': {
-    label: '动态粒子',
-    fields: [
-      { key: 'dotsNum', label: '粒子数量', type: 'slider', min: 20, max: 300, step: 5, default: 80 },
-      { key: 'connection', label: '连线距离', type: 'slider', min: 50, max: 400, step: 10, default: 150 },
-    ],
-  },
   '4': {
     label: '实时雨滴',
     fields: [

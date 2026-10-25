@@ -82,7 +82,18 @@ export const useWeatherRefresh = ({
     indicesTimer = setTimeout(updateIndices, 1000 * 60)
   }
 
+  /* 回到前台立刻刷一次：标签页在后台时定时器会被浏览器节流（甚至整个冻结），
+     用户切回来看到的可能是十几分钟前的数据 —— 分钟级降水 5 分钟一变，最容易被看出来
+     （「正在下雨」早就在后台过去了，胶囊却还按旧窗口说话）。
+     各接口自己的缓存时效仍然生效，所以来回切标签页不会真的多打请求。 */
+  const onVisibilityChange = () => {
+    if (document.hidden || !isEnabled()) return
+    updateWeather()
+  }
+
   onMounted(() => {
+    // 监听先挂上：引导没完成时 enabled 是 false，等它变 true 之后切换标签页也要能触发刷新
+    document.addEventListener('visibilitychange', onVisibilityChange)
     if (!isEnabled()) return
     updateWeather()
     if (refreshIndices) {
@@ -92,6 +103,7 @@ export const useWeatherRefresh = ({
   onUnmounted(() => {
     clearTimer()
     clearIndicesTimer()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('online', updateWeather)
   })
 

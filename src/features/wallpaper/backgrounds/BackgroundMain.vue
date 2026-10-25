@@ -1,58 +1,29 @@
 <template>
-  <div class="BackgroundMain" v-if="BackgroundIndex !== '0'">
-    <VantaBird v-if="BackgroundIndex === '1'" :VantaOptions="VantaBirdOptions"></VantaBird>
-    <StarrySky v-else-if="BackgroundIndex === '2'"></StarrySky>
-    <DynamicParticle v-else-if="BackgroundIndex === '3'"></DynamicParticle>
-    <RainEffect v-else-if="BackgroundIndex === '4'"></RainEffect>
-    <RainOverlayEffect v-else-if="BackgroundIndex === '5'"></RainOverlayEffect>
+  <div class="BackgroundMain" v-if="BackgroundIndex === '4' || BackgroundIndex === '5'">
+    <RainEffect v-if="BackgroundIndex === '4'"></RainEffect>
+    <RainOverlayEffect v-else></RainOverlayEffect>
   </div>
   <WallpaperDebugPanel v-if="NODE_ENV === 'development'" />
 </template>
 
 <script setup>
-import StarrySky from './StarrySky.vue';
-import VantaBird from './VantaBird.vue';
-import DynamicParticle from './DynamicParticle.vue';
 import RainEffect from './rain/RainEffect.vue';
 import RainOverlayEffect from './rain-overlay/RainOverlayEffect.vue';
 import WallpaperDebugPanel from '@/features/wallpaper/WallpaperDebugPanel.vue';
-import { ref, watch } from 'vue';
-import {
-  BackgroundIndex,
-  BirdInteraction,
-} from '../properties';
+import { watch } from 'vue';
+import { BackgroundIndex } from '../properties';
 let NODE_ENV = process.env.NODE_ENV || 'development';
 /**
  * 背景序号
  * 0-不显示背景
- * 小鸟-1
- * 星空-2
- * 动态粒子-3
- * 雨滴效果-4
- * 整页雨珠叠加-5（雨珠层盖在真实 DOM 之上）
+ * 4-雨滴效果
+ * 5-整页雨珠叠加（雨珠层盖在真实 DOM 之上）
+ *
+ * 旧的 1-小鸟 / 2-星空 / 3-动态粒子 已移除，对应的组件文件也已删除；
+ * 老配置里残留的 1/2/3 会在 properties.js 里回退到默认背景。
  */
 /**
- * 小鸟相关配置
- */
-const VantaBirdOptions = ref({
-  el: "#my-background",
-  mouseControls: false,
-  touchControls: false,
-  gyroControls: false,
-  minHeight: 200.00,
-  minWidth: 200.00,
-  scale: 1.00,
-  scaleMobile: 1.00
-})
-
-// 小鸟互动开关（壁纸属性 backgroundinteraction）
-watch(BirdInteraction, (interaction) => {
-  VantaBirdOptions.value.mouseControls = interaction
-  VantaBirdOptions.value.touchControls = interaction
-})
-
-/**
- * 背景切换：WebGL 上下文（小鸟 / 雨滴）重建比较重，直接整页重载最省事。
+ * 背景切换：WebGL 上下文重建比较重，直接整页重载最省事。
  * 壁纸属性监听器在 src/main.js 里统一接管（见 features/wallpaper/properties.js），
  * 属性变更会写进 BackgroundIndex，这里只负责在序号真的变化时重载一次。
  *

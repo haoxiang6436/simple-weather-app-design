@@ -10,40 +10,26 @@
       <LocationPicker v-if="showLocationStep" @selected="handleLocationSelected" />
 
       <!-- 第 1 步：说明 + 实时读取用户填写的域名/密钥 + 检测结果 -->
-      <!-- 页面里任何一次点击 / 按键都说明用户在场，立刻停掉自动前进（见下方 autoSecondsLeft） -->
-      <div v-else class="panel-view OnboardingPanel" @pointerdown="stopAutoAdvance" @keydown="stopAutoAdvance">
+      <div v-else class="panel-view OnboardingPanel">
         <section class="onb-left">
           <div class="onb-aura" aria-hidden="true"></div>
 
           <div class="onb-body">
             <header class="onb-head">
-              <span class="onb-kicker"><i class="onb-kicker-dot"></i>首次使用</span>
-              <h1 class="onb-title">还差一步，<br />才能<span class="onb-title-hl">显示天气</span></h1>
-              <p class="onb-lead">
+              <span class="onb-kicker">
+                <i class="onb-kicker-dot"></i>{{ reviewCopy ? '引导回顾' : '首次使用' }}
+              </span>
+              <h1 v-if="reviewCopy" class="onb-title">你已经配置好了，<br />这里是<span class="onb-title-hl">完整流程</span></h1>
+              <h1 v-else class="onb-title">还差一步，<br />才能<span class="onb-title-hl">显示天气</span></h1>
+              <p v-if="reviewCopy" class="onb-lead">
+                你的域名与密钥已经可用，这一步不用再填。看完点下面的<b>「返回设置」</b>即可。
+              </p>
+              <p v-else class="onb-lead">
                 请在右侧「壁纸属性」面板填入 <b>你自己的域名与密钥</b>，壁纸会自动读取并检测。
               </p>
             </header>
 
-            <div class="onb-status" :class="'tone-' + status.tone">
-              <div class="onb-status-main">
-                <span class="onb-status-icon">
-                  <span class="onb-status-glyph" :class="{ spinning: status.tone === 'loading' }">{{ statusGlyph }}</span>
-                </span>
-                <div class="onb-status-text">
-                  <div class="onb-status-title">{{ status.title }}</div>
-                  <div class="onb-status-desc">{{ status.desc }}</div>
-                </div>
-              </div>
-
-              <!-- 多个域名时，逐组结果收进同一张卡里，避免两块信息各说各话 -->
-              <ul v-if="CheckResults.length > 1" class="onb-status-list">
-                <li v-for="item in CheckResults" :key="item.host" :class="{ bad: !item.ok }">
-                  <i class="onb-status-dot"></i>
-                  <span class="onb-status-host">{{ item.host }}</span>
-                  <span class="onb-status-msg">{{ item.ok ? '可用' : item.message }}</span>
-                </li>
-              </ul>
-            </div>
+            <CredentialStatusCard />
 
             <div class="onb-actions">
               <button v-if="primaryAction" class="onb-btn primary" type="button" :disabled="primaryAction.disabled"
@@ -52,9 +38,10 @@
                 @click="secondaryAction.run()">{{ secondaryAction.label }}</button>
               <div v-if="autoSecondsLeft > 0" class="onb-auto">
                 <span>不想自动继续？</span>
-                <button class="onb-auto-cancel" type="button" @click="stopAutoAdvance">留在此页</button>
+                <button class="onb-auto-cancel" type="button" title="取消自动继续，留在此页"
+                  @click="stopAutoAdvance">取消</button>
               </div>
-              <button class="onb-help" type="button" @click="showHelp = true">
+              <button class="onb-help" type="button" @click="openHelp">
                 <svg class="onb-help-icon" viewBox="0 0 24 24" aria-hidden="true">
                   <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
                     d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
@@ -96,7 +83,7 @@
                 <span class="onb-step-no">3</span>
                 <div class="onb-step-body">
                   <div class="onb-step-title">检测通过 → 选好城市，显示天气</div>
-                  <p class="onb-step-text">检测通过后会倒数几秒自动继续；也可以直接点按钮马上走</p>
+                  <p class="onb-step-text">检测通过后会倒数几秒自动继续；不想等可以点「取消」留在本页</p>
                 </div>
               </li>
             </ol>
@@ -112,24 +99,7 @@
               </div>
             </div>
 
-            <!-- 浏览器（Edge 调试 / 直接打开 dist）能输入；壁纸引擎里没有这一块 -->
-            <div v-if="browserRuntime" class="onb-dev">
-              <div class="onb-card-head">
-                <span class="onb-card-title">浏览器调试</span>
-                <span class="onb-card-pill dev">仅浏览器可用</span>
-              </div>
-              <label class="onb-dev-row">
-                <span class="onb-dev-label">域名</span>
-                <input v-model="devHost" class="onb-dev-input" type="text" spellcheck="false"
-                  placeholder="xxxx.re.qweatherapi.com" />
-              </label>
-              <label class="onb-dev-row">
-                <span class="onb-dev-label">密钥</span>
-                <input v-model="devKey" class="onb-dev-input" type="text" spellcheck="false" placeholder="Web API Key" />
-              </label>
-              <p class="onb-dev-hint">输入后自动检测，多个用英文逗号分隔</p>
-            </div>
-            <p v-else class="onb-hint">填完没反应？点一下输入框外的空白处，让属性生效。</p>
+            <p class="onb-hint">在右侧「壁纸属性」面板改完后，点一下输入框外的空白处让它生效。</p>
           </div>
 
           <!-- 底部：开源地址 + 免责声明 -->
@@ -157,30 +127,30 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LocationPicker from '@/features/weather/LocationPicker.vue'
 import ApiHelpPanel from './ApiHelpPanel.vue'
-import {
-  UserApiEntries,
-  UserApiFingerprint,
-  UserApiHostRaw,
-  UserApiKeyRaw,
-  setUserApiFromBrowser,
-} from '@/api/credentials'
-import { isBrowserRuntime } from '@/shared/env'
+import CredentialStatusCard from './CredentialStatusCard.vue'
+import { UserApiEntries, UserApiFingerprint } from '@/api/credentials'
 import { PROJECT_REPO_URL, shortUrl, useCopyFeedback } from '@/shared/clipboard'
 import {
-  CheckResults,
   CheckStatus,
-  CredentialStatus,
   CredentialsReady,
   NeedsLocation,
+  OnboardingReview,
   canContinueWithoutCheck,
   closeOnboarding,
   continueWithoutCheck,
+  maskKey,
   runApiCheck,
 } from './onboardingState'
 
-const status = CredentialStatus
 const entries = UserApiEntries
-const browserRuntime = computed(() => isBrowserRuntime())
+// 从设置页主动打开的「回顾」态：文案换成回顾语气，且不自动前进
+const review = OnboardingReview
+// 回顾文案只在这个前提下成立：凭据真的可用。
+// 回顾途中用户把密钥改坏了、或者手动重新检测失败，就退回正常的引导文案，
+// 别一边报错一边说「已经配置好了」。
+const reviewCopy = computed(
+  () => review.value && CredentialsReady.value && CheckStatus.value !== 'error'
+)
 // 帮助页（怎么获取域名与密钥）开关
 const showHelp = ref(false)
 
@@ -204,10 +174,6 @@ const goToLocationStep = () => {
   nextStepRequested.value = true
 }
 
-const statusGlyph = computed(
-  () => ({ wait: '…', loading: '↻', ok: '✓', warn: '!', error: '×' }[status.value.tone] || '…')
-)
-
 const canClose = computed(() => CredentialsReady.value && !NeedsLocation.value)
 
 /**
@@ -223,7 +189,10 @@ const primaryAction = computed(() => {
   if (CredentialsReady.value && NeedsLocation.value) {
     return { label: '下一步 · 选择所在位置', run: goToLocationStep }
   }
-  if (canClose.value) return { label: '返回天气', run: closeOnboarding }
+  if (canClose.value) {
+    // 从设置页进来的回顾态：关掉后回到设置页，按钮文案跟着说清楚
+    return { label: review.value ? '返回设置' : '返回天气', run: closeOnboarding }
+  }
   if (canContinueWithoutCheck.value) return { label: '网络异常，仍然继续', run: continueWithoutCheck }
   return null
 })
@@ -236,12 +205,14 @@ const secondaryAction = computed(() => {
 
 /**
  * 检测通过后自动前进：倒计时结束后直接触发「当前」主按钮（未选位置是下一步，已选过位置是返回天气）。
- * 这里刻意不区分是不是首次使用 —— 按钮本来就会随状态变，倒计时只负责点它。
  *
- * 这里不看引导页是怎么打开的（首次使用、密钥失效、还是用户点钥匙图标回来看设置都一样）：
- * 只要检测通过、还停在第 1 步，就倒数几秒自动点当前主按钮。
- * 用户真要留在这一页时，界面内任何一次点击 / 按键都会立刻停掉倒计时，
- * 按钮下面也留了「留在此页」的出口 —— 自动跳转必须让人看得见、能取消。
+ * 只在「真的卡在流程里」时自动走：首次使用、密钥失效、用户主动模拟首次使用都算；
+ * 从设置页点「重新查看新手引导」进来的回顾态（OnboardingReview）不算 ——
+ * 用户是特意回来看的，9 秒后自己关掉等于没让人看完。
+ *
+ * 用户真要留在这一页时，点按钮下面的「取消」即可。
+ * 这里刻意不再用「点击页面任意处」来取消：用户只是点一下页面（滚动、看教程、点重新检测）
+ * 就会把倒计时停掉，自动前进等于形同虚设；取消必须是一次明确的动作。
  */
 const AUTO_ADVANCE_SECONDS = 9
 // 倒计时的计时心跳。这里不用页面里的 setInterval：壁纸引擎进全屏 / 切走窗口时页面会被隐藏，
@@ -263,9 +234,15 @@ const stopAutoAdvance = () => {
   autoSecondsLeft.value = 0
 }
 
-// 「检测通过 + 还停在第 1 步」就自动走
+// 打开教程弹层时停掉倒计时：否则用户在看教程，面板会在背后自动跳到下一步
+const openHelp = () => {
+  stopAutoAdvance()
+  showHelp.value = true
+}
+
+// 「检测通过 + 还停在第 1 步 + 不是主动回顾」才自动走
 const canAutoAdvance = computed(
-  () => CheckStatus.value === 'ok' && !showLocationStep.value
+  () => CheckStatus.value === 'ok' && !showLocationStep.value && !review.value
 )
 
 // 倒计时直接写在主按钮上：用户盯的是按钮，秒数出现在别处等于没提示
@@ -316,32 +293,14 @@ onBeforeUnmount(() => {
 // 底部步骤条：凭据可用（检测通过，或网络异常时用户选择继续）后第 1 步点亮，
 // 和主按钮用同一个判据，避免「按钮已经能进下一步、步骤条还说没检测完」
 const stepDone = computed(() => CredentialsReady.value)
-const stepHint = computed(() =>
-  stepDone.value ? '第 1 步已完成 · 下一步：选择所在位置' : '第 1 步 · 填写并检测域名与密钥'
-)
+const stepHint = computed(() => {
+  if (reviewCopy.value) return '配置已完成 · 这一页只作回顾'
+  return stepDone.value ? '第 1 步已完成 · 下一步：选择所在位置' : '第 1 步 · 填写并检测域名与密钥'
+})
 
-const maskKey = (key) => {
-  const text = String(key || '')
-  if (text.length <= 8) return '•'.repeat(Math.max(text.length, 4))
-  return `${text.slice(0, 4)}••••${text.slice(-4)}`
-}
 const maskedEntries = computed(() =>
   entries.value.map((item) => ({ host: item.host, key: maskKey(item.key) }))
 )
-
-// 浏览器调试输入框：与凭据模块双向同步（带一点去抖，避免逐字符触发检测）
-const devHost = ref(UserApiHostRaw.value)
-const devKey = ref(UserApiKeyRaw.value)
-let devTimer = null
-
-watch([devHost, devKey], ([host, key]) => {
-  clearTimeout(devTimer)
-  devTimer = setTimeout(() => setUserApiFromBrowser(host, key), 300)
-})
-watch([UserApiHostRaw, UserApiKeyRaw], ([host, key]) => {
-  if (host !== devHost.value) devHost.value = host
-  if (key !== devKey.value) devKey.value = key
-})
 
 // 凭据被改动 → 退回第 1 步，重新看过检测结果再决定要不要继续
 watch(UserApiFingerprint, () => {
@@ -472,185 +431,6 @@ const handleLocationSelected = () => {
     color: var(--text-primary);
     font-weight: 600;
   }
-}
-
-/* ---- 检测结果卡：所有 tone 共用的骨架，颜色由下面 .tone-* 变量给出 ---- */
-.onb-status {
-  --tone-glyph: var(--text-secondary);
-  --tone-wash: rgba(255, 255, 255, 0.075);
-  --tone-line: var(--glass-border);
-  --tone-tint: rgba(255, 255, 255, 0.03);
-  --tone-halo: rgba(255, 255, 255, 0.05);
-
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-  padding: 1.0625rem 1.125rem;
-  border: 1px solid var(--tone-line);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(158deg, var(--tone-tint), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
-  box-shadow:
-    0 1.125rem 2.5rem -1.875rem rgba(0, 0, 0, 0.85),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-/* 从左上角透出的状态色，让卡片有颜色倾向但不喧宾夺主 */
-.onb-status::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(72% 62% at 10% 0%, var(--tone-halo), transparent 72%);
-  pointer-events: none;
-}
-
-.onb-status-main {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.tone-ok {
-  --tone-glyph: #a7ecc9;
-  --tone-wash: rgba(111, 220, 174, 0.15);
-  --tone-line: rgba(111, 220, 174, 0.34);
-  --tone-tint: rgba(111, 220, 174, 0.1);
-  --tone-halo: rgba(111, 220, 174, 0.24);
-}
-
-.tone-error {
-  --tone-glyph: #ffb3ae;
-  --tone-wash: rgba(239, 97, 89, 0.16);
-  --tone-line: rgba(239, 97, 89, 0.36);
-  --tone-tint: rgba(239, 97, 89, 0.12);
-  --tone-halo: rgba(239, 97, 89, 0.28);
-}
-
-.tone-warn {
-  --tone-glyph: #ffcf9e;
-  --tone-wash: rgba(235, 155, 98, 0.16);
-  --tone-line: rgba(235, 155, 98, 0.34);
-  --tone-tint: rgba(235, 155, 98, 0.11);
-  --tone-halo: rgba(235, 155, 98, 0.24);
-}
-
-.tone-loading {
-  --tone-glyph: #a5dcff;
-  --tone-wash: rgba(56, 189, 248, 0.16);
-  --tone-line: rgba(56, 189, 248, 0.36);
-  --tone-tint: rgba(56, 189, 248, 0.12);
-  --tone-halo: rgba(56, 189, 248, 0.26);
-}
-
-/* 圆角方块而不是实心彩球：色更浅、更克制，和面板里的其他玻璃块同一家族 */
-.onb-status-icon {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--tone-glyph);
-  background: var(--tone-wash);
-  border: 1px solid var(--tone-line);
-  border-radius: 0.875rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0.75rem 1.5rem -0.9375rem var(--tone-halo);
-}
-
-.onb-status-glyph {
-  display: block;
-  line-height: 1;
-
-  &.spinning {
-    animation: onb-spin 1.1s linear infinite;
-  }
-}
-
-@keyframes onb-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.onb-status-text {
-  position: relative;
-  min-width: 0;
-}
-
-.onb-status-title {
-  font-size: 1.02rem;
-  font-weight: 700;
-  letter-spacing: 0.005em;
-  color: var(--tone-glyph);
-}
-
-.onb-status-desc {
-  margin-top: 0.1875rem;
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  /* 错误提示可能带换行（如「主体 + 建议」多行），保留换行符 */
-  white-space: pre-line;
-}
-
-/* 多域名时逐组列出：小圆点区分可用 / 不可用，域名过长省略 */
-.onb-status-list {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin: 0;
-  padding: 0.75rem 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-  }
-}
-
-.onb-status-dot {
-  flex: none;
-  display: block;
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--color-ok);
-  box-shadow: 0 0 0 0.1875rem rgba(149, 213, 174, 0.14);
-}
-
-.onb-status-list li.bad .onb-status-dot {
-  background: var(--color-warn);
-  box-shadow: 0 0 0 0.1875rem rgba(235, 155, 98, 0.14);
-}
-
-.onb-status-host {
-  min-width: 0;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.onb-status-msg {
-  flex: none;
-  margin-left: auto;
-}
-
-.onb-status-list li.bad .onb-status-msg {
-  color: #ffcb9e;
 }
 
 .onb-actions {
@@ -794,7 +574,7 @@ const handleLocationSelected = () => {
   }
 }
 
-/* ================= 右侧：操作指引 + 读取结果 + 调试输入 ================= */
+/* ================= 右侧：操作指引 + 读取结果 ================= */
 .onb-right {
   position: relative;
   display: flex;
@@ -949,12 +729,6 @@ const handleLocationSelected = () => {
   border-radius: 999px;
 }
 
-.onb-card-pill.dev {
-  color: #a5dcff;
-  background: rgba(56, 189, 248, 0.14);
-  border-color: rgba(56, 189, 248, 0.4);
-}
-
 .onb-readout {
   padding: 0.75rem 0.875rem;
   background: var(--glass-bg-soft);
@@ -1047,60 +821,7 @@ const handleLocationSelected = () => {
   color: var(--text-muted);
 }
 
-/* 调试输入：实线玻璃卡，和「已读取到」同一族；
-   用主色描边 + 浅色底把它和真实数据卡区分开，而不是靠虚线暗示「临时」 */
-.onb-dev {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 0.875rem;
-  background: linear-gradient(160deg, rgba(56, 189, 248, 0.11), rgba(56, 189, 248, 0.02));
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: var(--radius-sm);
-}
-
-.onb-dev-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.onb-dev-label {
-  flex: none;
-  width: 2.25rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-.onb-dev-input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.375rem 0.625rem;
-  font-family: inherit;
-  font-size: 0.8rem;
-  color: var(--text-primary);
-  background: rgba(4, 18, 31, 0.5);
-  border: 1px solid var(--glass-border);
-  border-radius: 0.5rem;
-  outline: none;
-
-  &::placeholder {
-    color: var(--text-muted);
-  }
-
-  &:focus {
-    border-color: rgba(56, 189, 248, 0.7);
-  }
-}
-
-.onb-dev-hint {
-  margin: 0;
-  font-size: 0.75rem;
-  line-height: 1.6;
-  color: var(--text-muted);
-}
-
-/* 壁纸引擎里没有调试输入框，这里给一句提示；
+/* 没有调试输入框了，这里给一句属性面板的生效提示；
    做成一张轻量的卡，免得右栏在中段只剩一行孤零零的小字 */
 .onb-hint {
   margin: 0;

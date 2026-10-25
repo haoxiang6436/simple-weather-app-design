@@ -75,7 +75,7 @@
               <div class="quota-card">
                 <div class="quota-title">每月 <b>50000</b> 次请求免费</div>
                 <p class="quota-sub">
-                  按每天运行 8 小时、每月 31 天估算：约 <b>1950</b> 次/月，约占免费额度的 <b>4%</b>
+                  按每天运行 8 小时、每月 31 天估算：约 <b>6100</b> 次/月，约占免费额度的 <b>12%</b>
                 </p>
                 <p class="quota-services">
                   适用于：天气预报 · 分钟预报 · 预警 · 天气指数 · 空气质量 · 时光机 · GeoAPI · 天文 · 控制台 API

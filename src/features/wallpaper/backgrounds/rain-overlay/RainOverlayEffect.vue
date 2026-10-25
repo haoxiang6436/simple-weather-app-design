@@ -22,11 +22,11 @@
 // 为什么不用 CSS filter: blur()——折射源是 html2canvas 的 DOM 快照，而 html2canvas 不支持
 // CSS filter，快照里会重新变回清晰图，底图与雨珠里看到的折射内容就不一致了。
 import backdropImage from '@/assets/dock-1365387_1920-blur.jpg';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useStorage } from '@vueuse/core';
 import { createRainOverlay } from './RainOverlayAdapter';
 import { overlayRainPresets } from './RainOverlayConfig';
-import { resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
+import { resolveMinutelyIntensity, resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
 import { useWeatherStore } from '@/store';
 import Bus from '@/shared/Bus';
 import { getBackgroundConfig, getBackgroundConfigs } from '@/features/wallpaper/backgroundConfig';
@@ -56,11 +56,17 @@ let appliedScale = null;
 let stopWeatherWatch = null;
 let unmounted = false;
 
+// 自动档：优先分钟级降水的第一条（当前 5 分钟段），没有数据时回退实时天气
+const autoRainIntensity = computed(() => {
+  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation);
+  return fromMinutely ?? resolveRainIntensity(WeatherStore.nowWeatherData);
+});
+
 // 当前生效的雨量预设：
-// auto 时按实时天气（icon 代码优先，其次天气文本）自动选档，否则用壁纸属性里选的强度
+// auto 时按分钟级降水的第一条自动选档，否则用壁纸属性里选的强度
 const currentPreset = () => {
   const key = WallpaperUserConfigRainConfig.value;
-  const state = key === 'auto' ? resolveRainIntensity(WeatherStore.nowWeatherData) : key;
+  const state = key === 'auto' ? autoRainIntensity.value : key;
   return overlayRainPresets[state] || overlayRainPresets.moderate;
 };
 
@@ -129,13 +135,10 @@ onMounted(async () => {
     return;
   }
   syncEffect();
-  // 自动模式：实时天气（图标 / 文本）变化时重算雨量
-  stopWeatherWatch = watch(
-    () => `${WeatherStore.nowWeatherData.icon}|${WeatherStore.nowWeatherData.text}`,
-    () => {
-      if (WallpaperUserConfigRainConfig.value === 'auto') syncEffect();
-    }
-  );
+  // 自动模式：分钟级第一条（兜底实时天气）变化时重算雨量
+  stopWeatherWatch = watch(autoRainIntensity, () => {
+    if (WallpaperUserConfigRainConfig.value === 'auto') syncEffect();
+  });
   Bus.on(BUS_EVENTS.RAIN_CONFIG_CHANGE, handleRainConfigChange);
   Bus.on(BUS_EVENTS.BACKGROUND_CONFIG_CHANGE, handleBackgroundConfigChange);
 });

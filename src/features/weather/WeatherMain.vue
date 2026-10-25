@@ -1,5 +1,7 @@
 <template>
-  <div class="weather weather-layer">
+  <!-- 整层也是「点击卡片外」的落点：设置页关闭、地址页确认已选点（见 shared/useLayerOutsideClick）。
+       卡片内的点击目标是卡里的元素，不会冒泡成「点在外面」 -->
+  <div ref="layerRef" class="weather weather-layer">
     <!-- 卡片外壳常驻，切换的是壳里的内容（动效定义见 style/weather-panel.scss） -->
     <Transition name="panel-in" appear>
      <div v-if="shellVisible" class="weather-shell" :class="{ 'weather-shell-card': panelView === 'weather' }">
@@ -10,6 +12,8 @@
         <Transition name="panel-swap">
           <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
           <OnboardingPanel v-if="panelView === 'onboarding'" />
+          <!-- 设置 / 状态页：已经能看天气之后，齿轮打开的是这里，不再回到首次引导 -->
+          <SettingsPanel v-else-if="panelView === 'settings'" />
           <!-- 地址选择页：日常换城市走这里（与天气卡同尺寸、同层级） -->
           <LocationPicker v-else-if="panelView === 'location'" dismissable @close="LocationPickerOpen = false"
             @selected="LocationPickerOpen = false" />
@@ -17,23 +21,27 @@
       <!-- 左侧：当前天气（紧凑） -->
       <header class="hero" :class="{ 'hero-warning': WeatherEarlyWarning.length }">
         <div class="hero-top">
-          <button class="location" type="button" :title="dayDateCity.city" @click="openSelectLocationDialog">
+          <button class="location" type="button" :title="locationTitle" @click="openSelectLocationDialog">
             <svg class="location-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16"
               height="16" aria-hidden="true">
               <path
                 d="M512 938.666667c-53.333333 0-384-257.258667-384-469.333334S299.925333 85.333333 512 85.333333s384 171.925333 384 384-330.666667 469.333333-384 469.333334z m0-352c64.8 0 117.333333-52.533333 117.333333-117.333334s-52.533333-117.333333-117.333333-117.333333-117.333333 52.533333-117.333333 117.333333 52.533333 117.333333 117.333333 117.333334z"
                 fill="currentColor"></path>
             </svg>
-            <span class="location-name">{{ dayDateCity.city }}</span>
+            <span class="location-name">{{ locationLabel }}</span>
           </button>
           <div class="hero-top-right">
             <WeatherStateIndicator :state="TheWeatherDataIsLoaded"
               :updated-minutes-ago="Number(WeatherDataUpdatedAtATimeComputed)" :err-count="errCount" />
-            <button class="api-entry" type="button" title="域名与密钥设置" @click="openOnboarding()">
-              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-                <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M14.5 9.5a3.5 3.5 0 1 0-3.2 3.49l-1.3 1.3v1.9H8.1v1.9H6.2v-1.9l4.9-4.9a3.5 3.5 0 0 1 3.4-1.79z" />
+            <button class="api-entry" type="button" title="设置" aria-label="设置" @click="openSettings()">
+              <!-- 齿轮：设置入口，比原来的钥匙轮廓更好认，尺寸也放大了一档 -->
+              <svg class="api-entry-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3.1" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </g>
               </svg>
             </button>
           </div>
@@ -52,25 +60,36 @@
           </div>
         </div>
 
-        <div class="now-desc">{{ nowWeatherData.text }}</div>
-        <div class="now-sub">
-          <span>体感 {{ nowWeatherData.feelsLike ?? '—' }}°</span>
-          <span class="now-sub-sep"></span>
-          <span>{{ todayTempRange }}</span>
+        <div class="now-desc">
+          <span class="now-desc-text">{{ nowWeatherData.text }}</span>
+          <!-- 体感和今日温区合成一行：给下面常驻的分钟级降水胶囊腾出一行高度 -->
+          <span class="now-sub">
+            <span>体感 {{ nowWeatherData.feelsLike ?? '—' }}°</span>
+            <span class="now-sub-sep"></span>
+            <span>{{ todayTempRange }}</span>
+          </span>
         </div>
 
-        <button v-if="WeatherEarlyWarning.length" class="early-chip" type="button"
-          :class="'sev-' + severityKey(currentWarning.level)" @click="EarlyWarningDetailsDialog = true">
-          <Transition name="chip-fade" mode="out-in">
-            <span class="early-chip-main" :key="warningIndex">
-              <svg class="early-chip-icon" aria-hidden="true">
-                <use :xlink:href="WeatherEarlyWarningLevel(currentWarning.level)"></use>
-              </svg>
-              <span class="early-chip-text">{{ currentWarning.typeName }}{{ currentWarning.level }}预警</span>
-            </span>
-          </Transition>
-          <span v-if="WeatherEarlyWarning.length > 1" class="early-count">×{{ WeatherEarlyWarning.length }}</span>
-        </button>
+        <!-- 分钟级降水 + 天气预警：两颗胶囊归成一组（组内只留 0.5rem）。
+             以前它们是 .hero 的两个直接子元素，各自吃一份 1.625rem 的行距，
+             看起来像两块互不相干的内容 —— 现在贴成一组，和上下内容的间距不变。 -->
+        <div class="hero-chips">
+          <!-- 分钟级降水：常驻入口，点开看未来两小时的柱状图 -->
+          <MinutelyRainChip />
+
+          <button v-if="WeatherEarlyWarning.length" class="early-chip" type="button"
+            :class="'sev-' + severityKey(currentWarning.level)" @click="openWarningDetails">
+            <Transition name="chip-fade" mode="out-in">
+              <span class="early-chip-main" :key="warningIndex">
+                <svg class="early-chip-icon" aria-hidden="true">
+                  <use :xlink:href="WeatherEarlyWarningLevel(currentWarning.level)"></use>
+                </svg>
+                <span class="early-chip-text">{{ currentWarning.typeName }}{{ currentWarning.level }}预警</span>
+              </span>
+            </Transition>
+            <span v-if="WeatherEarlyWarning.length > 1" class="early-count">×{{ WeatherEarlyWarning.length }}</span>
+          </button>
+        </div>
 
         <div v-if="displayedIndices.length" class="indices">
           <div class="indices-title">生活指数</div>
@@ -85,7 +104,7 @@
               <span class="index-cell-name">{{ idx.name.replace('指数', '') }}</span>
             </button>
           </div>
-          <!-- 聚焦卡：选中指数的分类 + 完整说明（正文固定 2 行高，切换不跳） -->
+          <!-- 聚焦卡：选中指数的分类 + 完整说明（正文固定 3 行高，切换不跳） -->
           <div v-if="activeIndex" class="index-focus" :class="'tone-' + indexTone(activeIndex.category)">
             <!-- mode="out-in"：旧的先走完再让新的进来，两段文字不会同时出现在卡片里 -->
             <Transition name="index-swap" mode="out-in">
@@ -103,16 +122,18 @@
         </div>
       </header>
 
-      <!-- 右侧：选中日详情 + 生活指数 + 4日预报 -->
+      <!-- 右侧：选中日详情 + 当日指标 + 4日预报 -->
       <main class="details">
         <div class="details-head">
           <div class="details-info">
             <span class="details-day">{{ activeDayLabel }}</span>
             <div class="details-quote" role="button" tabindex="0" aria-label="点击换一句"
-              :title="hitokoto ? (hitokoto + (hitokotoFrom ? ' · ' + hitokotoFrom : '') + '（点击换一句）') : '加载一句话'"
+              :title="hitokoto ? (hitokoto + (hitokotoFrom ? ' · ' + hitokotoFrom : '') + '（点击换一句）') : (hitokotoFailed ? '加载失败，点击重试' : '加载一句话')"
               @click="refreshHitokoto()" @keydown.enter="refreshHitokoto()" @keydown.space.prevent="refreshHitokoto()">
-              <span v-if="hitokotoLoading && !hitokoto" class="quote-skeleton"></span>
-              <span v-else-if="hitokoto" class="quote-text" :class="{ refreshing: hitokotoLoading }">{{ hitokoto }}</span>
+              <!-- 有文案就始终显示（刷新时淡化），没有文案才在骨架屏 / 失败提示之间切换 -->
+              <span v-if="hitokoto" class="quote-text" :class="{ refreshing: hitokotoLoading }">{{ hitokoto }}</span>
+              <span v-else-if="hitokotoFailed" class="quote-text quote-error">句子加载失败，点击重试</span>
+              <span v-else class="quote-skeleton"></span>
             </div>
           </div>
           <div class="details-temp">
@@ -126,39 +147,40 @@
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('precip')"></span>
             <span class="stat-label">降雨量</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.precip ?? '—' }}<small> mm</small></span>
+            <span class="stat-value">{{ activeDaily?.precip ?? '—' }}<small> mm</small></span>
           </li>
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('humidity')"></span>
             <span class="stat-label">湿度</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.humidity ?? '—' }}<small> %</small></span>
+            <span class="stat-value">{{ activeDaily?.humidity ?? '—' }}<small> %</small></span>
           </li>
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('wind')"></span>
-            <span class="stat-label">风速</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.windSpeedDay ?? '—' }}<small> km/h</small></span>
+            <span class="stat-label">风向风力</span>
+            <span class="stat-value stat-wind">{{ activeDaily?.windDirDay || '—' }} {{ activeDaily?.windScaleDay ?? '—' }}级</span>
           </li>
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('uv')"></span>
             <span class="stat-label">紫外线</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.uvIndex ?? '—' }}</span>
+            <!-- 与其它指标同字号同色：指数 + 强度等级，例如 5-弱 -->
+            <span class="stat-value stat-uv" :title="activeUv.title">{{ activeUv.text }}</span>
           </li>
           <li class="stat">
-            <span class="stat-icon" v-html="statIcon('pressure')"></span>
-            <span class="stat-label">气压</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.pressure ?? '—' }}<small> hPa</small></span>
+            <span class="stat-icon" v-html="statIcon('temp')"></span>
+            <span class="stat-label">平均温度</span>
+            <span class="stat-value">{{ activeDaily?.tempAvg ?? '—' }}<small> °C</small></span>
           </li>
           <li class="stat">
-            <span class="stat-icon" v-html="statIcon('vis')"></span>
-            <span class="stat-label">能见度</span>
-            <span class="stat-value">{{ activeWeatherDate[0]?.vis ?? '—' }}<small> km</small></span>
+            <span class="stat-icon" v-html="statIcon('cloud')"></span>
+            <span class="stat-label">云量</span>
+            <span class="stat-value">{{ activeDaily?.cloud ?? '—' }}<small> %</small></span>
           </li>
         </ul>
 
         <div class="sun-row">
-          <span class="sun-item">日出 <b>{{ activeWeatherDate[0]?.sunrise ?? '—' }}</b></span>
+          <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
           <span class="sun-sep"></span>
-          <span class="sun-item">日落 <b>{{ activeWeatherDate[0]?.sunset ?? '—' }}</b></span>
+          <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
         </div>
 
         <ul class="forecast-list">
@@ -181,30 +203,83 @@
 <script setup>
 import 'qweather-icons/font/qweather-icons.css'
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
+import { useStorage } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import { useWeatherStore } from '@/store/index';
 import WeatherStateIndicator from './WeatherStateIndicator.vue'
 import LocationPicker from './LocationPicker.vue'
+import MinutelyRainChip from './MinutelyRainChip.vue'
 import OnboardingPanel from '@/features/onboarding/OnboardingPanel.vue'
-import { OnboardingOpen, WeatherReady, openOnboarding } from '@/features/onboarding/onboardingState'
+import SettingsPanel from '@/features/onboarding/SettingsPanel.vue'
+import { OnboardingOpen, SettingsOpen, WeatherReady, closeSettings, openSettings } from '@/features/onboarding/onboardingState'
 import { WallpaperPropertiesReady } from '@/features/wallpaper/properties'
+import { useLayerOutsideClick } from '@/shared/useLayerOutsideClick'
 import Bus from '@/shared/Bus';
-import { BUS_EVENTS } from '@/features/wallpaper/constants';
+import { BUS_EVENTS, STORAGE_KEYS } from '@/features/wallpaper/constants';
 import { useWeatherRefresh } from './useWeatherRefresh';
 
 const WeatherMainIsShow = ref(false)
 const weatherStore = useWeatherStore()
-const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, EarlyWarningDetailsDialog } = storeToRefs(weatherStore)
-const { getLocationInformation, getWeatherIndices, ReviseState } = weatherStore
+const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, CityAddressLabel } = storeToRefs(weatherStore)
+const { getLocationInformation, getWeatherIndices, ReviseState, openWarningDetails } = weatherStore
 const activeItem = ref('今天')
 const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item => item.fxDate === activeItem.value))
 
-// 面板视图：引导 → 地址选择 → 天气卡（三者尺寸/层级一致，见 style/weather-panel.scss）
+/**
+ * 当前选中那一天的展示数据。
+ * v1 的每日预报不含气压/能见度，所以指标格里换成它有的「最大阵风」「云量」，
+ * 这里直接透传，不再做「今天用实况补位」的拼接。
+ */
+const activeDaily = computed(() => activeWeatherDate.value[0] || null)
+
+/**
+ * 紫外线强度等级。
+ * 按 WHO《全球紫外线指数指南》的五档划分：
+ *   0–2 最弱 · 3–5 弱 · 6–7 中 · 8–10 强 · ≥11 很强
+ * 接口 uvIndexMax 的取值范围是 [0, 15]，11 以上统一按「很强」处理。
+ * 卡片里只显示「5-弱」这样的纯文本，字号和颜色跟其它指标一致。
+ */
+const UV_LEVELS = [
+  { max: 2, level: '最弱', advice: '紫外线很弱，正常外出无需特别防护。' },
+  { max: 5, level: '弱', advice: '紫外线较弱，外出可涂 SPF15+ 防晒霜。' },
+  { max: 7, level: '中', advice: '紫外线中等，外出建议涂 SPF30+ 防晒霜、戴遮阳帽。' },
+  { max: 10, level: '强', advice: '紫外线强，10–16 点减少户外暴晒，做好防晒。' },
+  { max: Infinity, level: '很强', advice: '紫外线很强，尽量避免正午外出，注意遮阳防晒。' },
+]
+const activeUv = computed(() => {
+  const raw = activeDaily.value?.uvIndex
+  if (raw === null || raw === undefined || Number.isNaN(Number(raw))) {
+    return { text: '—', title: '暂无紫外线数据' }
+  }
+  const index = Number(raw)
+  const level = UV_LEVELS.find((item) => index <= item.max) || UV_LEVELS[UV_LEVELS.length - 1]
+  return {
+    text: `${index}-${level.level}`,
+    title: `紫外线指数 ${index}（${level.level}）· ${level.advice}`,
+  }
+})
+
+// 地址文案统一由 store 的 CityAddressLabel 给出（点选后是「区县 路名」，
+// 例如「黄岩区 中学路」）。以前这里自己拼过一次，结果和「最近」里各写各的，
+// 一个显示中学路、一个显示中心路，还丢了「区」字 —— 现在只有一处拼。
+const locationLabel = CityAddressLabel
+// 悬停给回完整层级 + 坐标：同名区县（北京朝阳 / 长春朝阳）还能对上号
+const locationTitle = computed(() => {
+  const point = dayDateCity.value.point
+  if (!point) return dayDateCity.value.city
+  const coords = `${point.lng}, ${point.lat}`
+  const full = `${dayDateCity.value.city} ${point.road || ''}`.trim()
+  return `${full}（${coords}）`
+})
+
+// 面板视图：引导 → 设置 → 地址选择 → 天气卡（四者尺寸/层级一致，见 style/weather-panel.scss）
 const LocationPickerOpen = ref(false)
 const panelView = computed(() => {
   // 壁纸引擎下发的属性还没补发完成 → 先什么都不显示，避免闪一下引导页
   if (!WallpaperPropertiesReady.value) return 'loading'
+  // 引导页永远优先：凭据没配好、密钥失效、还没选位置时，设置页没有意义
   if (OnboardingOpen.value) return 'onboarding'
+  if (SettingsOpen.value) return 'settings'
   if (LocationPickerOpen.value) return 'location'
   return 'weather'
 })
@@ -214,42 +289,176 @@ const shellVisible = computed(
   () => panelView.value !== 'loading' && !(panelView.value === 'weather' && WeatherMainIsShow.value)
 )
 
-// 一言（名言）模块：右侧“今天”下方
-const hitokoto = ref('')
-const hitokotoFrom = ref('')
-const hitokotoLoading = ref(true)
-let hitokotoReq = 0
+/* 引导页 / 设置页的优先级高于地址页（见上面的 panelView）。它们接手时，地址页的开关必须
+   一起关掉 —— 地址页自己的 @close / @selected 只在它还挂着的时候才发得出来：
+   一旦被顶掉（运行中请求 401/403 触发 USER_API_INVALID → ForceOpen；或者凭据被改坏 →
+   OnboardingOpen），组件先被卸载，这两个事件永远不会来，LocationPickerOpen 就一直是 true。
+   等凭据修好、引导页一关，panelView 会按优先级「自己」弹回地址页 —— 用户一下都没点。
+   设置页在同样场景下早就被显式关掉了（见 onboardingState 的 USER_API_INVALID 与
+   markLocationChosen），地址页漏了这一步。 */
+watch([OnboardingOpen, SettingsOpen], ([onboarding, settings]) => {
+  if (onboarding || settings) LocationPickerOpen.value = false
+})
+
+/* 属性里勾了「隐藏天气面板」（沉浸式雨滴）时，地址页也要跟着收掉。
+   现在 shellVisible 只对 panelView === 'weather' 生效，地址页开着时隐藏开关等于失效
+   （卡片还赖在屏幕上），等下次显示面板又直接从地址页开始，看着就像它自己又开了。 */
+watch(WeatherMainIsShow, (hidden) => {
+  if (hidden) LocationPickerOpen.value = false
+})
+
+/* 点击卡片外的空白关闭设置页。
+   地址页的「点外面确认已选点」由 LocationPicker 自己接管（它可能在引导页里，不在这一层直接渲染）。 */
+const layerRef = ref(null)
+const handleLayerClick = () => {
+  // 只有设置页这么关：引导页是必填流程，地址页有自己的规则（只认地图上点过的 pin）
+  if (panelView.value === 'settings') closeSettings()
+}
+useLayerOutsideClick(layerRef, handleLayerClick)
+
+/* 一言（名言）模块：右侧“今天”下方
+ *
+ * 以前这里有三处会导致空白：
+ *   1. 首次请求失败（断网 / 接口 5xx / 返回体没有 hitokoto）后直接 `return`，
+ *      hitokoto 一直是空串，骨架屏也跟着消失，只剩一条空的竖线；
+ *   2. 手动点击与自动刷新并发时，旧请求的 `req === hitokotoReq` 判定会把
+ *      已经成功的结果丢掉（后发请求失败、先发请求成功），界面同样空白；
+ *   3. 请求一直不返回（没有超时），骨架屏会永远闪下去。
+ * 现在：请求带超时 + 并发合并，成功后落盘；失败时保留上一条，一条都没有才
+ * 显示「点击重试」提示，并且按 5 秒（连续失败 5 次后 30 秒）自动重试。
+ * 数据有效期 2 小时：首次打开优先用缓存，过期后自动换新。 */
+const HITOKOTO_API = 'https://v1.hitokoto.cn/?c=i&c=d&c=a&encode=json&max_length=30'
+const HITOKOTO_TTL = 2 * 60 * 60 * 1000 // 一言数据有效期：2 小时
 const HITOKOTO_MANUAL_MIN = 5 * 1000 // 手动点击至少间隔 5 秒
-const HITOKOTO_AUTO_INTERVAL = 12 * 60 * 60 * 1000 // 自动刷新每 12 小时
+const HITOKOTO_TIMEOUT = 8 * 1000 // 单次请求超时，避免骨架屏/旧文案一直挂着
+const HITOKOTO_RETRY = 5 * 1000
+const HITOKOTO_RETRY_SLOW = 30 * 1000
+
+// 默认值给 null 时 useStorage 会推断成 any（写出 "[object Object]"），
+// 所以显式按 JSON 读写；read 自带容错，缓存损坏时只当作没有缓存，不影响组件初始化
+const HitokotoCache = useStorage(STORAGE_KEYS.HITOKOTO_CACHE, null, localStorage, {
+  flush: 'sync',
+  serializer: {
+    read: (raw) => {
+      try {
+        return JSON.parse(raw)
+      } catch (error) {
+        return null
+      }
+    },
+    write: (value) => JSON.stringify(value),
+  },
+})
+
+// 读出上一次成功缓存的文案；结构不对（旧版本 / 手改过）就当作没有缓存
+const hitokotoCacheValue = (() => {
+  const cache = HitokotoCache.value
+  if (!cache || typeof cache.text !== 'string') return null
+  const text = cache.text.trim()
+  const at = Number(cache.at)
+  if (!text || !Number.isFinite(at) || at <= 0) return null
+  return { text, from: typeof cache.from === 'string' ? cache.from.trim() : '', at }
+})()
+
+const hitokoto = ref(hitokotoCacheValue?.text || '')
+const hitokotoFrom = ref(hitokotoCacheValue?.from || '')
+const hitokotoUpdatedAt = ref(hitokotoCacheValue?.at || 0)
+const hitokotoLoading = ref(!hitokotoCacheValue)
+const hitokotoFailed = ref(false)
+let hitokotoInFlight = false
+let hitokotoAbort = null
+let hitokotoTimer = null
+let hitokotoFailCount = 0
+let hitokotoDisposed = false
 let lastManualAt = 0
-let hitokotoAutoTimer = null
-const fetchHitokoto = async () => {
-  const req = ++hitokotoReq
-  hitokotoLoading.value = true
-  try {
-    const res = await fetch('https://v1.hitokoto.cn/?c=i&c=d&c=a&encode=json&max_length=30')
-    if (!res.ok) return
-    const data = await res.json()
-    if (req === hitokotoReq && data && data.hitokoto) {
-      hitokoto.value = data.hitokoto
-      hitokotoFrom.value = data.from || ''
-    }
-  } catch (e) {
-    // 请求失败则保持现状，不影响其余内容
-  } finally {
-    if (req === hitokotoReq) hitokotoLoading.value = false
+
+const hitokotoAge = () => (hitokotoUpdatedAt.value > 0 ? Date.now() - hitokotoUpdatedAt.value : Infinity)
+// age < 0 说明系统时间被往回调过：当作过期处理，避免一条旧文案被“永久有效”
+const hitokotoFresh = () => {
+  const age = hitokotoAge()
+  return !!hitokoto.value && age >= 0 && age < HITOKOTO_TTL
+}
+
+const clearHitokotoTimer = () => {
+  if (hitokotoTimer !== null) {
+    clearTimeout(hitokotoTimer)
+    hitokotoTimer = null
   }
 }
-// 手动换一句：10 秒内忽略重复点击
+
+// 只保留一个定时器：失败重试、2 小时到期、回到前台后重新校准，都走这里
+const scheduleHitokoto = (delay) => {
+  if (hitokotoDisposed) return
+  clearHitokotoTimer()
+  hitokotoTimer = setTimeout(() => {
+    hitokotoTimer = null
+    fetchHitokoto()
+  }, Math.max(0, delay))
+}
+
+const fetchHitokoto = async () => {
+  // 同一时间只允许一个请求：既不会互相覆盖，也避免用户连点消耗接口
+  if (hitokotoDisposed || hitokotoInFlight) return
+  hitokotoInFlight = true
+  hitokotoLoading.value = true
+  clearHitokotoTimer()
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null
+  hitokotoAbort = controller
+  const timeout = setTimeout(() => controller?.abort(), HITOKOTO_TIMEOUT)
+  try {
+    const res = await fetch(HITOKOTO_API, { signal: controller?.signal, cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const text = typeof data?.hitokoto === 'string' ? data.hitokoto.trim() : ''
+    if (!text) throw new Error('接口返回的一言为空')
+    hitokoto.value = text
+    hitokotoFrom.value = typeof data.from === 'string' ? data.from.trim() : ''
+    hitokotoUpdatedAt.value = Date.now()
+    hitokotoFailed.value = false
+    hitokotoFailCount = 0
+    HitokotoCache.value = {
+      text: hitokoto.value,
+      from: hitokotoFrom.value,
+      at: hitokotoUpdatedAt.value,
+    }
+    // 从拿到新数据开始计算 2 小时有效期
+    scheduleHitokoto(HITOKOTO_TTL)
+  } catch (error) {
+    // 有旧文案就继续展示旧文案（下面会自动重试），一条都没有才让界面显示失败提示
+    hitokotoFailed.value = !hitokoto.value
+    hitokotoFailCount += 1
+    scheduleHitokoto(hitokotoFailCount > 5 ? HITOKOTO_RETRY_SLOW : HITOKOTO_RETRY)
+  } finally {
+    clearTimeout(timeout)
+    hitokotoInFlight = false
+    hitokotoAbort = null
+    hitokotoLoading.value = false
+  }
+}
+
+// 手动换一句：5 秒内忽略重复点击；正在请求时也直接忽略，防止并发
 const refreshHitokoto = () => {
+  if (hitokotoInFlight) return
   const now = Date.now()
   if (now - lastManualAt < HITOKOTO_MANUAL_MIN) return
   lastManualAt = now
   fetchHitokoto()
 }
+
+const handleHitokotoVisibility = () => {
+  if (document.hidden || hitokotoDisposed || hitokotoInFlight) return
+  // 后台标签页的定时器会被节流/冻结，回到前台先校准一次
+  if (hitokotoFresh()) scheduleHitokoto(HITOKOTO_TTL - hitokotoAge())
+  else fetchHitokoto()
+}
+
 const startHitokotoAuto = () => {
-  clearInterval(hitokotoAutoTimer)
-  hitokotoAutoTimer = setInterval(() => fetchHitokoto(), HITOKOTO_AUTO_INTERVAL)
+  document.addEventListener('visibilitychange', handleHitokotoVisibility)
+  window.addEventListener('online', handleHitokotoVisibility)
+  // 首次打开：缓存还在 2 小时有效期内就直接用，到点再换；否则先显示旧文案并立即刷新
+  if (hitokotoFresh()) scheduleHitokoto(HITOKOTO_TTL - hitokotoAge())
+  else fetchHitokoto()
 }
 
 // 预警轮播：多条预警自动切换当前展示的一条
@@ -319,8 +528,8 @@ const ICONS = {
   humidity: '<path d="M12 3.5C8.8 7.6 7.3 10.1 7.3 12.6a4.7 4.7 0 0 0 9.4 0c0-2.5-1.5-5-4.7-9.1z"/><path d="M9 13a3 3 0 0 0 2.5 2.7"/>',
   wind: '<path d="M3.5 8.5h11a2.4 2.4 0 1 0-2.4-2.4M3.5 12.5h15.5M3.5 16.5h9"/>',
   uv: '<circle cx="12" cy="12" r="3.8"/><path d="M12 2.8v1.8M12 19.4v1.8M2.8 12h1.8M19.4 12h1.8M5.5 5.5l1.3 1.3M17.2 17.2l1.3 1.3M18.5 5.5l-1.3 1.3M6.8 17.2l-1.3 1.3"/>',
-  pressure: '<path d="M4.5 16a7.5 7.5 0 0 1 15 0"/><path d="M12 16l3.6-4.7"/><path d="M8.2 16h.01M12 16h.01M15.8 16h.01"/>',
-  vis: '<path d="M2.8 12S6 6 12 6s9.2 6 9.2 6-3.2 6-9.2 6-9.2-6-9.2-6z"/><circle cx="12" cy="12" r="2.6"/>',
+  temp: '<path d="M12 4.4a1.9 1.9 0 0 1 1.9 1.9v7.2a3.6 3.6 0 1 1-3.8 0V6.3A1.9 1.9 0 0 1 12 4.4z"/><path d="M10.1 9h3.8M10.1 11.9h3.8"/>',
+  cloud: '<path d="M17.3 9.2a4.2 4.2 0 0 0-8.1-1.3 3.6 3.6 0 0 0 .3 7.1h7a3.2 3.2 0 0 0 .8-5.8z"/>',
   sport: '<circle cx="15" cy="4.8" r="1.7"/><path d="M9 19.5l2.6-4.7-2.6-1.9 1.6-4 3 1.6 1.4 3.4h3.4"/><path d="M13.8 8.6l1.4 3.3M11.6 14.8l-2.4 4.6"/>',
   wash: '<path d="M5.4 12.8l1.1-3.2A2 2 0 0 1 8.4 8h7.2a2 2 0 0 1 1.9 1.4l1.1 3.4"/><rect x="4.5" y="12.5" width="15" height="3.2" rx="1.2"/><circle cx="7.6" cy="16.4" r="1.3"/><circle cx="16.4" cy="16.4" r="1.3"/><path d="M8 10.6h8"/>',
   dress: '<path d="M9 3.5l2.6 1.4 2.6-1.4 3.8 2.9-2.3 2.4-1.2-.5v8.7H9V8.3l-1.2.5L5.5 6.4 9 3.5z"/>',
@@ -333,11 +542,9 @@ const statIcon = (key) => iconSvg(ICONS[key] || '')
 const INDEX_TYPE_ICON = { 1: 'sport', 2: 'wash', 3: 'dress', 5: 'uv', 6: 'travel', 8: 'comfort', 9: 'flu' }
 const indexIcon = (type) => iconSvg(ICONS[INDEX_TYPE_ICON[type] || 'uv'])
 
-/* 生活指数：选择器 + 聚焦卡。
-   左栏空间实测很紧（1920×1080、panelscale 0.75 时整栏只剩 30px，出现预警 chip 时只剩 15px），
-   所以选择器固定 4 列 × 2 行（7 条 → 4+3），聚焦卡正文固定预留 3 行高：
-   两行选择器 81px + 聚焦卡 84px ≈ 194px，与原版 6 张卡（192px）基本持平，
-   整栏余量约 28px（出现预警 chip 时约 10px，且是恒定下界 —— 更长的正文由 line-clamp 截断）。 */
+/* 生活指数：选择器 + 一张带边框的聚焦卡（标题行 + 3 行说明）。
+   卡片高度 46.5rem 下，整栏底部约 48px 空白（出现预警 chip 时约 33px）；
+   正文固定 3 行高，更长的文字由 line-clamp 截断，切换时高度不跳。 */
 // 展示顺序：按「出行 / 健康」分两行 —— 第一行运动 / 洗车 / 旅游 / 舒适度，第二行穿衣 / 紫外线 / 感冒。
 // 接口返回顺序不保证稳定，所以按 type 显式排一次；未知 type 排在最后，保留其原有相对顺序。
 const INDEX_DISPLAY_ORDER = ['1', '2', '6', '8', '3', '5', '9']
@@ -433,7 +640,6 @@ onMounted(() => {
   Bus.on(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, handleBackgroundIndexChange)
   ensureRotateWorker()
   startIndexRotate()
-  fetchHitokoto()
   startHitokotoAuto()
 })
 onUnmounted(() => {
@@ -442,7 +648,12 @@ onUnmounted(() => {
   rotateWorker?.terminate()
   rotateWorker = null
   stopIndexRotate()
-  clearInterval(hitokotoAutoTimer)
+  hitokotoDisposed = true
+  clearHitokotoTimer()
+  document.removeEventListener('visibilitychange', handleHitokotoVisibility)
+  window.removeEventListener('online', handleHitokotoVisibility)
+  hitokotoAbort?.abort()
+  hitokotoAbort = null
 })
 
 watch(() => WeatherEarlyWarning.value.length, () => {
@@ -468,8 +679,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 1.125rem;
-  padding: 2.125rem;
+  /* 与右栏同一套呼吸感：右栏 gap 1.625rem / padding 2.5rem，
+     左栏原来是 1.125rem / 2.125rem，明显更挤。卡片加高后把省出来的高度换成间距，
+     而不是全部堆在底部（否则左栏会变成「上面一坨、下面一大片空白」）。 */
+  gap: 1.625rem;
+  padding: 2.5rem;
   background: linear-gradient(155deg, rgba(14, 165, 233, 0.34), rgba(56, 189, 248, 0.10) 55%, transparent);
   overflow: hidden;
 }
@@ -483,12 +697,10 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 /* 左栏出现天气预警 chip 时，比没有预警时多占一行（chip 本身 + 一个 gap）。
-   面板高度有限（见 style/weather-panel.scss），这里把左栏间距和指数选择器内边距收紧一点，
-   把省下来的高度让给 chip，保证生活指数区完整落在面板内而不是被顶到下沿外。
-   实测（1920×1080、panelscale 0.75）：6 张指数卡的老版式用完只剩 15px 余量；
-   改成「4 列选择器 + 聚焦卡」后还剩 10px（没有预警时约 28px）。 */
+   卡片加高到 46.5rem 后，正常状态下预警 chip 也能完整放下；
+   这里再收紧一档间距，纯粹是给极端情况（chip 文案特别长 / 指数正文 3 行）留安全余量。 */
 .hero.hero-warning {
-  gap: 0.875rem;
+  gap: 1.25rem;
 }
 
 .hero.hero-warning .indices {
@@ -515,13 +727,13 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   gap: 0.5rem;
 }
 
-/* API 设置入口：重新打开新用户引导（查看/修改域名与密钥的说明与检测结果） */
+/* 设置入口：已能看天气之后，齿轮打开的是「设置 / 状态」页（不是首次引导） */
 .api-entry {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.125rem;
+  height: 2.125rem;
   color: var(--text-muted);
   background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
@@ -532,6 +744,17 @@ watch(() => WeatherEarlyWarning.value.length, () => {
     color: var(--text-primary);
     background: var(--glass-border);
   }
+}
+
+.api-entry-icon {
+  width: 1.1875rem;
+  height: 1.1875rem;
+  flex: none;
+  transition: transform 0.35s ease;
+}
+
+.api-entry:hover .api-entry-icon {
+  transform: rotate(45deg);
 }
 
 .location {
@@ -573,9 +796,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .hero-date {
   position: relative;
   z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .date-dayname {
+  flex: none;
   margin: 0;
   font-size: 1.8rem;
   font-weight: 700;
@@ -584,11 +812,18 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   color: var(--text-primary);
 }
 
+/* 日期缩成星期旁边的小字：原来它单独占一行（约 21px），左栏因此更挤。
+   信息没少，只是从「第二行」变成「标题行里的注解」。 */
 .date-day {
   display: block;
-  margin-top: 0.3125rem;
-  font-size: 0.95rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  font-size: 0.9rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .hero-now {
@@ -600,7 +835,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .weather-icon {
-  font-size: 4.4rem;
+  font-size: 5rem;
   line-height: 1;
   color: rgba(255, 255, 255, 0.9);
 }
@@ -616,34 +851,43 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .now-temp-num {
-  font-size: 5rem;
+  font-size: 6rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 
 .now-temp-unit {
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 600;
   margin-left: 0.25rem;
   color: var(--text-secondary);
 }
 
+/* 天气文案 + 体感/温区合成一行：省下的这一行高度让给常驻的分钟级降水胶囊，
+   否则左栏（预警 + 分钟级 + 生活指数）会顶出卡片下沿 */
 .now-desc {
   position: relative;
   z-index: 1;
-  font-size: 1.3rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.625rem;
   font-weight: 600;
   color: var(--text-secondary);
 }
 
+.now-desc-text {
+  font-size: 1.4rem;
+  line-height: 1.5;
+}
+
 .now-sub {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.88rem;
+  font-weight: 400;
   color: var(--text-muted);
 }
 
@@ -652,6 +896,19 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   height: 0.25rem;
   border-radius: 50%;
   background: var(--text-muted);
+}
+
+/* 分钟级降水 + 天气预警：两颗同系列胶囊贴成一组，组内只留 0.5rem。
+   它们是 .hero 的 flex 子元素时各占一份行距（1.625rem，有预警时 1.25rem），
+   同一块状态信息被拆得像两段；包成一组后组内收紧，组和上下内容的间距保持不变。 */
+.hero-chips {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .early-chip {
@@ -760,6 +1017,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   opacity: 0.5;
 }
 
+/* 没有拿到任何文案时的兜底提示：内容始终占位，不会出现空白 */
+.quote-text.quote-error {
+  font-style: normal;
+  opacity: 0.72;
+}
+
 .quote-skeleton {
   display: block;
   width: clamp(5rem, 45%, 13.75rem);
@@ -852,6 +1115,18 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: normal;
+}
+
+/* 风向 + 风级整行同字号；8 方位最长的「西北风 12级」也只是贴到卡片内边距，不换行 */
+.stat-wind {
+  white-space: nowrap;
+}
+
+/* ===== 紫外线卡 =====
+   「5-弱」整串走 .stat-value 的默认字号与颜色，不再单独设置字体样式；
+   两列数字 + 两个汉字的最长组合也只在卡片内边距里，不折行。 */
+.stat-uv {
+  white-space: nowrap;
 }
 
 .sun-row {
@@ -956,7 +1231,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 /* 聚焦卡：选中指数的分类 + 完整说明。
-   正文固定 2 行高（min-height），否则各条文字长短不同，切换时整栏会上下跳。 */
+   正文固定 3 行高（min-height），否则各条文字长短不同，切换时整栏会上下跳。 */
 .index-focus {
   /* 内边距提成变量，改一处就够 */
   --focus-pad-x: 0.875rem;
@@ -964,7 +1239,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   position: relative;
   margin-top: 0.5rem;
   /* out-in 换条时旧内容已移除、新内容还没插入，中间有一帧是空的：
-     兜一个高度（= 内边距 + 标题行 + 3 行正文 ≈ 实测的 84.2px），
+     兜一个高度（= 内边距 + 标题行 + 3 行正文 ≈ 实测的 84px），
      卡片就不会在换条的一瞬间塌下去 */
   min-height: 7rem;
   padding: var(--focus-pad-y) var(--focus-pad-x);
@@ -972,8 +1247,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   border: 1px solid var(--glass-border);
   border-left: 0.1875rem solid var(--tone-color, var(--glass-border-strong));
   border-radius: var(--radius-sm);
-  /* 轮播时离场的那份会向上滑出，裁掉它才能干净地"从卡片里滑走"，
-     而不是飘到上面的选择器上面去 */
+  /* 轮播时离场的那份会向下滑出，裁掉它才能干净地"从卡片里滑走" */
   overflow: hidden;
   transition: border-left-color 0.2s ease;
 }

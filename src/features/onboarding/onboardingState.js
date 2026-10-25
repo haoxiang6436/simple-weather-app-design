@@ -1,9 +1,13 @@
 /**
- * 新用户引导的状态机
+ * 新用户引导 / 设置页共用的状态机
  *
  * 流程：引导说明 → 读取用户填写的域名/密钥 → 自动检测 → 选择位置 → 显示天气
  * 只有「凭据齐备 + 检测通过（或用户手动确认继续）+ 已选位置」三件事都完成，
  * 天气面板才会出现；不使用内置额度。
+ *
+ * 天气能显示之后，右上角齿轮打开的是设置页（SettingsOpen），不是再走一遍引导；
+ * 两页共用这里的检测状态与凭据数据，只是回答的问题不同：
+ * 引导页 =「第一次怎么配」，设置页 =「现在什么状态、去哪儿改」。
  */
 import { computed, ref, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
@@ -40,8 +44,13 @@ export const CheckStatus = ref('idle')
 // [{ host, ok, kind, code, message, soft }]
 export const CheckResults = ref([])
 export const CheckSummary = ref('')
-// 用户手动打开引导页（天气卡上的入口）
+// 用户手动打开引导页（设置页的「重新查看新手引导」、调试面板的「打开引导页」）
 export const ForceOpen = ref(false)
+// 手动打开的引导页只作回顾：不自动前进（否则 9 秒后自己关掉，用户还没看完）
+export const OnboardingReview = ref(false)
+// 设置页开关（天气卡右上角的齿轮）。它和引导页是两个不同的面板：
+// 引导页回答「第一次怎么配」，设置页回答「现在是什么状态、去哪儿改」
+export const SettingsOpen = ref(false)
 // 网络类失败时用户选择"仍然继续"的凭据指纹（仅本次会话有效）
 const NetworkOverride = ref('')
 
@@ -178,31 +187,68 @@ export const continueWithoutCheck = () => {
   NetworkOverride.value = UserApiFingerprint.value
   // 用户手动确认继续 → 引导页的"强制打开"状态也随之结束
   ForceOpen.value = false
+  OnboardingReview.value = false
 }
 
-export const openOnboarding = () => {
+/**
+ * 打开引导页
+ * @param {Object} [options]
+ * @param {boolean} [options.review] 从设置页主动「重新查看」：只作回顾，不自动前进
+ */
+export const openOnboarding = (options = {}) => {
   ForceOpen.value = true
+  OnboardingReview.value = options.review === true
 }
 
 export const closeOnboarding = () => {
   ForceOpen.value = false
+  OnboardingReview.value = false
 }
 
+export const openSettings = () => {
+  SettingsOpen.value = true
+}
+
+export const closeSettings = () => {
+  SettingsOpen.value = false
+}
+
+/**
+ * 标记「位置已经选好」。
+ *
+ * 必须无条件调用：NeedsLocation 只看这个时间戳，引导页/地址页的收尾全靠它。
+ * 以前调用方只在「有省市区路径」时才调，于是「路径为空、但确认了坐标」那条路
+ * （首次使用残留点位、老数据只有坐标）走完整个确认流程却什么都没标记，
+ * 面板会永远停在选区县页。
+ *
+ * @param {Array<{value:string,label:string}>} [path]
+ *   这次的省 / 市 / 区路径。传数组 = 以这次为准（空数组表示「只有坐标、没有路径」，
+ *   会清掉可能对不上的旧路径）；不传 = 保持已保存的路径不动。
+ */
 export const markLocationChosen = (path) => {
   LocationChosenAt.value = Date.now()
-  if (Array.isArray(path) && path.length) {
+  if (Array.isArray(path)) {
     ChosenLocationPath.value = path.map((node) => ({ value: node.value, label: node.label }))
   }
   // 流程已经走完，引导页该让位了。
   // 用户是点天气卡上的入口/「模拟首次使用」手动打开引导页时 ForceOpen 为 true，
   // 不清掉的话即使选好位置也会一直被它按住在引导页上。
   ForceOpen.value = false
+  OnboardingReview.value = false
+  // 设置页同理：它可能正开在引导页背后（齿轮、调试面板的「打开设置页」）。
+  // 不关掉的话，位置一选完就落到设置页上，而不是用户期待的天气卡。
+  SettingsOpen.value = false
 }
 
 /** 凭据齐备且已通过检测（或已选择继续） */
 export const CredentialsReady = computed(() => {
   if (UserApiState.value !== 'ok' || !UserApiEntries.value.length) return false
   if (CheckStatus.value === 'ok') return true
+  // 凭据没变、之前已经验证通过：这里仍然算「可用」。
+  // 重新检测只是刷新一次状态，不该在检测中 / 检测失败时把设置页顶回引导页
+  // （整张卡会重播一次 panel-swap 进场动画），也不该中断天气轮询。
+  // 真的失效会由运行时 USER_API_INVALID 清空 VerifiedFingerprint，并重新打开引导页。
+  if (VerifiedFingerprint.value && VerifiedFingerprint.value === UserApiFingerprint.value) return true
   return !!NetworkOverride.value && NetworkOverride.value === UserApiFingerprint.value
 })
 
@@ -268,4 +314,15 @@ Bus.on(BUS_EVENTS.USER_API_INVALID, (payload) => {
   CheckStatus.value = 'error'
   CheckSummary.value = payload?.message || '密钥失效或额度不足，请重新填写域名与密钥'
   ForceOpen.value = true
+  // 用户可能正停在设置页：关掉它，让引导页接手，
+  // 否则修好凭据后一关引导页又弹回一个过期的设置页
+  SettingsOpen.value = false
+  OnboardingReview.value = false
 })
+
+/** 密钥打码：只露前 4 位与后 4 位，用来确认「填的是哪一把」，不泄露完整密钥 */
+export const maskKey = (key) => {
+  const text = String(key || '')
+  if (text.length <= 8) return '•'.repeat(Math.max(text.length, 4))
+  return `${text.slice(0, 4)}••••${text.slice(-4)}`
+}

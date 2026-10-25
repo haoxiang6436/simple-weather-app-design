@@ -135,6 +135,25 @@ const handleTrackDown = (event) => {
 
 const onResize = () => refresh()
 
+/**
+ * 把列滚到选中项。
+ * 单纯靠 watch(active) 是不够的：带历史路径打开时，selectedPath 在 setup 里就已经
+ * 算好了，列挂载时 active 本来就有值、watcher 不会触发，列表就停在最上面 ——
+ * 看起来像「历史选择没有套用」，其实只是选中项在下面看不见。所以挂载后要补一次。
+ */
+const scrollToActive = async () => {
+  await refresh()
+  // 必须把元素本身传进去：BetterScroll 对字符串参数走的是 document.querySelector，
+  // 三列同时有选中项时会滚到「第一列的那个 active」，位置算出来是错的。
+  const target = scrollEl.value?.querySelector('.pc-item.active')
+  if (!target || !scroll) return
+  try {
+    scroll.scrollToElement(target, 260)
+  } catch (error) {
+    // 找不到元素时忽略（列表还没渲染完）
+  }
+}
+
 onMounted(async () => {
   useMouseWheelPlugin()
   await nextTick()
@@ -152,6 +171,7 @@ onMounted(async () => {
     scroll.on('scrollEnd', updateBar)
   }
   refresh()
+  scrollToActive()
   window.addEventListener('resize', onResize)
 })
 
@@ -162,25 +182,24 @@ onUnmounted(() => {
   window.removeEventListener('resize', onResize)
 })
 
-// 列表内容变化（切换省/市）→ 复位到顶部并重新计算滚动条
+// 列表内容变化（切换省/市）→ 有选中项就滚到它，否则复位到顶部并重新计算滚动条
 watch(
   () => props.items,
-  () => {
-    refresh().then(() => scroll?.scrollTo(0, 0, 0))
+  async () => {
+    if (props.active) {
+      scrollToActive()
+      return
+    }
+    await refresh()
+    scroll?.scrollTo(0, 0, 0)
   }
 )
 
-// 选中项变化（例如从"最近选择"恢复）→ 滚动到可见位置
+// 选中项变化（例如从"最近选择"恢复、点了别的城市）→ 滚动到可见位置
 watch(
   () => props.active,
-  async (value) => {
-    await refresh()
-    if (!value || !scroll) return
-    try {
-      scroll.scrollToElement('.pc-item.active', 260)
-    } catch (error) {
-      // 找不到元素时忽略（列表还没渲染完）
-    }
+  (value) => {
+    if (value) scrollToActive()
   }
 )
 </script>

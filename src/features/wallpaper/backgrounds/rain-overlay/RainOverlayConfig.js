@@ -9,7 +9,7 @@
  *   （2~20px、150 个/秒），既能看到湿润的玻璃感，又不会糊住文字。
  *
  * 四档强度：light 小雨 / moderate 中雨 / heavy 大雨 / storm 暴雨（none 为雨停）。
- * 与实时天气的对应关系见 `features/wallpaper/rainIntensity.js`。
+ * 与分钟级降水（第一条）/实时天气的对应关系见 `features/wallpaper/rainIntensity.js`。
  *
  * 参数语义（来自 raindrop-fx v1.0.8 源码）：
  *   spawnInterval  两次生成下落雨滴之间的秒数（越小越密）

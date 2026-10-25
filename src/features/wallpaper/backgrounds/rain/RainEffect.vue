@@ -6,11 +6,11 @@
 
 <script setup>
 import img from '@/assets/dock-1365387_1920.jpg'; // 使用图片的URL
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useStorage } from '@vueuse/core';
 import RaindropFX from './RainEffectCore.js';
 import { rainPresets } from './RainConfig.js';
-import { resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
+import { resolveMinutelyIntensity, resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
 import { useWeatherStore } from '@/store';
 import Bus from '@/shared/Bus';
 import { getBackgroundConfig } from '@/features/wallpaper/backgroundConfig';
@@ -21,7 +21,6 @@ const canvas = ref(null);
 const RainEffectComponent = ref(null);
 let raindropFx = null
 let rect = null;
-let timer = null;
 let stopWeatherWatch = null;
 
 const handleResize = () => {
@@ -44,17 +43,15 @@ const applyRainConfig = (config) => {
     raindropFx.options[key] = merged[key];
   });
 }
-const autoApplyRainConfig = (weather) => {
-  if (!raindropFx) {
-    console.warn('RaindropFX 未加载完成，无法应用配置');
-    timer && clearTimeout(timer);
-    timer = setTimeout(() => {
-      autoApplyRainConfig(weather);
-    }, 500);
-    return
-  }
-  // 实时天气 → 雨量档位（icon 代码优先，其次天气文本），见 rainIntensity.js
-  const state = resolveRainIntensity(weather);
+// 自动档：优先分钟级降水的第一条（当前 5 分钟段），没有数据时回退实时天气
+const autoRainIntensity = computed(() => {
+  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation)
+  return fromMinutely ?? resolveRainIntensity(WeatherStore.nowWeatherData)
+})
+const applyAutoRainConfig = () => {
+  if (!raindropFx) return;
+  // 分钟级降水 → 雨量档位（第一条），不可用时回退实时天气，见 rainIntensity.js
+  const state = autoRainIntensity.value;
   console.log('自动应用配置:', state);
   applyRainConfig(rainPresets[state] || rainPresets.moderate);
 }
@@ -62,8 +59,8 @@ const handleRainConfigChange = (str) => {
   WallpaperUserConfigRainConfig.value = str;
   if (!raindropFx) return;
   if (str === 'auto') {
-    // 自动模式：根据当前实时天气匹配雨量强度
-    autoApplyRainConfig(WeatherStore.nowWeatherData);
+    // 自动模式：根据分钟级降水的第一条匹配雨量强度
+    applyAutoRainConfig();
   }
   else {
     applyRainConfig(rainPresets[str]);
@@ -73,7 +70,7 @@ const handleBackgroundConfigChange = (payload) => {
   if (payload.index !== '4' || !raindropFx) return;
   const cur = WallpaperUserConfigRainConfig.value;
   if (cur === 'auto') {
-    autoApplyRainConfig(WeatherStore.nowWeatherData);
+    applyAutoRainConfig();
   }
   else {
     applyRainConfig(rainPresets[cur]);
@@ -81,17 +78,20 @@ const handleBackgroundConfigChange = (payload) => {
 }
 onMounted(async () => {
   await startRain();
+  // 先按当前壁纸设置应用一次：手动档不会随 autoRainIntensity 变化，必须在这里落地
+  if (WallpaperUserConfigRainConfig.value === 'auto') {
+    applyAutoRainConfig();
+  }
+  else {
+    applyRainConfig(rainPresets[WallpaperUserConfigRainConfig.value] || rainPresets.moderate);
+  }
   stopWeatherWatch = watch(
-    () => `${WeatherStore.nowWeatherData.icon}|${WeatherStore.nowWeatherData.text}`,
+    autoRainIntensity,
     () => {
       if (WallpaperUserConfigRainConfig.value === 'auto') {
-        autoApplyRainConfig(WeatherStore.nowWeatherData);
+        applyAutoRainConfig();
       }
-      else {
-        applyRainConfig(rainPresets[WallpaperUserConfigRainConfig.value]);
-      }
-    },
-    { immediate: true }
+    }
   );
   Bus.on(BUS_EVENTS.RAIN_CONFIG_CHANGE, handleRainConfigChange);
   Bus.on(BUS_EVENTS.BACKGROUND_CONFIG_CHANGE, handleBackgroundConfigChange);
@@ -122,8 +122,6 @@ onUnmounted(() => {
   raindropFx = null;
   canvas.value = null;
   rect = null;
-  timer && clearTimeout(timer);
-  timer = null;
   window.removeEventListener('resize', handleResize);
 })
 </script>

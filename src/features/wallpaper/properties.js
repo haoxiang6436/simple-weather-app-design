@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import Bus from '@/shared/Bus'
-import { setUserApiFromProperties } from '@/api/credentials'
+import { setAmapKeyFromProperties, setUserApiFromProperties } from '@/api/credentials'
 import { markWallpaperEngineEvent } from '@/shared/env'
 import {
   BACKGROUND_INDEX_OPTIONS,
@@ -31,30 +31,33 @@ import {
  *      所以这里必须逐个属性判空，不能假设一次能拿到所有字段。
  */
 
-// 背景序号：0-无 / 1-小鸟 / 2-星空 / 3-动态粒子 / 4-实时雨滴 / 5-整页雨珠叠加
+// 背景序号：0-无 / 4-实时雨滴 / 5-整页雨珠叠加（1-小鸟 / 2-星空 / 3-动态粒子 已移除）
 // flush: 'sync'：背景切换后 BackgroundMain 会立即触发 location.reload()，
 // 必须先同步持久化，避免重载后丢失新的背景序号
 export const BackgroundIndex = useStorage(STORAGE_KEYS.BACKGROUND_INDEX, DEFAULT_BACKGROUND_INDEX, localStorage, {
   flush: 'sync',
 })
 
-// 小鸟背景的鼠标交互开关（backgroundinteraction）
-export const BirdInteraction = ref(false)
+// 旧版本可能存着已移除的背景序号（1 小鸟 / 2 星空 / 3 动态粒子），
+// 这些值不再合法，直接回退到默认背景，避免页面渲染成空白背景
+if (!BACKGROUND_INDEX_OPTIONS.includes(String(BackgroundIndex.value))) {
+  BackgroundIndex.value = DEFAULT_BACKGROUND_INDEX
+}
 
 // 天气面板整体缩放（panelscale，1 = 设计原尺寸）
 export const PanelScale = ref(DEFAULT_PANEL_SCALE)
 
 // 引擎上一次下发过的属性快照（不含域名/密钥 —— 那两项在 api/credentials.js 里单独缓存）。
 // 壁纸引擎只在页面加载时下发一次属性，页面重载（换背景会主动 location.reload、部署新版本后
-// 引擎也会重载页面）或切换壁纸后偶尔不再补发；只靠内存就会出现「面板缩放、小鸟互动、
+// 引擎也会重载页面）或切换壁纸后偶尔不再补发；只靠内存就会出现「面板缩放、
 // 背景编号全被重置」。这里同步落一份盘，加载时先当兜底基线，再用引擎这次真正下发的值覆盖。
 export const WallpaperPropertySnapshot = useStorage(
   STORAGE_KEYS.WALLPAPER_PROPERTY_SNAPSHOT, {}, localStorage, { flush: 'sync' }
 )
 
 // 参与快照的属性（= 引擎属性面板里除域名/密钥之外的字段）
+// 域名、和风密钥、高德 key 都不在这里：它们自己带一份 localStorage 缓存（见 api/credentials.js）
 const SNAPSHOT_PROPERTY_KEYS = [
-  WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION,
   WALLPAPER_PROPERTIES.BACKGROUND_INDEX,
   WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN,
   WALLPAPER_PROPERTIES.RAIN_CONFIG,
@@ -127,11 +130,6 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
   // 便于在壁纸引擎里自查：壁纸引擎设置 → 常规 → CEF devtools port（建议 8080），
   // 浏览器打开 localhost:8080 选中壁纸页面，就能在控制台看到每次下发的属性
   console.log('[Wallpaper] applyUserProperties', properties)
-  // 小鸟互动
-  const backgroundInteraction = readPropertyValue(properties, WALLPAPER_PROPERTIES.BACKGROUND_INTERACTION)
-  if (backgroundInteraction !== undefined) {
-    BirdInteraction.value = !!backgroundInteraction
-  }
   // 背景序号
   const backgroundIndex = readPropertyValue(properties, WALLPAPER_PROPERTIES.BACKGROUND_INDEX)
   if (backgroundIndex !== undefined) {
@@ -170,6 +168,13 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
   const apiKey = readPropertyValue(properties, WALLPAPER_PROPERTIES.QWEATHER_KEY)
   if (apiHost !== undefined || apiKey !== undefined) {
     setUserApiFromProperties(apiHost, apiKey, { fromLoad: inLoadPhase() })
+  }
+  // 高德「Web服务」key（可选）：只影响地图选点处的道路名。
+  // 留空 = 关掉道路名，地址改由和风 GeoAPI 反查区县（显示「xx附近」），其余功能不变。
+  // 同样由 credentials.js 自己缓存，所以不进上面的属性快照
+  const amapKey = readPropertyValue(properties, WALLPAPER_PROPERTIES.AMAP_KEY)
+  if (amapKey !== undefined) {
+    setAmapKeyFromProperties(amapKey, { fromLoad: inLoadPhase() })
   }
 
   if (remember) rememberProperties(properties)
