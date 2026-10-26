@@ -162,7 +162,7 @@
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('uv')"></span>
             <span class="stat-label">紫外线</span>
-            <!-- 与其它指标同字号同色：指数 + 强度等级，例如 5-弱 -->
+            <!-- 与其它指标同字号同色：只显示强度等级，例如「弱」 -->
             <span class="stat-value stat-uv" :title="activeUv.title">{{ activeUv.text }}</span>
           </li>
           <li class="stat">
@@ -237,7 +237,8 @@ const activeDaily = computed(() => activeWeatherDate.value[0] || null)
  * 按 WHO《全球紫外线指数指南》的五档划分：
  *   0–2 最弱 · 3–5 弱 · 6–7 中 · 8–10 强 · ≥11 很强
  * 接口 uvIndexMax 的取值范围是 [0, 15]，11 以上统一按「很强」处理。
- * 卡片里只显示「5-弱」这样的纯文本，字号和颜色跟其它指标一致。
+ * 卡片里只显示「弱」这样的强度等级纯文本，字号和颜色跟其它指标一致；
+ * 具体指数值放在 title 提示里。
  */
 const UV_LEVELS = [
   { max: 2, level: '最弱', advice: '紫外线很弱，正常外出无需特别防护。' },
@@ -254,7 +255,7 @@ const activeUv = computed(() => {
   const index = Number(raw)
   const level = UV_LEVELS.find((item) => index <= item.max) || UV_LEVELS[UV_LEVELS.length - 1]
   return {
-    text: `${index}-${level.level}`,
+    text: level.level,
     title: `紫外线指数 ${index}（${level.level}）· ${level.advice}`,
   }
 })
@@ -1123,8 +1124,8 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 /* ===== 紫外线卡 =====
-   「5-弱」整串走 .stat-value 的默认字号与颜色，不再单独设置字体样式；
-   两列数字 + 两个汉字的最长组合也只在卡片内边距里，不折行。 */
+   「弱」这类强度等级走 .stat-value 的默认字号与颜色，不再单独设置字体样式；
+   指数值只在 title 提示里，卡片内不折行。 */
 .stat-uv {
   white-space: nowrap;
 }

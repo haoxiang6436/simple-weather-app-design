@@ -10,8 +10,9 @@
  *
  * 1. 参数顺序：高德 `location` 是「经度,纬度」。传反了**不报错**，
  *    只会返回 status=1 + formatted_address=[]（空数组），看起来像「这个地方没有地址」。
- * 2. 坐标系：高德要 GCJ-02，本项目对外统一用 WGS-84。
- *    默认按 WGS-84 收参并自动转换；调用方手里已经是 GCJ-02 时传 { crs: 'GCJ02' } 跳过转换。
+ * 2. 坐标系：高德要 GCJ-02。本项目的落库 / 查询坐标就是和风的坐标系
+ *    （大陆 GCJ-02，境外 WGS-84），默认按 GCJ-02 收参、不再换算；
+ *    手里是 GPS / WGS-84 坐标时传 { crs: 'WGS84' }，这里补上大陆的偏移。
  * 3. 空结果：`formatted_address` 无结果时是数组 [] 而不是空字符串；
  *    `status` / `infocode` 也都是字符串（'1' / '10000'），不能和数字比。
  *
@@ -196,8 +197,8 @@ const request = async (lng, lat, outerSignal, timeout = TIMEOUT) => {
  * @param {number} lng 经度
  * @param {number} lat 纬度
  * @param {object} [options]
- * @param {'WGS84'|'GCJ02'} [options.crs='WGS84'] 入参坐标系。本项目对外是 WGS-84；
- *   地图组件手里已经是 GCJ-02 时传 'GCJ02'，可以省掉一次往返转换（少 1~2 m 误差）
+ * @param {'GCJ02'|'WGS84'} [options.crs='GCJ02'] 入参坐标系。默认就是本项目落库坐标系
+ *   （和风的：大陆 GCJ-02、境外 WGS-84），高德直接可用；传 'WGS84' 时先补偏移
  * @param {AbortSignal} [options.signal] 取消信号
  * @param {boolean} [options.force=false] 跳过缓存，强制重新请求
  * @param {number} [options.timeout] 单次请求超时（毫秒），默认 6 秒。
@@ -207,7 +208,7 @@ const request = async (lng, lat, outerSignal, timeout = TIMEOUT) => {
  * @throws {Error} error.code 见 fail() 的说明
  */
 export const reverseGeocode = async (lng, lat, options = {}) => {
-  const { crs = 'WGS84', signal, force = false, timeout = TIMEOUT } = options
+  const { crs = 'GCJ02', signal, force = false, timeout = TIMEOUT } = options
 
   if (!readAmapKey()) {
     throw fail('NO_KEY', '用户没填高德 key（壁纸属性 → 高德密钥），无法查询道路名')
@@ -222,7 +223,8 @@ export const reverseGeocode = async (lng, lat, options = {}) => {
     throw fail('INVALID_COORD', '经纬度超出有效范围')
   }
 
-  // 高德只认 GCJ-02；境外坐标 wgs84ToGcj02 会原样返回（GCJ-02 只在国内偏移）
+  // 高德只认 GCJ-02；默认的落库坐标已经是这个坐标系。传 WGS-84 时补偏移，
+  // 境外坐标转换函数原样返回（GCJ-02 只在大陆偏移）
   const [gLng, gLat] = crs === 'GCJ02' ? [x, y] : wgs84ToGcj02(x, y)
   const cacheKey = `${gLng.toFixed(5)},${gLat.toFixed(5)}`
 

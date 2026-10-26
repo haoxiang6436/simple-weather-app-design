@@ -100,15 +100,14 @@ WE_PROJECT_DIR="D:/path/to/we/project" yarn deploy:we
 
 ## 环境变量配置
 
-项目通过根目录 `.env` 文件配置天气接口与密钥（缓存时效也可覆盖）。**`.env` 中包含真实 API 密钥，请勿提交到公开仓库**（建议加入 `.gitignore`）。
+`.env` 只用于覆盖**缓存时效**等非敏感配置，已被 `.gitignore` 忽略（模板见 `.env.example`）。
+
+> ⚠️ **不要把任何密钥写进 `.env` / `.env.local`**：`vue-cli` 会把所有 `VUE_APP_*` 内联进 `dist/js/*.js`（明文），
+> 等于随安装包公开分发。和风天气的域名 / 密钥、高德 Web服务 key 都只在应用里填写：
+> Wallpaper Engine 用「壁纸属性」面板（`qweatherhost` / `qweatherkey` / `amapkey`），
+> 浏览器开发用右上角调试面板（存 localStorage）。读写逻辑见 `src/api/credentials.js`。
 
 ```ini
-# 和风天气 API 域名列表（逗号分隔，与 KEYS 一一对应）
-VUE_APP_HOSTS=host1.example.com,host2.example.com,host3.example.com
-
-# 和风天气 API 密钥列表（逗号分隔，与 HOSTS 按顺序配对）
-VUE_APP_KEYS=key1,key2,key3
-
 # 缓存时效（可选覆盖；默认值统一在 src/config/weatherCache.js，取自和风官方推荐）
 # 需要覆盖时取消对应注释，单位毫秒
 # VUE_APP_WEATHER_UPDATE_REALTIME=600000    # 实时天气：10 分钟（官方 10-30 分钟）
@@ -118,14 +117,11 @@ VUE_APP_KEYS=key1,key2,key3
 # VUE_APP_WEATHER_UPDATE_MINUTELY=300000    # 分钟级降水：5 分钟（官方 5-10 分钟）
 ```
 
-> 说明：高德 key **不在 `.env` 里配置**了——`vue-cli` 会把所有 `VUE_APP_*` 变量写进 `dist/js/*.js`（明文），
-> 而高德 Web服务 key 没有域名白名单，等于随安装包公开分发。现在它是壁纸属性面板里的可选项 `amapkey`
-> （见下文属性表）：用户填了才显示路名，不填也不影响任何功能。开发环境在右上角调试面板里填一次即可
-> （存 localStorage，刷新不丢）。**不填高德 key 时，地图选点的地址会退回和风 GeoAPI 的区县反查**
-> （`市 区县附近`，例如「台州市 黄岩附近」），见下文「地图选点的地址文案」。
+> 说明：高德 Web服务 key 没有域名白名单，所以只作为属性 `amapkey` 由用户自填；不填时地图选点的地址
+> 退回和风 GeoAPI 的区县反查（`市 区县附近`，例如「台州市 黄岩附近」），见下文「地图选点的地址文案」。
 
-> 说明：新版本**不再读取** `VUE_APP_HOSTS` / `VUE_APP_KEYS`——天气请求一律使用用户在壁纸属性面板里填写的域名与密钥
-> （见下文「用户自带 API 域名/密钥与新用户引导」）。`.env` 里保留这两项只作为备份/参考，缓存时效仍可在 `.env` 里覆盖（见 `VUE_APP_WEATHER_UPDATE_*`）。
+> 说明：天气请求一律使用用户在壁纸属性面板里填写的域名与密钥（见下文「用户自带 API 域名/密钥与新用户引导」），
+> 源码和构建产物都不再读取、也不再包含任何密钥。
 
 ## 项目结构
 
@@ -156,7 +152,7 @@ simple-weather-app-design
 │   │   │   ├── RegionCascade.vue      # 省/市/区三列（三列页与全屏「重选地区」卡片共用）
 │   │   │   ├── RegionPickerDialog.vue # 全屏地图上的「重选地区」悬浮卡片（不改全屏、不丢视野）
 │   │   │   ├── regionTree.js          # 地区树读取规则（findNode / 叶子 / 需先选城市…）
-│   │   │   ├── MapPointPicker.vue     # 地图选点（高德瓦片：拖动平移/双击缩放/落点，选点后显示路名或「市 区县附近」）
+│   │   │   ├── MapPointPicker.vue     # 地图选点（高德瓦片：拖动平移/滚轮·双击缩放/落点，选点后显示路名或「市 区县附近」）
 │   │   │   ├── mapTiles.js            # 瓦片投影与坐标换算（WGS-84 ↔ GCJ-02）
 │   │   │   ├── reverseGeocode.js      # 高德逆地理编码：坐标 → 最近道路名（带缓存/取消/超时，可选）
 │   │   │   ├── placeLookup.js         # 和风 GeoAPI 坐标反查：坐标 → 区县（无高德 key 时的地址兜底）
@@ -213,7 +209,7 @@ simple-weather-app-design
 │   │   ├── dock-1365387_1920.jpg       # 雨滴背景底图（清晰，供 `4` 用）
 │   │   └── dock-1365387_1920-blur.jpg  # 同一张图的预模糊版（供 `5` 的底图用）
 │   └── fonts/                      # Montserrat 本地字体
-├── .env                            # 环境变量（API 域名/密钥/缓存时效）
+├── .env                            # 本地环境变量（仅缓存时效，已被 .gitignore 忽略）
 ├── vue.config.js                   # CLI 配置（相对路径、关闭 sourcemap 等）
 ├── jsconfig.json                   # 路径别名 @ -> src
 ├── scripts/
@@ -333,9 +329,14 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 4. 如果是「没点地图、只用区县中心」确认，仍然按 adcode 查天气，地址用完整的三级路径；
 5. 高德 key 仍然完全可选：没填 / 填错 / 额度用尽 / 郊区无命名道路时静默退回和风，
    选点与天气都不受影响；
-6. 高德只认 **GCJ-02**，而项目对外统一 WGS-84：`reverseGeocode(lng, lat, { crs: 'WGS84' })`
-   会自动转换，地图组件手里已经是 GCJ-02 时传 `{ crs: 'GCJ02' }`，避免往返转换带来的 1~2 m 误差
-   （路口附近这点误差足以让「最近的路」翻成隔壁那条）；
+6. 坐标系按和风的规范：**中国大陆用 GCJ-02，其他地区用 WGS-84**
+   （[官方词汇表](https://dev.qweather.com/docs/resource/glossary/#coordinate)）。
+   高德瓦片正好是 GCJ-02，所以地图点选的坐标**不做转换**，直接落库、直接查天气；
+   `reverseGeocode(lng, lat)` 默认就按这个坐标系收参，只有手里是 GPS / WGS-84 坐标时
+   才传 `{ crs: 'WGS84' }`。换用 WGS-84 底图源（`TILE_SOURCES.osm`）时才需要换算，
+   见 `mapTiles.js` 的 `toQueryCoord` / `toMapCoord`。升级前的记录存的是 WGS-84，
+   启动时会按 `point.crs` 标记自动迁移一次（`useWeatherStore` / `useLocationHistory`），
+   否则老用户的 pin 会整体偏 ~500 m；
 7. 高德结果按 1e-5 度取整（约 1 m）缓存，同一个 pin 反复确认不会重复消耗 QPS 3 的额度。
 8. 高德 key 走 `src/api/credentials.js`，与和风凭据同一套「引擎下发 + localStorage 兜底 +
    加载阶段空值不覆盖」逻辑；必须用**高德 Web服务**类型的 key（`restapi.amap.com`），不是 Web端（JS API）。
@@ -350,13 +351,15 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 2. **自动检测**（`src/features/onboarding/onboardingState.js`）：属性下发后去抖 700ms，用
    `/geo/v2/city/lookup` 逐组检测（1 组 1 次请求，同时验证域名可达性、密钥有效性与接口权限）。
    `401 / 403 / 429` 等明确错误只给修复提示与重试；超时、断网等临时问题额外给一个「网络异常，仍然继续」。
-3. **检测结果按凭据指纹缓存**：只存哈希，凭据没变就不再重复检测（省用户额度）；`.env` 里的旧密钥不再参与请求。
+3. **检测结果按凭据指纹缓存**：只存哈希，凭据没变就不再重复检测（省用户额度）；凭据只来自属性面板 / localStorage，构建产物里不含任何密钥。
 4. **地址选择页**（`src/features/weather/LocationPicker.vue`）：检测通过后进入，省 → 市 → 区/县三级点选，
    选到市或区县都会进入地图选点（点热门城市同理，不再点一下就直接拉天气），地图这一步再确认；
    只选到省 / 自治区时按钮是禁用的「请先选择城市」（和风不认省级 adcode，`440000` 会返回 400），
    直辖市（北京/天津/上海/重庆）与港澳本身可查询，仍保留「就用 X」/「下一步」；热门城市与最近 6 条记录；
    每一列都是 BetterScroll 拖拽滚动 + 自绘可见滚动条。
-   地图可以全屏（缩放胶囊最右一颗，Esc 退出）：全屏时底部「重选地区」不再退回三列页，
+   地图支持滚轮按比例连续缩放（短补间、鼠标一格约 9%）、双击缩放（左键放大 / 右键缩小）与拖动平移，
+   缩小时会预加载视口外一圈瓦片，也可以全屏
+   （缩放胶囊最右一颗，Esc 退出）：全屏时底部「重选地区」不再退回三列页，
    而是叠一块 `RegionPickerDialog`（省/市/区三列 + 草稿路径）——取消不动地图，确认后按街道级原地飞过去，
    全屏和刚调好的视野都不会丢。卡片形态下点「重选地区」仍回到三列页（那里本来就是一整块选择界面）。
 5. **进入天气面板**：选好位置后才会请求天气并显示面板；日常点左上角地址同样打开这个地址页

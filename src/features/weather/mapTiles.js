@@ -1,13 +1,16 @@
 /**
- * 地图瓦片工具：瓦片源配置、Web Mercator 换算、GCJ-02 → WGS-84 转换
+ * 地图瓦片工具：瓦片源配置、Web Mercator 换算、坐标系换算
  *
  * 设计前提（见《地图选点-开发路线》§5）：
  *   1. 不引入 MapLibre / Leaflet，直接用 <img> 拼瓦片 —— 壁纸里已有雨滴 WebGL
  *      重特效，再开一个 WebGL 上下文会直接抢帧；
  *   2. 用高德 raster（中文标注全、道路密度高、国内快）。它无需 key，但属于调用
  *      高德网页版的内部瓦片端点，不是公开 API，失效风险由使用方承担；
- *   3. 高德瓦片是 GCJ-02，和风吃 WGS-84。点选得到的坐标必须先转换再交给 store，
- *      否则会有数百米偏移（北京实测 ≈ 555 m；区县级查询看不出来，但依然是 bug）。
+ *   3. 和风天气的坐标系是「中国大陆 GCJ-02，其他地区 WGS-84」（官方词汇表
+ *      https://dev.qweather.com/docs/resource/glossary/#coordinate）。高德瓦片正好是
+ *      GCJ-02，所以默认源下地图坐标就是落库 / 查询坐标，点选后不需要任何转换；
+ *      GCJ-02 的偏移只在大陆范围生效，境外两套坐标系数值一致，规则也自动满足。
+ *      只有换成 WGS-84 底图（如 OSM）时才需要转一次，见 toQueryCoord / toMapCoord。
  */
 
 export const TILE_SIZE = 256
@@ -51,7 +54,8 @@ export const MAX_TILE_FAILURES = 3
 
 /**
  * 瓦片源。新增源只要满足 { label, crs, url(z,x,y), invert? } 即可。
- * crs 决定点选坐标要不要做 GCJ-02 → WGS-84 转换。
+ * crs 是这个源自己的坐标系；落库 / 查询统一用和风的坐标系（大陆 GCJ-02、境外 WGS-84），
+ * 所以 crs 只决定 toQueryCoord / toMapCoord 要不要转换。
  *
  * 只有 amap 是「无 key 且国内可达」的：CARTO 的 basemaps 已经收进 API key
  * （https://carto.com/basemaps/apikey/），不能再当零配置的回退源。
@@ -139,7 +143,7 @@ export const lngLatToViewPixel = (lng, lat, center, zoom, viewW = MAP_VIEW, view
 }
 
 /* ------------------------------------------------------------------ *
- * GCJ-02 → WGS-84
+ * 坐标系换算（GCJ-02 ↔ WGS-84）
  * ------------------------------------------------------------------ */
 
 const A = 6378245.0
@@ -184,7 +188,7 @@ export const gcj02ToWgs84 = (lng, lat) => {
 }
 
 /**
- * 反向：WGS-84 → GCJ-02（把历史记录里的坐标摆回高德底图上时要用）
+ * 反向：WGS-84 → GCJ-02（WGS-84 底图上的坐标交给和风 / 高德时用）
  * 用同一个偏移公式正向计算，误差在 1~2 m 量级，摆 pin 完全够
  * @returns {[number, number]} [lng, lat]
  */
@@ -200,3 +204,48 @@ export const wgs84ToGcj02 = (lng, lat) => {
   dLng = (dLng * 180) / ((A / sqrtMagic) * Math.cos(radLat) * PI)
   return [lng + dLng, lat + dLat]
 }
+
+/* ------------------------------------------------------------------ *
+ * 地图坐标系 ↔ 查询坐标系（和风天气）
+ *
+ * 和风要的是：中国大陆 GCJ-02，其他地区 WGS-84。
+ * 高德瓦片本身就是 GCJ-02，而 GCJ-02 的偏移只在大陆生效（境外等同 WGS-84），
+ * 所以默认源下两个坐标系完全重合 —— 下面两个函数原样返回，不做换算。
+ * 换成 WGS-84 底图源（TILE_SOURCES.osm）时才真的需要转：
+ *   地图 WGS-84 → 和风 GCJ-02：大陆内加偏移，境外原样
+ *   和风 GCJ-02 → 地图 WGS-84：大陆内减偏移，境外原样
+ * ------------------------------------------------------------------ */
+
+/**
+ * 地图坐标 → 查询 / 落库坐标（和风的坐标系）
+ * @param {number} lng
+ * @param {number} lat
+ * @param {'GCJ02'|'WGS84'} [crs] 地图瓦片源的坐标系
+ * @returns {[number, number]} [lng, lat]
+ */
+export const toQueryCoord = (lng, lat, crs = TILE_SOURCES[ACTIVE_SOURCE].crs) =>
+  crs === 'WGS84' ? wgs84ToGcj02(lng, lat) : [lng, lat]
+
+/**
+ * 查询 / 落库坐标（和风的坐标系）→ 地图坐标，把 pin / 视口摆到底图上时用
+ * @param {number} lng
+ * @param {number} lat
+ * @param {'GCJ02'|'WGS84'} [crs] 地图瓦片源的坐标系
+ * @returns {[number, number]} [lng, lat]
+ */
+export const toMapCoord = (lng, lat, crs = TILE_SOURCES[ACTIVE_SOURCE].crs) =>
+  crs === 'WGS84' ? gcj02ToWgs84(lng, lat) : [lng, lat]
+
+/* ------------------------------------------------------------------ *
+ * 展示文案
+ * ------------------------------------------------------------------ */
+
+/**
+ * 经纬度 → 带半球标识的展示文案，如「N 28.1234, E 121.5678」。
+ * 只用于界面展示，别拿它回填坐标；4 位小数和落库精度保持一致。
+ * @param {number} lat
+ * @param {number} lng
+ * @returns {string}
+ */
+export const formatLatLng = (lat, lng) =>
+  `${lat < 0 ? 'S' : 'N'} ${Math.abs(lat).toFixed(4)}, ${lng < 0 ? 'W' : 'E'} ${Math.abs(lng).toFixed(4)}`

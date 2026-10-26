@@ -194,7 +194,7 @@ const isAbort = (error, signal) =>
 /**
  * 按坐标反查最近的区县。
  *
- * @param {number} lng 经度（WGS-84；和风天气所有接口都用 WGS-84）
+ * @param {number} lng 经度（和风的坐标系：大陆 GCJ-02，境外 WGS-84）
  * @param {number} lat 纬度
  * @param {object} [options]
  * @param {AbortSignal} [options.signal] 取消信号（地图上快速连点时丢弃旧请求）

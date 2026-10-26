@@ -7,33 +7,42 @@
            全屏收放时 `.mp-wrap` 已经铺满整块屏幕，底色会跑到裁切框外面去 -->
       <div class="mp-void" :style="veilStyle" aria-hidden="true"></div>
 
-      <!-- 底层：缩放前后的旧瓦片，按 2 倍或 1 倍垫在新图下面，
-           新瓦片没画上来之前不会闪出底色 -->
-      <div v-if="underlay" class="mp-layer" :style="underlayStyle">
-        <img v-for="tile in underlayTiles" :key="'u' + tile.key" class="mp-tile"
-          :class="{ 'is-inverted': invertTiles }" :src="tile.src" :style="tile.style" alt=""
-          draggable="false" referrerpolicy="no-referrer" />
-      </div>
+      <!-- 全屏裁切必须放在不参与缩放的这一层：
+           stage 上带着 tileScale，clip-path 会跟着被缩放，卡片矩形就对不上了 -->
+      <div class="mp-clip" :style="clipStyle">
+        <!-- 底层：缩放前后的旧瓦片，按 2 倍或 1 倍垫在新图下面，
+             新瓦片没画上来之前不会闪出底色 -->
+        <div v-if="underlay" class="mp-layer" :style="underlayStyle">
+          <img v-for="tile in underlayTiles" :key="'u' + tile.key" class="mp-tile"
+            :class="{ 'is-inverted': invertTiles }" :src="tile.src" :style="tile.style" alt=""
+            draggable="false" referrerpolicy="no-referrer" />
+        </div>
 
-      <!-- 视口 = 容器实际像素，瓦片按 256px 原样铺；缩放动画只改这一层的 transform -->
-      <!-- 右键不弹系统菜单：双击右键 = 缩小（见 handleContextMenu）。
-           只挂在 stage 上，胶囊按钮和右下角的版权字都不受影响 -->
-      <div ref="stageEl" class="mp-stage" :class="{ 'is-dragging': dragging }"
-        :style="stageStyle" @pointerdown="handlePointerDown" @dragstart.prevent
-        @contextmenu="handleContextMenu">
-        <img v-for="tile in tiles" :key="tile.key" class="mp-tile"
-          :class="{ 'is-failed': failedKeys.has(tile.key), 'is-inverted': invertTiles }"
-          :src="tile.src" :style="tile.style" :data-key="tile.key" alt="" draggable="false"
-          referrerpolicy="no-referrer" @load="handleTileLoad" @error="handleTileError" />
+        <!-- 视口 = 容器实际像素，瓦片按 256px 原样铺。
+             stage 只负责滚轮的连续缩放（围绕视口中心），inner 负责按钮 / 双击的
+             一次完整级差动画（围绕锚点），两者拆开就不会在同一个 transform-origin
+             上互相打架。 -->
+        <!-- 右键不弹系统菜单：双击右键 = 缩小（见 handleContextMenu）。
+             只挂在 stage 上，胶囊按钮和右下角的版权字都不受影响 -->
+        <div ref="stageEl" class="mp-stage" :class="{ 'is-dragging': dragging }"
+          :style="stageStyle" @pointerdown="handlePointerDown" @dragstart.prevent
+          @contextmenu="handleContextMenu" @wheel.prevent.stop="handleWheel">
+          <div class="mp-stage-inner" :style="innerStyle">
+            <img v-for="tile in tiles" :key="tile.key" class="mp-tile"
+              :class="{ 'is-failed': failedKeys.has(tile.key), 'is-inverted': invertTiles }"
+              :src="tile.src" :style="tile.style" :data-key="tile.key" alt="" draggable="false"
+              referrerpolicy="no-referrer" @load="handleTileLoad" @error="handleTileError" />
 
-        <div v-if="pinStyle" class="mp-pin" :style="pinStyle">
-          <span class="mp-pin-ripple"></span>
-          <svg class="mp-pin-icon" viewBox="0 0 24 32" aria-hidden="true">
-            <path
-              d="M12 1.2c-5.6 0-10.1 4.5-10.1 10.1 0 7.3 10.1 19 10.1 19s10.1-11.7 10.1-19c0-5.6-4.5-10.1-10.1-10.1z"
-              fill="#38bdf8" stroke="#04121f" stroke-width="1.5" stroke-linejoin="round" />
-            <circle cx="12" cy="11.3" r="3.9" fill="#04121f" />
-          </svg>
+            <div v-if="pinStyle" class="mp-pin" :style="pinStyle">
+              <span class="mp-pin-ripple"></span>
+              <svg class="mp-pin-icon" viewBox="0 0 24 32" aria-hidden="true">
+                <path
+                  d="M12 1.2c-5.6 0-10.1 4.5-10.1 10.1 0 7.3 10.1 19 10.1 19s10.1-11.7 10.1-19c0-5.6-4.5-10.1-10.1-10.1z"
+                  fill="#38bdf8" stroke="#04121f" stroke-width="1.5" stroke-linejoin="round" />
+                <circle cx="12" cy="11.3" r="3.9" fill="#04121f" />
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -56,7 +65,7 @@
       </div>
       <div v-else-if="loadingHintVisible && !underlay && !dragging" class="mp-hint">地图加载中…</div>
       <div v-else-if="!picked && !dragging && !isLoading" class="mp-hint mp-hint--tip">
-        拖动平移 · 点击选点 · 双击放大 / 右键缩小
+        拖动平移 · 滚轮缩放 · 点击选点 · 双击/右键缩放
       </div>
 
       <!-- 选点后告诉用户「落在哪」。有高德 key 时是最近道路名；
@@ -81,14 +90,14 @@
       <!-- 缩放：44px 圆形按钮装进一枚胶囊里，壁纸场景下也比原来 28px 好点。
            全屏时多出「全国」和「退出全屏」两颗，胶囊整体靠到卡片矩形的右侧边上 -->
       <div class="mp-zoom" role="group" aria-label="地图缩放">
-        <button class="mp-zoom-btn" type="button" title="放大（双击左键）" aria-label="放大"
+        <button class="mp-zoom-btn" type="button" title="放大（滚轮向上 / 双击左键）" aria-label="放大"
           :disabled="zooming || fsBusy || zoom >= ZOOM_MAX" @click.stop="zoomIn">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
         <span class="mp-zoom-sep" aria-hidden="true"></span>
-        <button class="mp-zoom-btn" type="button" title="缩小（双击右键）" aria-label="缩小"
+        <button class="mp-zoom-btn" type="button" title="缩小（滚轮向下 / 双击右键）" aria-label="缩小"
           :disabled="zooming || fsBusy || zoom <= minZoom" @click.stop="zoomOut">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M5 12h14" />
@@ -157,14 +166,15 @@ import {
   ZOOM_DEFAULT,
   ZOOM_MAX,
   ZOOM_MIN,
-  gcj02ToWgs84,
+  formatLatLng,
   lngLatToViewPixel,
   lngLatToWorld,
   minZoomForViewport,
   tileUrl,
+  toMapCoord,
+  toQueryCoord,
   viewOrigin,
   viewPixelToLngLat,
-  wgs84ToGcj02,
   worldToLngLat,
 } from './mapTiles'
 import { isReverseGeocodeEnabled, reverseGeocode } from './reverseGeocode'
@@ -180,7 +190,7 @@ const props = defineProps({
   bar: { type: Boolean, default: true },
   // 是否撑满父容器（父容器必须有确定高度）；默认按 1:1 方形
   fill: { type: Boolean, default: false },
-  // 初始 pin（WGS-84）。从「最近」进来时把上次的点摆好，用户可以微调也可以直接确认
+  // 初始 pin（落库坐标系：大陆 GCJ-02）。从「最近」进来时把上次的点摆好，用户可以微调也可以直接确认
   initialPoint: { type: Object, default: null },
   // 是否处于全屏。真正的「铺满屏幕」由外层完成（整块面板 teleport 到 body），
   // 这里只负责：量尺寸、算相机、把裁切框从卡片那块展开出去
@@ -208,6 +218,18 @@ const FS_FADE = 130
 // 从全屏退回卡片时的落点：刚选的点 + 街道级；已经在更高级就别往回缩
 const FS_CARD_ZOOM = 14
 
+/* ---------------- 滚轮缩放 ----------------
+ * 滚轮不走按钮的「±1 级」逻辑：把 deltaY 当成真实像素位移，按比例换算成
+ * 连续的缩放量。鼠标一格约 100px ≈ 0.12 级（约 8.7%），只前进一小步；
+ * 触控板本来就是像素级输入，同一条比例曲线自然跟手。
+ *
+ * 不用 CSS transition：缩放期间 center 也跟着改，只过渡 transform 会和瓦片
+ * 位置脱节。这里用 rAF 把当前级别追向目标级别（约 35ms 时间常数），
+ * 鼠标一格也能看到一小段连续的推近 / 拉远，而不是一帧跳完。
+ */
+const WHEEL_ZOOM_PER_PX = 0.0012
+const WHEEL_EASE_MS = 35
+
 /* ---------------- 节流参数 ----------------
  * 拖动分两段，各管一件事：
  *   1) 画面用 rAF 合并（每帧最多一次），跟手；
@@ -227,11 +249,24 @@ const stageEl = ref(null)
 const viewW = ref(0)
 const viewH = ref(0)
 
-// 视口中心（地图坐标系）与「已提交」的整数缩放
+// 视口中心（地图坐标系）与连续缩放。zoom 可以是小数：
+// 瓦片只按整数级取，剩下的级差用 tileScale 表现，地图就不会一格一跳。
 const center = ref([...(props.center || [0, 0])])
 const zoom = ref(props.zoom)
-// 显示缩放：动画期间在 1 与 2（或 0.5）之间过渡；平时恒为 1
+// 动画缩放：只给按钮 / 双击的一次完整级差用；滚轮不动它
 const k = ref(1)
+// 瓦片只请求整数级；zoom 的小数部分全部由这一层的 scale 补上。
+// 取最近整数级，scale 落在 [0.707, 1.414]，放大 / 缩小都不会太糊。
+const MIN_TILE_SCALE = 1 / Math.SQRT2
+const tileZoom = computed(() => Math.round(zoom.value))
+const tileScale = computed(() => 2 ** (zoom.value - tileZoom.value))
+// scale<1 时需要多铺一圈。按 5% 分桶，既不会每帧重建瓦片列表，
+// 又不会一直按最坏情况多请求一大圈边缘瓦片
+const tilePadScale = computed(() => {
+  const s = tileScale.value
+  if (s >= 1) return 1
+  return Math.max(MIN_TILE_SCALE, Math.floor(s * 20) / 20)
+})
 // 还没折进 center 的拖动位移（屏幕像素）：先垫在 transform 上让画面跟手
 const pan = ref({ x: 0, y: 0 })
 // 换图后的垫底层，新瓦片全部加载后撤掉
@@ -269,7 +304,7 @@ const failedKeys = reactive(new Set())
 const retryTick = ref(0)
 
 // point = 地图坐标系（高德源时是 GCJ-02），只用来画 pin
-// picked = WGS-84，对外展示与 emit 都用它
+// picked = 落库 / 查询坐标系（和风的：大陆 GCJ-02、境外 WGS-84），对外展示与 emit 都用它
 const point = ref(null)
 const picked = ref(null)
 const dragging = ref(false)
@@ -292,6 +327,12 @@ let panTimer = 0
 let measureTimer = 0
 let measurePending = false
 let hintTimer = 0
+// 滚轮：目标级别、锚点（屏幕像素 + 地理位置）、补间帧、上一帧时间
+let wheelRaf = 0
+let wheelTargetZoom = null
+let wheelAnchorPx = null
+let wheelAnchorGeo = null
+let wheelLastFrameAt = 0
 let roadTimer = 0
 let roadCtrl = null
 // 请求序号：连点时只有最后一次允许写回结果，旧响应晚到直接丢弃
@@ -313,8 +354,22 @@ const minZoom = computed(() => (
 const isFinitePoint = (p) => !!p && Number.isFinite(p.x) && Number.isFinite(p.y)
 
 /**
+ * 视口外始终多留一圈瓦片。
+ *
+ * 滚轮缩小是连续的：当前这一帧刚好铺满视口，下一帧 stage 就会缩到 0.7 倍，
+ * 四周立刻要看视口外的内容。等缩到边缘再发请求已经来不及，会先闪一圈白底。
+ * 所以不管当前 scale 是多少，都提前请求视口外一整圈；缩小时这一圈已经在缓存里。
+ */
+const PRELOAD_TILE_RING = 1
+
+/**
  * 按给定状态算瓦片列表。
- * 多铺一张（ceil + 1），保证任意偏移下都盖满视口；拖动时不会露出白边。
+ *
+ * 铺图范围 = 视口 + 缩放补偿 + 预加载外圈，四边都用显式 tile 边界计算，
+ * 不再用 cols/rows 凑，避免某个方向少铺一张。
+ *
+ * state.scale < 1 时瓦片层会被围绕中心缩小，视口边缘需要看到当前铺图范围
+ * 之外的内容；这里按缩小比例补一圈，避免四周露出打底色。
  */
 const buildTiles = (state, width, height) => {
   if (!width || !height) return []
@@ -324,18 +379,27 @@ const buildTiles = (state, width, height) => {
   if (!Number.isFinite(clng) || !Number.isFinite(clat)) return []
   const total = 2 ** state.zoom
   const [ox, oy] = viewOrigin(state.center, state.zoom, width, height)
-  const tx0 = Math.floor(ox / TILE_SIZE)
-  const ty0 = Math.floor(oy / TILE_SIZE)
-  const cols = Math.ceil(width / TILE_SIZE) + 1
-  const rows = Math.ceil(height / TILE_SIZE) + 1
+  // scale<1 时围绕中心缩小，四周要看到当前铺图范围之外的内容
+  const needPad = Number.isFinite(state.scale) && state.scale < 1
+  const padRatio = needPad ? 1 / state.scale - 1 : 0
+  const padX = needPad ? (width / 2) * padRatio : 0
+  const padY = needPad ? (height / 2) * padRatio : 0
+  // 当前缩放真正需要的范围（不含预加载圈）
+  const coreTx0 = Math.floor((ox - padX) / TILE_SIZE)
+  const coreTy0 = Math.floor((oy - padY) / TILE_SIZE)
+  const coreTx1 = Math.ceil((ox + width + padX) / TILE_SIZE) - 1
+  const coreTy1 = Math.ceil((oy + height + padY) / TILE_SIZE) - 1
+  // 再向外多铺一圈：缩小时这圈瓦片已经提前加载过
+  const tx0 = coreTx0 - PRELOAD_TILE_RING
+  const ty0 = coreTy0 - PRELOAD_TILE_RING
+  const tx1 = coreTx1 + PRELOAD_TILE_RING
+  const ty1 = coreTy1 + PRELOAD_TILE_RING
   // 点「重试」后带一个只影响缓存的查询参数；不加的话 <img> 的 src 没变，
   // 浏览器可能直接复用失败结果 / 不重新请求
   const bust = retryTick.value ? `_r=${retryTick.value}` : ''
   const list = []
-  for (let dx = 0; dx < cols; dx++) {
-    for (let dy = 0; dy < rows; dy++) {
-      const tx = tx0 + dx
-      const ty = ty0 + dy
+  for (let tx = tx0; tx <= tx1; tx++) {
+    for (let ty = ty0; ty <= ty1; ty++) {
       // 纬度方向没有环绕，越界直接跳过
       if (ty < 0 || ty >= total) continue
       // 经度方向环绕，避免跨 180° 时出现空列
@@ -343,9 +407,14 @@ const buildTiles = (state, width, height) => {
       const url = tileUrl(source, state.zoom, wx, ty)
       const src = bust ? `${url}${url.includes('?') ? '&' : '?'}${bust}` : url
       list.push({
-        // 重试计数写进 key：Vue 会换掉旧的 <img>，重新派发 load / error
-        key: `${source}/${state.zoom}/${wx}/${ty}/${retryTick.value}`,
+        // 重试计数写进 key：Vue 会换掉旧的 <img>，重新派发 load / error。
+        // 位置用未环绕的 tx：低级别跨 180° 时同一张图可能同时出现在屏幕两侧，
+        // 用 wx 会让两个 <img> 撞 key
+        key: `${source}/${state.zoom}/${tx}/${ty}/${retryTick.value}`,
         src,
+        // 预加载圈只负责提前进缓存，不参与「地图加载中」和失败判定：
+        // 屏幕内已经画好了就不该因为屏幕外一张边缘图慢而顶着加载提示
+        preload: tx < coreTx0 || tx > coreTx1 || ty < coreTy0 || ty > coreTy1,
         style: {
           left: `${tx * TILE_SIZE - ox}px`,
           top: `${ty * TILE_SIZE - oy}px`,
@@ -357,12 +426,22 @@ const buildTiles = (state, width, height) => {
 }
 
 const tiles = computed(() => buildTiles(
-  { zoom: zoom.value, center: center.value }, viewW.value, viewH.value
+  {
+    zoom: tileZoom.value,
+    center: center.value,
+    scale: tilePadScale.value,
+  },
+  viewW.value,
+  viewH.value
 ))
+
+// 加载状态只看「当前视口 + 缩放补偿」需要的瓦片；预加载外圈不进账，
+// 否则屏内早就画好了，还会因为屏幕外一张边缘图没回来而显示「地图加载中」
+const activeTiles = computed(() => tiles.value.filter((tile) => !tile.preload))
 
 // 还没拿到结果的瓦片数：只统计「当前这一屏」里既没 load 也没 error 的。
 // 换成按 key 记账后，复用的 <img> 不会再把计数顶上去
-const pending = computed(() => tiles.value.filter(
+const pending = computed(() => activeTiles.value.filter(
   (tile) => !loadedKeys.has(tile.key) && !failedKeys.has(tile.key)
 ).length)
 
@@ -384,11 +463,11 @@ const armLoadingTimer = () => {
 
 const isLoading = computed(() => pending.value > 0 && !loadingTimedOut.value)
 
-// 当前这一屏里已经画出来 / 已经明确失败的瓦片数
-const failedInView = computed(() => tiles.value.filter(
+// 当前这一屏里已经画出来 / 已经明确失败的瓦片数（同样不含预加载外圈）
+const failedInView = computed(() => activeTiles.value.filter(
   (tile) => failedKeys.has(tile.key)
 ).length)
-const loadedInView = computed(() => tiles.value.filter(
+const loadedInView = computed(() => activeTiles.value.filter(
   (tile) => loadedKeys.has(tile.key)
 ).length)
 
@@ -403,7 +482,7 @@ const loadedInView = computed(() => tiles.value.filter(
  * 网络断开 / 瓦片服务不可用时所有瓦片都会失败，B 自然成立。
  */
 const mapFailed = computed(() => {
-  const total = tiles.value.length
+  const total = activeTiles.value.length
   if (!total) return false
   const failed = failedInView.value
   const loaded = loadedInView.value
@@ -472,37 +551,50 @@ const veilStyle = computed(() => {
   }
 })
 
-// 垫着的拖动位移 + 缩放动画共用同一个 transform；
+// 垫着的拖动位移 + 滚轮的连续级差共用这个 transform；
 // 缩放时 pan 恒为 0（拖动已松手并提交），两者不会互相干扰。
-// 全屏的裁切框也挂在这一层：裁的是地图本身，缩放胶囊等在裁切外面
+// 全屏裁切在外层 .mp-clip 上，不会跟着这里的 scale 一起被缩放
 const stageStyle = computed(() => ({
-  transform: `translate3d(${pan.value.x}px, ${pan.value.y}px, 0) scale(${k.value})`,
-  transformOrigin: anchor.value,
-  ...clipStyle.value,
+  transform: `translate3d(${pan.value.x}px, ${pan.value.y}px, 0) scale(${tileScale.value})`,
+  transformOrigin: '50% 50%',
 }))
 
-const underlayStyle = computed(() => ({
-  transform: `translate3d(${pan.value.x}px, ${pan.value.y}px, 0) scale(${underlay.value?.scale || 1})`,
+// 按钮 / 双击的完整级差单独放在内层，围绕锚点缩放；
+// 滚轮的 tileScale 在外层围绕视口中心，两个 origin 互不干扰
+const innerStyle = computed(() => ({
+  transform: `scale(${k.value})`,
   transformOrigin: anchor.value,
 }))
 
-// pin 在 stage 内会被一起放大，用 1/k 反补；transform-origin 在尖端，
-// 所以缩放时尖端始终钉在地理点上
+const underlayStyle = computed(() => {
+  const u = underlay.value
+  const origin = u?.origin
+  return {
+    transform: `translate3d(${pan.value.x}px, ${pan.value.y}px, 0) scale(${u?.scale || 1})`,
+    transformOrigin: origin ? `${origin.x}px ${origin.y}px` : '50% 50%',
+  }
+})
+
+// pin 会跟着 stage 的 tileScale 和内层的 k 一起放大，用 1/(tileScale*k)
+// 反补；transform-origin 在尖端，所以缩放时尖端始终钉在地理点上
 const pinStyle = computed(() => {
   if (!point.value) return null
+  // 摆在内层瓦片坐标系（tileZoom），外层 stage 的 tileScale 会把它带到
+  // 连续级别 zoom 对应的屏幕上；直接按 zoom 算会再被 tileScale 缩一次
   const [px, py] = lngLatToViewPixel(
-    point.value.lng, point.value.lat, center.value, zoom.value, viewW.value, viewH.value
+    point.value.lng, point.value.lat, center.value, tileZoom.value, viewW.value, viewH.value
   )
+  const totalScale = Math.max(0.001, tileScale.value * k.value)
   return {
     left: `${px}px`,
     top: `${py}px`,
-    transform: `translate(-50%, -100%) scale(${1 / k.value})`,
+    transform: `translate(-50%, -100%) scale(${1 / totalScale})`,
   }
 })
 
 const coordText = computed(() =>
   picked.value
-    ? `${picked.value.lat.toFixed(4)}, ${picked.value.lng.toFixed(4)}`
+    ? formatLatLng(picked.value.lat, picked.value.lng)
     : '点击地图任意位置'
 )
 
@@ -556,8 +648,8 @@ const settleRoadWaiter = () => {
  * 等当前 pin 的地名查询落地。
  *
  * 给「确认选点」用：外层拿到的是同一个 pin，直接等这一份结果就行。
- * 不要在外层再发一次 —— 两次查询的入参坐标系不同（GCJ-02 / WGS-84），
- * 落点会差 1~2 米，「最近的路」在路口附近就可能翻成隔壁那条
+ * 不要在外层再发一次 —— 同一个点查两遍既多花一次高德配额，两次响应又一前一后
+ * 回来时，晚到的旧结果可能把新 pin 的地名覆盖掉
  *（曾经出现过地图上写中学路、存下来是中心路）。
  *
  * 无论成功、失败还是超时都会 resolve，调用方读 roadInfo / 已发出的 road 事件即可。
@@ -586,9 +678,9 @@ const runRoadQuery = async (target, seq) => {
     // 1) 有高德 key：先取道路名（还带省 / 市 / 区 / 街道，地址页标题要用）
     if (isReverseGeocodeEnabled()) {
       try {
-        // target 是地图坐标系（高德源 = GCJ-02），传 crs 跳过 WGS-84 往返转换
+        // target 是地图坐标系；高德和地图瓦片用的是同一套坐标系，直接传源的 crs
         const amap = await reverseGeocode(target.lng, target.lat, {
-          crs: 'GCJ02',
+          crs: TILE_SOURCES[source].crs,
           signal: controller?.signal,
         })
         info = {
@@ -608,14 +700,13 @@ const runRoadQuery = async (target, seq) => {
     }
 
     // 2) 和风只覆盖到区县，作为「没有道路」时的兜底。
-    //    两者取其一，不重复发请求；和风只认 WGS-84，地图坐标系是 GCJ-02 时先转回来
+    //    两者取其一，不重复发请求；入参用和风的坐标系（大陆 GCJ-02），
+    //    高德源下就是 target 本身，不需要换算
     if (seq !== roadSeq) return
     if ((!info || (!info.road && !info.district)) && isPlaceLookupAvailable()) {
-      const [wLng, wLat] = TILE_SOURCES[source].crs === 'GCJ02'
-        ? gcj02ToWgs84(target.lng, target.lat)
-        : [target.lng, target.lat]
+      const [qLng, qLat] = toQueryCoord(target.lng, target.lat, TILE_SOURCES[source].crs)
       try {
-        const place = await lookupPlaceByCoord(wLng, wLat, {
+        const place = await lookupPlaceByCoord(qLng, qLat, {
           signal: controller?.signal,
           timeout: 4000,
         })
@@ -639,7 +730,7 @@ const runRoadQuery = async (target, seq) => {
     if (seq !== roadSeq) return
     roadInfo.value = info
     // 把地名交给外层落库：「最近」记录和天气卡的地址文案都要用它。
-    // 带上 WGS-84 坐标，外层可以核对这是不是当前这个 pin 的结果
+    // 带上落库坐标，外层可以核对这是不是当前这个 pin 的结果
     if (info && picked.value) {
       emit('road', {
         point: picked.value,
@@ -704,16 +795,14 @@ const reset = () => {
   picked.value = null
 }
 
-// 把外部传入的初始点摆成 pin（WGS-84 → 地图坐标系）。
+// 把外部传入的落库坐标摆成 pin（查询坐标系 → 地图坐标系）。
 // 只给「从最近记录进来」用；用户点过之后 props 不再变，不会把 pin 拽回去
 const applyPoint = (p) => {
   if (!p || !Number.isFinite(p.lng) || !Number.isFinite(p.lat)) {
     reset()
     return
   }
-  const [lng, lat] = TILE_SOURCES[source].crs === 'GCJ02'
-    ? wgs84ToGcj02(p.lng, p.lat)
-    : [p.lng, p.lat]
+  const [lng, lat] = toMapCoord(p.lng, p.lat, TILE_SOURCES[source].crs)
   point.value = { lng, lat }
   picked.value = { lng: p.lng, lat: p.lat }
 }
@@ -726,12 +815,13 @@ const applyInitialPoint = () => applyPoint(props.initialPoint)
  * 做成方法而不是靠 props：连着点同一个城市时 props 值没变，watch 不会触发，
  * 地图就「点了没反应」。
  * @param {[number, number]} nextCenter 地图坐标系（GCJ-02）中心
- * @param {{lng:number,lat:number}|null} pin 要摆放的 WGS-84 坐标；null = 不摆 pin
+ * @param {{lng:number,lat:number}|null} pin 要摆放的落库坐标；null = 不摆 pin
  * @param {{zoom?: number}} [options] zoom 指定落点级别（全屏里从地区卡片重选时用街道级）
  */
 const focusTo = (nextCenter, pin = null, options = {}) => {
   const [lng, lat] = nextCenter || []
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+  cancelWheelZoom()
   cancelAnimationFrame(rafId)
   clearTimeout(zoomGuard)
   rafId = 0
@@ -758,67 +848,106 @@ const focusTo = (nextCenter, pin = null, options = {}) => {
 
 const scheduleUnderlayDrop = () => {
   clearTimeout(underlayTimer)
-  // 兜底：万一 load 事件没来（缓存/中断），不能一直压着一层旧图
-  underlayTimer = setTimeout(() => { underlay.value = null }, 1600)
+  // 兜底：万一 load 事件没来（缓存/中断），不能一直压着一层旧图。
+  // 正常情况由下面的 pending watch 在新瓦片齐了之后 160ms 撤掉；
+  // 这里留 4s 给慢请求，避免 1.6s 就撤、边缘几张图还在路上时露出白块
+  underlayTimer = setTimeout(() => { underlay.value = null }, 4000)
 }
 
 /**
- * 缩放动画。
+ * 算出「目标级别下锚点仍压着同一个地理位置」时的视口中心。
+ * 按钮 / 双击动画从当前画面反查锚点；滚轮因为锚点地理坐标已经固定，
+ * 走下面的 centerForAnchorGeo，避免每帧反查累积浮点误差。
+ */
+const centerForAnchoredZoom = (target, fromCenter, fromZoom, pivot) => {
+  const [gLng, gLat] = viewPixelToLngLat(
+    pivot.x, pivot.y, fromCenter, fromZoom, viewW.value, viewH.value
+  )
+  const [wx, wy] = lngLatToWorld(gLng, gLat)
+  const targetScale = 2 ** target * TILE_SIZE
+  const candidate = worldToLngLat(
+    wx - (pivot.x - viewW.value / 2) / targetScale,
+    wy - (pivot.y - viewH.value / 2) / targetScale
+  )
+  // 算不出有限值就保持原中心，宁可少一次居中，也不要让 NaN 流进瓦片索引
+  if (!Number.isFinite(candidate[0]) || !Number.isFinite(candidate[1])) {
+    return [...fromCenter]
+  }
+  return clampCenter(candidate)
+}
+
+/**
+ * 两次围绕不同原点的缩放叠加后，仍然是一次等比缩放。
+ * 返回等效 origin，让垫底层可以用单个 transform 复刻「外层 tileScale
+ * 围绕视口中心 + 内层动画围绕锚点」的合成效果。
+ */
+const composeScaleOrigin = (outerScale, innerScale, pivot) => {
+  const cx = viewW.value / 2
+  const cy = viewH.value / 2
+  const total = outerScale * innerScale
+  // total=1 时没有缩放，origin 取哪里都不影响；用一个安全值避免除零
+  if (Math.abs(total - 1) < 1e-6) return { x: cx, y: cy }
+  return {
+    x: (cx * (1 - outerScale) + pivot.x * (outerScale - total)) / (1 - total),
+    y: (cy * (1 - outerScale) + pivot.y * (outerScale - total)) / (1 - total),
+  }
+}
+
+/**
+ * 缩放动画（按钮 / 双击）。
  *
- * 两个方向的做法不同，但收尾状态完全一致（zoom=目标值、k=1、垫底层=旧瓦片）：
+ * 一次完整级差（2 倍）仍然走动画，但分两段：
+ *   外层 stage 的 tileScale 是滚轮留下的连续级差（可能 0.8 / 1.3），
+ *   内层 k 再从 1 走到 2（缩小反向从 0.5 走到 1）。
+ * 两者叠起来正好是目标级别；收尾时把 stage 换成目标状态，内外两层同时
+ * 归位，画面不会先缩一下再跳回来。
  *
- *   放大：旧瓦片从 1 放大到 2。旧图会被越放越大，始终盖满视口；
- *         k=2 时它覆盖的地理范围正好等于新一级的视野，此刻换瓦片没有位移。
- *   缩小：先把目标瓦片放到 2 倍（与当前视野重合）再缩回 1。目标瓦片始终被放大、
- *         盖满视口，旧图只在底下垫着（看不见）。反过来做的话，旧图缩到 0.5 倍
- *         就不够铺满视口，四边会露出底色。
+ * 放大：先留着旧瓦片，内层 k 从 1 放大到 2，k=2 时旧图覆盖的地理范围
+ *       正好等于新视野，此刻换瓦片没有位移。
+ * 缩小：先把目标瓦片放到 2 倍（与当前视野重合）再缩回 1；目标瓦片始终
+ *       被放大、盖满视口，旧图只在底下垫着。
  *
- * @param {number} target 目标缩放级别
+ * @param {number} target 目标级别（可以是小数）
  * @param {{x:number,y:number}|null} anchorPx 缩放锚点（视口像素）；null = 视口中心
  */
 const animateZoom = (target, anchorPx = null) => {
-  if (zooming.value || target === zoom.value) return
-  if (target < minZoom.value || target > ZOOM_MAX) return
+  // 按钮 / 双击开始动画时，丢掉还没跑完的滚轮补间
+  cancelWheelZoom()
+  if (zooming.value) return
+  const targetZoom = Math.min(ZOOM_MAX, Math.max(minZoom.value, target))
+  const fromZoom = zoom.value
+  if (Math.abs(targetZoom - fromZoom) < 1e-5) return
   // 缩放和拖动位移不能共存：先把残留位移折进 center，动画的 transform 里就只剩 scale
   if (pan.value.x || pan.value.y) commitPan()
 
-  const fromZoom = zoom.value
   const fromCenter = [...center.value]
-  const zoomIn = target > fromZoom
-  const fromK = zoomIn ? 1 : 2
-  const toK = zoomIn ? 2 : 1
+  const fromTileZoom = tileZoom.value
+  const fromTileScale = tileScale.value
+  const zoomIn = targetZoom > fromZoom
+  const stepScale = 2 ** (targetZoom - fromZoom)
+  const fromK = zoomIn ? 1 : 1 / stepScale
+  const toK = zoomIn ? stepScale : 1
 
   const pivot = isFinitePoint(anchorPx)
     ? anchorPx
     : { x: viewW.value / 2, y: viewH.value / 2 }
-  anchorPoint.value = zoomIn ? pivot : null
+  anchorPoint.value = pivot
 
-  // 放大时视口中心要跟着锚点移动：否则 k=2 那一帧是以点击点为中心放大的，
-  // 而换图后却是以原中心渲染，两者错位，看起来就是「先缩一下再跳回来」
-  let nextCenter = fromCenter
-  if (zoomIn) {
-    const [gLng, gLat] = viewPixelToLngLat(
-      pivot.x, pivot.y, fromCenter, fromZoom, viewW.value, viewH.value
-    )
-    const [wx, wy] = lngLatToWorld(gLng, gLat)
-    const targetScale = 2 ** target * TILE_SIZE
-    const candidate = worldToLngLat(
-      wx - (pivot.x - viewW.value / 2) / targetScale,
-      wy - (pivot.y - viewH.value / 2) / targetScale
-    )
-    // 算不出有限值就保持原中心，宁可少一次居中，也不要让 NaN 流进瓦片索引
-    if (Number.isFinite(candidate[0]) && Number.isFinite(candidate[1])) {
-      nextCenter = clampCenter(candidate)
-    }
-  }
+  const nextCenter = centerForAnchoredZoom(targetZoom, fromCenter, fromZoom, pivot)
 
   zooming.value = true
   k.value = fromK
 
   if (!zoomIn) {
-    // 缩小：先换到目标瓦片并放大 2 倍，视觉上和当前一帧完全相同
-    underlay.value = { zoom: fromZoom, center: fromCenter, scale: 1 }
-    zoom.value = target
+    // 缩小：先换到目标瓦片，内层放大 1/stepScale 倍，视觉上和当前一帧完全相同
+    underlay.value = {
+      zoom: fromTileZoom,
+      center: fromCenter,
+      scale: fromTileScale,
+      origin: { x: viewW.value / 2, y: viewH.value / 2 },
+    }
+    center.value = nextCenter
+    zoom.value = targetZoom
   }
 
   const startedAt = performance.now()
@@ -830,12 +959,20 @@ const animateZoom = (target, anchorPx = null) => {
     zoomGuard = 0
     if (!zooming.value) return
     if (zoomIn) {
-      // 旧瓦片放大 2 倍后与新视野重合，留在底下等新瓦片画上来
-      underlay.value = { zoom: fromZoom, center: fromCenter, scale: 2 }
+      // 旧瓦片放大 stepScale 倍后与新视野重合，留在底下等新瓦片画上来。
+      // 旧图本身可能还带 tileScale，合成后才是真正的总倍数
+      const origin = composeScaleOrigin(fromTileScale, stepScale, pivot)
+      underlay.value = {
+        zoom: fromTileZoom,
+        center: fromCenter,
+        scale: fromTileScale * stepScale,
+        origin,
+      }
       center.value = nextCenter
-      zoom.value = target
+      zoom.value = targetZoom
     }
     k.value = 1
+    anchorPoint.value = null
     zooming.value = false
     scheduleUnderlayDrop()
   }
@@ -855,6 +992,150 @@ const animateZoom = (target, anchorPx = null) => {
   rafId = requestAnimationFrame(step)
   // rAF 在壁纸被遮挡时会被节流甚至暂停，兜底强制收尾，避免卡在动画中间
   zoomGuard = setTimeout(commit, ZOOM_DURATION + 500)
+}
+
+/* ---------------- 滚轮缩放 ---------------- */
+
+// wheel 的 delta 单位不一定是像素：行 / 页要换算成视口像素
+const wheelDeltaPx = (event) => {
+  if (event.deltaMode === 1) return event.deltaY * 16
+  if (event.deltaMode === 2) return event.deltaY * Math.max(1, viewH.value)
+  return event.deltaY
+}
+
+/**
+ * 滚轮事件位置 → 逻辑视口像素。
+ *
+ * 用 viewportBox 还原 stage 未缩放的屏幕矩形；不能直接用 stage 的
+ * getBoundingClientRect：stage 自身带着 tileScale，量出来会被放大 / 缩小。
+ */
+const wheelPointFromEvent = (event) => {
+  const box = viewportBox()
+  if (!box || !viewW.value || !viewH.value) return null
+  const x = (event.clientX - box.left) * (viewW.value / box.width)
+  const y = (event.clientY - box.top) * (viewH.value / box.height)
+  if (x < 0 || y < 0 || x > viewW.value || y > viewH.value) return null
+  return { x, y }
+}
+
+/**
+ * 锚点地理坐标固定时，算出目标级别对应的视口中心。
+ * 和 centerForAnchoredZoom 的区别是：这里不需要每次从当前 center 反查，
+ * 滚轮补间连续调用时不会因为浮点误差把锚点慢慢漂走。
+ */
+const centerForAnchorGeo = (target, anchorGeo, pivot) => {
+  const [wx, wy] = lngLatToWorld(anchorGeo[0], anchorGeo[1])
+  const scale = 2 ** target * TILE_SIZE
+  return clampCenter(worldToLngLat(
+    wx - (pivot.x - viewW.value / 2) / scale,
+    wy - (pivot.y - viewH.value / 2) / scale
+  ))
+}
+
+/**
+ * 把连续级别应用到相机上。瓦片只换整数级，小数部分交给 stage 的 scale；
+ * 换级时把当前画面压进 underlay，等新瓦片铺上来再撤掉。
+ */
+const applyViewZoom = (target, pivot, anchorGeo) => {
+  const nextZoom = Math.min(ZOOM_MAX, Math.max(minZoom.value, target))
+  if (Math.abs(nextZoom - zoom.value) < 1e-5) return
+  const fromTileZoom = tileZoom.value
+  const fromCenter = [...center.value]
+  const fromTileScale = tileScale.value
+  const nextCenter = centerForAnchorGeo(nextZoom, anchorGeo, pivot)
+
+  center.value = nextCenter
+  zoom.value = nextZoom
+
+  if (tileZoom.value !== fromTileZoom) {
+    underlay.value = {
+      zoom: fromTileZoom,
+      center: fromCenter,
+      scale: fromTileScale,
+      origin: { x: viewW.value / 2, y: viewH.value / 2 },
+    }
+    scheduleUnderlayDrop()
+  }
+}
+
+/**
+ * 清掉滚轮的目标级别和补间帧。
+ * 外部换视野、进 / 退全屏、开始拖拽之前都要调：相机已经切走了，
+ * 滚轮补间再跑下去就会把用户刚切到的位置顶飞。
+ */
+const cancelWheelZoom = () => {
+  cancelAnimationFrame(wheelRaf)
+  wheelRaf = 0
+  wheelTargetZoom = null
+  wheelAnchorPx = null
+  wheelAnchorGeo = null
+  wheelLastFrameAt = 0
+}
+
+/**
+ * 滚轮补间：每帧朝目标级别追一点，时间常数约 35ms。
+ * 不做长动画、不排队；目标被新的 wheel 事件连续改写时，只是换一个追赶方向。
+ */
+const wheelFrame = (now) => {
+  wheelRaf = 0
+  if (wheelTargetZoom == null || !wheelAnchorPx || !wheelAnchorGeo) return
+  const diff = wheelTargetZoom - zoom.value
+  if (Math.abs(diff) < 0.0005) {
+    applyViewZoom(wheelTargetZoom, wheelAnchorPx, wheelAnchorGeo)
+    wheelTargetZoom = null
+    wheelAnchorPx = null
+    wheelAnchorGeo = null
+    wheelLastFrameAt = 0
+    return
+  }
+
+  const dt = wheelLastFrameAt ? Math.min(50, now - wheelLastFrameAt) : 16
+  wheelLastFrameAt = now
+  const alpha = 1 - Math.exp(-dt / WHEEL_EASE_MS)
+  const next = zoom.value + diff * alpha
+  const before = zoom.value
+  applyViewZoom(next, wheelAnchorPx, wheelAnchorGeo)
+  // 已经卡在上下限：补间没必要再空转
+  if (Math.abs(zoom.value - before) < 1e-5 && Math.abs(next - zoom.value) > 0.0005) {
+    wheelTargetZoom = null
+    wheelAnchorPx = null
+    wheelAnchorGeo = null
+    wheelLastFrameAt = 0
+    return
+  }
+  wheelRaf = requestAnimationFrame(wheelFrame)
+}
+
+const handleWheel = (event) => {
+  // 全屏展开 / 收回期间相机在过渡，再叠一层缩放会打架；
+  // 拖着地图时同理，别让滚轮插进来把相机从指针底下抽走
+  if (fsBusy.value || dragState || zooming.value) return
+  const pt = wheelPointFromEvent(event)
+  if (!pt) return
+  const delta = wheelDeltaPx(event)
+  if (!Number.isFinite(delta) || delta === 0) return
+  // 滚轮和拖动位移不能共存：先把残余位移折进 center，锚点坐标才对得上
+  if (pan.value.x || pan.value.y) commitPan()
+
+  const [lng, lat] = viewPixelToLngLat(
+    pt.x, pt.y, center.value, zoom.value, viewW.value, viewH.value
+  )
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+
+  // 锚点每次按当前画面取：指针没动时得到的是同一个地理点，
+  // 指针挪了位置就自然换成新位置下的点，不会把地图从指针底下扯走
+  wheelAnchorPx = pt
+  wheelAnchorGeo = [lng, lat]
+  // 向下滚 = 缩小，向上滚 = 放大，和常见地图一致
+  const base = wheelTargetZoom == null ? zoom.value : wheelTargetZoom
+  wheelTargetZoom = Math.min(
+    ZOOM_MAX,
+    Math.max(minZoom.value, base - delta * WHEEL_ZOOM_PER_PX)
+  )
+  if (!wheelRaf) {
+    wheelLastFrameAt = 0
+    wheelRaf = requestAnimationFrame(wheelFrame)
+  }
 }
 
 /* ---------------- 拖拽平移 ---------------- */
@@ -973,6 +1254,8 @@ const handlePointerUp = (event) => {
 const handlePointerDown = (event) => {
   if (zooming.value) return
   if (event.pointerType === 'mouse' && event.button !== 0) return
+  // 拖动开始前先放弃待执行的滚轮，避免松手后地图又自己补一级
+  cancelWheelZoom()
   cancelPan()
   dragState = {
     startX: event.clientX,
@@ -993,8 +1276,8 @@ const handlePointerDown = (event) => {
  * 所以这里自己数：一次按下的 contextmenu 记一次，两次落在 320ms / 8px 内算双击。
  * 顺手吃掉系统菜单 —— 在地图上弹「另存为图片」没有任何用处。
  *
- * 锚点只在放大时用得上（缩小的动画是从 2 倍缩回 1 倍，天然以视口中心为轴），
- * 这里照样传 pt，和「+」按钮那边保持同一个调用形状。
+ * 锚点现在两个方向都用：缩小从 2 倍缩回 1 倍时也以右键位置为轴，
+ * 和滚轮缩放 / 双击放大保持同一种手感。
  */
 const handleContextMenu = (event) => {
   event.preventDefault()
@@ -1011,14 +1294,14 @@ const handleContextMenu = (event) => {
   lastRight = { at: now, x: pt.x, y: pt.y }
 }
 
-// 事件坐标 → 视口内像素；落在视口外返回 null
+// 事件坐标 → 视口内像素；落在视口外返回 null。
+// 同样走 viewportBox，避开 stage 上的 tileScale。
 const toViewPoint = (event) => {
-  const rect = stageEl.value?.getBoundingClientRect()
-  if (!rect || !rect.width || !Number.isFinite(event?.clientX)) return null
-  // 缩放动画期间不响应指针，此时 k=1，rect 就是逻辑视口
-  const px = event.clientX - rect.left
-  const py = event.clientY - rect.top
-  if (px < 0 || py < 0 || px > rect.width || py > rect.height) return null
+  const box = viewportBox()
+  if (!box || !Number.isFinite(event?.clientX)) return null
+  const px = (event.clientX - box.left) * (viewW.value / box.width)
+  const py = (event.clientY - box.top) * (viewH.value / box.height)
+  if (px < 0 || py < 0 || px > viewW.value || py > viewH.value) return null
   return { x: px, y: py }
 }
 
@@ -1028,12 +1311,10 @@ const pickAt = (pt) => {
     pt.x, pt.y, center.value, zoom.value, viewW.value, viewH.value
   )
 
-  // 两种坐标不能混用：pin 用地图坐标系，查询用 WGS-84
+  // 两种坐标不能混用：pin 用地图坐标系，落库 / 查询用和风的坐标系
   point.value = { lng, lat }
-  const [wLng, wLat] = TILE_SOURCES[source].crs === 'GCJ02'
-    ? gcj02ToWgs84(lng, lat)
-    : [lng, lat]
-  picked.value = { lng: wLng, lat: wLat }
+  const [qLng, qLat] = toQueryCoord(lng, lat, TILE_SOURCES[source].crs)
+  picked.value = { lng: qLng, lat: qLat }
   emit('pick', picked.value)
 }
 
@@ -1105,6 +1386,7 @@ const insetsOf = (rect, width, height) => ({
 
 // 把正在跑的缩放/拖动动画收干净：裁切框按「静止画面」算，带位移会算错
 const settleMotion = () => {
+  cancelWheelZoom()
   cancelAnimationFrame(rafId)
   clearTimeout(zoomGuard)
   clearTimeout(underlayTimer)
@@ -1128,12 +1410,17 @@ const settleMotion = () => {
  */
 const enterFullscreen = async () => {
   if (fsBusy.value || props.fullscreen) return
-  const stage = stageEl.value
-  if (!stage) return
   fsBusy.value = true
   try {
     settleMotion()
-    const rect = stage.getBoundingClientRect()
+    const box = viewportBox()
+    if (!box) return
+    const rect = {
+      left: box.left,
+      top: box.top,
+      right: box.left + box.width,
+      bottom: box.top + box.height,
+    }
     const width = window.innerWidth
     const height = window.innerHeight
     const fromW = viewW.value
@@ -1196,6 +1483,7 @@ const applyCardCamera = () => {
  */
 const exitFullscreen = async () => {
   if (!props.fullscreen || fsBusy.value) return
+  cancelWheelZoom()
   emit('fs-leaving')
   fsBusy.value = true
   try {
@@ -1261,12 +1549,33 @@ const toggleCountry = async () => {
 
 /* ---------------- 尺寸自适应 ---------------- */
 
+/**
+ * stage 在屏幕上的「未缩放」矩形。
+ * 不能用 stage.getBoundingClientRect()：它带着 tileScale，量出来是缩放后的；
+ * clientWidth / clientHeight 是布局尺寸，再借 wrap 的边框偏移还原左上角。
+ */
+const viewportBox = () => {
+  const stage = stageEl.value
+  if (!stage) return null
+  const width = stage.clientWidth
+  const height = stage.clientHeight
+  if (!width || !height) return null
+  const wrap = wrapEl.value
+  if (!wrap) return { left: 0, top: 0, width, height }
+  const rect = wrap.getBoundingClientRect()
+  return {
+    left: rect.left + wrap.clientLeft,
+    top: rect.top + wrap.clientTop,
+    width,
+    height,
+  }
+}
+
 const measure = () => {
-  const el = stageEl.value
-  if (!el) return
-  const box = el.getBoundingClientRect()
-  viewW.value = Math.max(1, Math.round(box.width))
-  viewH.value = Math.max(1, Math.round(box.height))
+  const stage = stageEl.value
+  if (!stage) return
+  viewW.value = Math.max(1, Math.round(stage.clientWidth))
+  viewH.value = Math.max(1, Math.round(stage.clientHeight))
 }
 
 /**
@@ -1294,9 +1603,9 @@ onMounted(() => {
   measure()
   // 首次挂载时 center 的 watch 不会触发，初始 pin 要在这里补一次
   applyInitialPoint()
-  if (typeof ResizeObserver !== 'undefined') {
+  if (typeof ResizeObserver !== 'undefined' && wrapEl.value) {
     observer = new ResizeObserver(scheduleMeasure)
-    observer.observe(stageEl.value)
+    observer.observe(wrapEl.value)
   } else {
     window.addEventListener('resize', scheduleMeasure)
   }
@@ -1311,6 +1620,7 @@ onBeforeUnmount(() => {
   cancelPan()
   clearTimeout(measureTimer)
   clearTimeout(hintTimer)
+  cancelWheelZoom()
   // 卸掉时把还在路上的道路名请求一起掐掉，避免回写到已卸载的组件
   roadSeq += 1
   abortRoadQuery()
@@ -1353,6 +1663,7 @@ watch(pending, (value) => {
 
 // 换了区县：终止动画、回正视口、按新的初始点摆 pin
 watch(() => (props.center || []).join(','), () => {
+  cancelWheelZoom()
   cancelAnimationFrame(rafId)
   clearTimeout(zoomGuard)
   rafId = 0
@@ -1383,12 +1694,15 @@ watch(AmapKey, () => {
 watch(() => props.initialPoint, applyInitialPoint)
 
 watch(() => props.zoom, (value) => {
-  if (Number.isFinite(value)) zoom.value = value
+  if (!Number.isFinite(value)) return
+  cancelWheelZoom()
+  zoom.value = value
 })
 
 // 外层强制收回（比如「重选地区」时动画正好被占住）：把裁切和淡出状态一起清掉
 watch(() => props.fullscreen, (on) => {
   if (on) return
+  cancelWheelZoom()
   clipInsets.value = null
   stageFading.value = false
   nextTick(() => measure())
@@ -1495,28 +1809,46 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   }
 }
 
+/* 全屏展开/收回只改这一层的 clip-path，不动 stage 的 transform：
+   瓦片不会被拉伸变糊，裁切矩形也不会被 tileScale 缩放。
+   时长要和 MapPointPicker 里的 FS_DURATION 保持一致 */
+.mp-clip {
+  position: absolute;
+  inset: 0;
+  /* 只在这里裁：这层不参与 transform，裁切框就是视口本身。
+     stage / underlay 自己带 scale，绝不能在它们身上写 overflow:hidden ——
+     scale<1 时会先按视口裁掉、再把整个裁切结果一起缩小，四周就露出白边 */
+  overflow: hidden;
+  transition: clip-path 320ms var(--ease), opacity 130ms ease;
+}
+
 .mp-layer {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  /* 同样不能裁：这层可能带着 <1 的 scale（旧图垫底时） */
   pointer-events: none;
 }
 
 .mp-stage {
   position: absolute;
   inset: 0;
-  overflow: hidden;
   cursor: grab;
   touch-action: none;
+  overscroll-behavior: contain;
   user-select: none;
   will-change: transform;
-  /* 全屏展开/收回只改 clip-path，不动 transform：瓦片不会被拉伸变糊。
-     时长要和 MapPointPicker 里的 FS_DURATION 保持一致 */
-  transition: clip-path 320ms var(--ease), opacity 130ms ease;
 
   &.is-dragging {
     cursor: grabbing;
   }
+}
+
+/* 按钮 / 双击的内层动画：围绕锚点做一次完整级差。
+   stage 自己的 tileScale 围绕视口中心，两层 origin 分开互不影响 */
+.mp-stage-inner {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
 }
 
 /* 必须用 px 且不缩放：rem 会随 --panel-scale 变化，瓦片和 left/top 就对不上了 */

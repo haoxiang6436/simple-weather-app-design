@@ -35,14 +35,26 @@
             <div class="lp-chip-row">
               <span class="lp-chip-label">热门</span>
               <button v-for="city in HOT_CITIES" :key="city.label" class="lp-chip" type="button"
-                :class="{ 'is-current': isPathSelected(city.path) }" :aria-pressed="isPathSelected(city.path)"
+                :class="{ 'is-current': isHotCitySelected(city.path) }"
+                :aria-pressed="isHotCitySelected(city.path)"
                 :disabled="submitting || locating" @click="applyIds(city.path)">{{ city.label }}</button>
             </div>
             <div v-if="history.length" class="lp-chip-row">
               <span class="lp-chip-label">最近</span>
-              <button v-for="item in history" :key="item.key" class="lp-chip" type="button"
-                :class="{ 'is-current': isPathSelected(item.path) }" :aria-pressed="isPathSelected(item.path)"
-                :disabled="submitting || locating" @click="applyHistory(item)">{{ item.label }}</button>
+              <!-- 一条记录 = 「选中」和「删除」两个按钮。不能把删除按钮嵌进选中按钮里：
+                   <button> 里面套 <button> 是非法结构，键盘和读屏都会乱 -->
+              <div v-for="item in history" :key="locationHistoryKey(item)" class="lp-chip-history"
+                :class="{ 'is-current': isHistoryCurrent(item) }">
+                <button class="lp-chip-main" type="button" :aria-pressed="isHistoryCurrent(item)"
+                  :disabled="submitting || locating" @click="applyHistory(item)">{{ item.label }}</button>
+                <button class="lp-chip-remove" type="button"
+                  :aria-label="`删除最近地址：${item.label}`" :title="`删除「${item.label}」`"
+                  :disabled="submitting || locating" @click="removeHistoryItem(item)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6 6 18" />
+                  </svg>
+                </button>
+              </div>
               <button class="lp-chip-clear" type="button" :disabled="submitting || locating"
                 @click="clearLocationHistory()">清空</button>
             </div>
@@ -126,14 +138,21 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useWeatherStore } from '@/store'
 import { lookupCity } from '@/api/weather'
-import { ZOOM_DEFAULT, wgs84ToGcj02 } from './mapTiles'
+import { ZOOM_DEFAULT, formatLatLng, toMapCoord } from './mapTiles'
 import { isReverseGeocodeEnabled, reverseGeocode } from './reverseGeocode'
 import { isPlaceLookupAvailable, isSameAdminName, joinAdminParts, lookupPlaceByCoord, pointAddressLabel } from './placeLookup'
 import RegionCascade from './RegionCascade.vue'
 import RegionPickerDialog from './RegionPickerDialog.vue'
 import MapPointPicker from './MapPointPicker.vue'
 import { canLocateRegion, findNode, isLeaf, needsCityFirst as pathNeedsCityFirst, pathLabels } from './regionTree'
-import { LocationHistory, addLocationHistory, clearLocationHistory } from './useLocationHistory'
+import {
+  LocationHistory,
+  addLocationHistory,
+  clearLocationHistory,
+  locationHistoryIdentity,
+  locationHistoryKey,
+  removeLocationHistory,
+} from './useLocationHistory'
 import { ChosenLocationPath, markLocationChosen } from '@/features/onboarding/onboardingState'
 import { useLayerOutsideClick } from '@/shared/useLayerOutsideClick'
 
@@ -190,7 +209,7 @@ const regionDialogOpen = ref(false)
 const regionDialogError = ref('')
 // 当前区县中心 [lng, lat]，地图的初始视口；拿不到时退回「点区县即确认」
 const districtCenter = ref(null)
-// 地图上点选的位置（WGS-84），null = 没点，确认时用区县中心
+// 地图上点选的位置（落库坐标系：大陆 GCJ-02；境外 WGS-84），null = 没点，确认时用区县中心
 const pickedPoint = ref(null)
 // 当前 pin 最近的道路名（高德逆地理编码）。保存时一起写入 point，
 // 「最近」和天气卡就用「黄岩区 中学路」代替原来的两位小数坐标
@@ -206,7 +225,7 @@ const pickedDistrictSource = ref('')
 // 标题要拼「浙江省-台州市-黄岩区-新前街道-中学路」，只有路名/区县不够。
 // 没配高德 key、断网或老记录时保持 null，标题退回三列选中的省 / 市 / 区
 const mapGeo = ref(null)
-// 进地图时要预先摆好的 pin（WGS-84）：区县中心，或当前选址 / 「最近」记录里已有的坐标
+// 进地图时要预先摆好的 pin（落库坐标系）：区县中心，或当前选址 / 「最近」记录里已有的坐标
 const mapInitialPoint = ref(null)
 // 同一个区县来回切换时不必重复查；同时留一份 city 对象给「不点地图直接确认」复用
 const districtCache = new Map()
@@ -251,10 +270,10 @@ const resolveDistrict = async (adcode) => {
 }
 
 /**
- * 和风给的经纬度是 WGS-84，瓦片是 GCJ-02。
- * 直接拿去当视口中心会偏 ~500 m，所以在交给地图之前先转一次。
+ * 和风给的经纬度是它自己的坐标系（大陆 GCJ-02，境外 WGS-84），和地图瓦片一致，
+ * 默认高德源下直接可用；换成 WGS-84 底图源时 toMapCoord 会自动换算。
  */
-const toMapCenter = ([lng, lat]) => wgs84ToGcj02(lng, lat)
+const toMapCenter = ([lng, lat]) => toMapCoord(lng, lat)
 
 /**
  * 壁纸当前正在用的精确坐标 —— 只有上次在地图上点过才会有。
@@ -444,8 +463,8 @@ const handleRoad = (info) => {
  * 确认前把坐标级地名补齐（高德路名 + 区县名，或和风区县名）。
  *
  * 关键是「只查一次」：地图组件已经为这个 pin 查过（或正在查），这里直接等它那一份结果。
- * 以前这里会自己再发一次逆地理编码，而入参坐标系不同（WGS-84 vs 地图的 GCJ-02），
- * 落点差 1~2 米，在路口附近「最近的路」就可能翻成隔壁那条 ——
+ * 以前这里会自己再发一次逆地理编码，同一个点查两遍既多花配额，两次响应又一前一后
+ * 回来，旧的那份把新的覆盖掉，路口附近「最近的路」就会翻成隔壁那条 ——
  * 结果是地图上写中学路、存进卡片却是中心路。
  * 等待上限 1.2 秒，查不到就留空按坐标兜底，绝不能为了地名把「确认」卡住。
  */
@@ -748,9 +767,36 @@ const subText = computed(() => {
   return titleAddress.value ? hint : `${contextText.value} · ${hint}`
 })
 
-// 当前选中路径的 adcode 串：用来给热门/最近的 chip 打「当前」高亮
-const selectedKey = computed(() => selectedPath.value.map((node) => node.value).join('/'))
-const isPathSelected = (ids) => {
+// 当前选中路径的 adcode 串：热门城市只按地区判断（它们没有精确坐标）
+const selectedIds = computed(() => selectedPath.value.map((node) => node.value))
+const selectedKey = computed(() => selectedIds.value.join('/'))
+
+// 当前选择的完整身份 = 路径 + 精确坐标。
+// 以前「最近」只比 adcode 路径，同一个区县里存过两条记录（比如旧版的纯地区记录
+// 和后来地图点选的记录）时会一起高亮；现在必须坐标也一致才算同一条。
+const currentLocationKey = computed(() => locationHistoryIdentity({
+  path: selectedIds.value,
+  point: pickedPoint.value,
+}))
+
+// 当前选择命中了哪条「最近」。命中后高亮只留给它，
+// 热门城市不再重复点亮同一个地址。
+const currentHistoryKey = computed(() => {
+  const key = currentLocationKey.value
+  if (!key) return ''
+  return history.value.some((item) => locationHistoryIdentity(item) === key) ? key : ''
+})
+
+const isHistoryCurrent = (item) => (
+  !!currentHistoryKey.value && locationHistoryIdentity(item) === currentHistoryKey.value
+)
+
+// 热门城市没有坐标：只有「当前选择还停在地区级」时才算选中。
+// 已经在地图上点过精确坐标时，热门只是地区快捷入口，不再冒充当前地址。
+const isHotCitySelected = (ids) => {
+  if (pickedPoint.value) return false
+  // 同一条地址正在「最近」里高亮：只保留一个高亮，避免两个 chip 同时亮
+  if (currentHistoryKey.value) return false
   const key = (ids || []).join('/')
   return !!key && key === selectedKey.value
 }
@@ -758,7 +804,7 @@ const isPathSelected = (ids) => {
 const coordText = computed(() => {
   const point = pickedPoint.value || mapInitialPoint.value
   if (!point) return '未选点 · 将使用中心坐标'
-  const coords = `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`
+  const coords = formatLatLng(point.lat, point.lng)
   // 中心点只是占位，明确标出来，免得用户以为已经选到街一级
   return pickedPoint.value ? coords : `中心 ${coords}`
 })
@@ -775,7 +821,7 @@ const fallbackTarget = () => {
 
 /**
  * 确认位置。
- * @param {Object|null} point 地图点选的 WGS-84 坐标；不传 / 传 null 时按区县 adcode 查天气
+ * @param {Object|null} point 地图点选的坐标（和风坐标系：大陆 GCJ-02）；不传 / 传 null 时按区县 adcode 查天气
  */
 const confirm = async (point) => {
   // 只认真正的坐标对象：模板里写成 @click="confirm" 会传进来 MouseEvent
@@ -1059,6 +1105,15 @@ const applyHistory = async (item) => {
     await confirm(point)
   }
 }
+
+/**
+ * 删除单条「最近」记录。
+ * 按归一化 key 删，旧缓存里被列表折叠掉、但实际仍躺在 localStorage 里的副本一起清掉，
+ * 否则删完一条，折叠逻辑又会把另一份同名记录顶出来。
+ */
+const removeHistoryItem = (item) => {
+  removeLocationHistory(locationHistoryKey(item))
+}
 </script>
 
 <style lang="scss" scoped>
@@ -1183,6 +1238,108 @@ const applyHistory = async (item) => {
   &:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+}
+
+/* 「最近」的一个条目：左边是地址（点击后把地图移过去），右边是独立的删除按钮。
+   两块共用一个胶囊外框，但不能写成 button 套 button —— 那是非法结构，键盘和读屏都会乱 */
+.lp-chip-history {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  color: var(--text-secondary);
+  background: var(--glass-bg-soft);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+
+  &:hover:not(.is-current) {
+    background: var(--glass-border);
+    border-color: var(--glass-border-strong);
+  }
+
+  &.is-current {
+    color: #04121f;
+    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    border-color: transparent;
+
+    .lp-chip-main {
+      color: #04121f;
+      font-weight: 600;
+    }
+
+    .lp-chip-remove {
+      color: rgba(4, 18, 31, 0.62);
+      border-left-color: rgba(4, 18, 31, 0.18);
+
+      &:hover:not(:disabled) {
+        color: #04121f;
+        background: rgba(4, 18, 31, 0.1);
+      }
+    }
+  }
+}
+
+.lp-chip-main {
+  padding: 0.3125rem 0.4375rem 0.3125rem 0.75rem;
+  font-size: 0.82rem;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  transition: color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: -2px;
+  }
+}
+
+/* 删除按钮：用一条细分隔线和地址文案分开，点击只删这一条，不触发选中。
+   图标是内联 SVG 而不是「×」字符 —— 字符的基线受字体影响，垂直方向会偏 */
+.lp-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--glass-border);
+  transition: color 0.2s ease, background 0.2s ease;
+
+  svg {
+    display: block;
+    width: 0.6875rem;
+    height: 0.6875rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+  }
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: -2px;
   }
 }
 
@@ -1597,6 +1754,10 @@ const applyHistory = async (item) => {
 
   .lp-chip {
     padding: 0.25rem 0.625rem;
+  }
+
+  .lp-chip-main {
+    padding: 0.25rem 0.375rem 0.25rem 0.625rem;
   }
 }
 </style>

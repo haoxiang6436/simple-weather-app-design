@@ -5,15 +5,15 @@
  *   1. 有高德 key：逆地理编码，能到最近的道路名；
  *   2. 没 key / 高德失败：和风 GeoAPI 反查，只能到区县。
  *
- * 区别只在于坐标系：地图组件手里是 GCJ-02，能省掉一次转换；这里入参统一是
- * 落库的 WGS-84（dayDateCity.point / 最近记录里的 point），所以走默认的 WGS84。
+ * 区别只在于坐标系：地图组件手里是地图坐标系，能省掉一次转换；这里入参统一是
+ * 落库坐标（和风的坐标系：大陆 GCJ-02、境外 WGS-84），高德和和风都直接可用。
  */
 import { isReverseGeocodeEnabled, reverseGeocode } from './reverseGeocode'
 import { isPlaceLookupAvailable, lookupPlaceByCoord } from './placeLookup'
 
 /**
- * @param {number} lng WGS-84 经度
- * @param {number} lat WGS-84 纬度
+ * @param {number} lng 经度（落库坐标系：大陆 GCJ-02）
+ * @param {number} lat 纬度
  * @param {{signal?: AbortSignal, timeout?: number}} [options]
  * @returns {Promise<null | {source:'amap'|'qweather', road:string, district:string,
  *   city:string, province:string, township:string}>}
@@ -27,7 +27,7 @@ export const resolvePointAddress = async (lng, lat, options = {}) => {
 
   if (isReverseGeocodeEnabled()) {
     try {
-      const info = await reverseGeocode(x, y, { signal, timeout })
+      const info = await reverseGeocode(x, y, { crs: 'GCJ02', signal, timeout })
       return {
         source: 'amap',
         road: info.road || '',

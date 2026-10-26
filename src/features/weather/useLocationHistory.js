@@ -8,11 +8,42 @@
 import { computed } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { pointAddressLabel } from './placeLookup'
+import { wgs84ToGcj02 } from './mapTiles'
 
 const STORAGE_KEY = 'WeatherLocationHistory'
 const MAX_HISTORY = 6
 
 const Stored = useStorage(STORAGE_KEY, [])
+
+/**
+ * 一次性迁移：早期版本误以为和风只吃 WGS-84，记录里的坐标是 WGS-84。
+ * 现在统一用和风的坐标系落库（大陆 GCJ-02）：没有 crs 标记的旧记录转换一次并打标，
+ * 否则升级后「最近」里的 pin 会整体偏 ~500 m（和 useWeatherStore 的迁移同一条规则）。
+ */
+const migrateLegacyPoints = () => {
+  const items = Stored.value || []
+  let changed = false
+  const next = items.map((item) => {
+    const point = item?.point
+    if (!point || point.crs === 'GCJ02') return item
+    const lng = Number(point.lng)
+    const lat = Number(point.lat)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return item
+    const [gLng, gLat] = wgs84ToGcj02(lng, lat)
+    changed = true
+    return {
+      ...item,
+      point: {
+        ...point,
+        lng: Number(gLng.toFixed(4)),
+        lat: Number(gLat.toFixed(4)),
+        crs: 'GCJ02',
+      },
+    }
+  })
+  if (changed) Stored.value = next
+}
+migrateLegacyPoints()
 
 /** 坐标只取整数度：丢掉小数点后的部分，并规避 -0 这种边界值 */
 const coordKey = (value) => {
@@ -34,6 +65,27 @@ const keyOf = ({ path = [], point = null } = {}) => {
     return pathKey
   }
   return `${pathKey}@${coordKey(point.lng)},${coordKey(point.lat)}`
+}
+
+/**
+ * 列表 / 删除用的记录键：和落库时的 keyOf 完全一致。
+ * 同一地址在旧缓存里的多份副本会算成同一个 key，删一条就能一起清掉。
+ */
+export const locationHistoryKey = (entry) => keyOf(entry)
+
+/**
+ * 高亮用的「当前地址」身份：路径 + 4 位小数坐标。
+ *
+ * 去重键故意忽略坐标小数（同一个区县只留一条记录），但高亮不能跟着忽略：
+ * 用户在地图上挪了几百米之后其实已经换了地址，原来那条「最近」不该继续亮着。
+ * 4 位小数与落库精度一致（见 addLocationHistory / useWeatherStore.choosePoint）。
+ */
+export const locationHistoryIdentity = ({ path = [], point = null } = {}) => {
+  const pathKey = (path || []).join('/')
+  if (!point || !Number.isFinite(Number(point.lng)) || !Number.isFinite(Number(point.lat))) {
+    return pathKey
+  }
+  return `${pathKey}@${Number(point.lng).toFixed(4)},${Number(point.lat).toFixed(4)}`
 }
 
 /** 按归一化 key 折叠重复项，保留先出现的（＝ 最近使用的那个） */
@@ -62,6 +114,8 @@ export const addLocationHistory = (entry) => {
     ? {
       lng: Number(entry.point.lng.toFixed(4)),
       lat: Number(entry.point.lat.toFixed(4)),
+      // 坐标系标记：和风的（大陆 GCJ-02）。老记录没有它，模块加载时已由 migrateLegacyPoints 补上
+      crs: 'GCJ02',
       // 路名/区县/市名跟着点一起存：这是「最近」列表的显示文案（「黄岩区 中学路」/
       // 「台州市 黄岩区附近」），也免得重新选回同一个点时要再查一次逆地理编码。
       // 老记录没有这些字段，照常能用
@@ -86,6 +140,24 @@ export const addLocationHistory = (entry) => {
 
 export const clearLocationHistory = () => {
   Stored.value = []
+}
+
+/**
+ * 删除单条「最近」记录。
+ *
+ * 按归一化 key 删除而不是按数组下标：列表是 collapse 之后的视图，
+ * 下标和 Stored 里的原始顺序不一定对得上；同一地址在旧缓存里留下的多份副本
+ * 也会一起清掉，否则删完一条，折叠后另一条又会冒出来。
+ *
+ * @param {string|{path?:string[],point?:object|null}} target 记录 key，或记录本身
+ */
+export const removeLocationHistory = (target) => {
+  if (!target) return
+  const key = typeof target === 'string' ? target : keyOf(target)
+  if (!key) return
+  const items = Stored.value || []
+  const next = items.filter((item) => keyOf(item) !== key)
+  if (next.length !== items.length) Stored.value = next
 }
 
 /**

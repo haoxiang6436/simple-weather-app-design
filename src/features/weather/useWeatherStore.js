@@ -9,6 +9,7 @@ import { useStorage } from '@vueuse/core';
 import { ChosenLocationPath } from '@/features/onboarding/onboardingState';
 import { getCacheTtl, isCacheFresh } from '@/config/weatherCache';
 import { isSameAdminName, lookupPlaceByCoord, pointAddressLabel } from '@/features/weather/placeLookup';
+import { wgs84ToGcj02 } from '@/features/weather/mapTiles';
 
 // 天气数据缓存的 localStorage key。
 // 注意：它必须定义在模块作用域 —— 下面 defineStore 的 persist 选项是在模块加载时求值的，
@@ -84,7 +85,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     city: '北京市，北京',
     location: 101010100,
     area_code: null,
-    // 地图点选的坐标（WGS-84）。null = 按区县选择，天气用 LocationID
+    // 地图点选的坐标（和风的坐标系：大陆 GCJ-02，境外 WGS-84）。null = 按区县选择，天气用 LocationID
     point: null,
   }
   // 一次性迁移：老版本把地址塞在天气缓存的 blob 里，这里在 useStorage 初始化之前先原样搬过来。
@@ -100,6 +101,31 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
   }
   const dayDateCity = useStorage(DAY_DATE_CITY_STORAGE_KEY, DAY_DATE_CITY_DEFAULT)
+  /**
+   * 一次性迁移：早期版本误以为和风只吃 WGS-84，落库的 point 是把高德 GCJ-02
+   * 转成 WGS-84 之后存的。现在统一按和风的坐标系落库（大陆 GCJ-02），
+   * 没有 crs 标记的旧点一律当作 WGS-84，转换一次并打标；否则升级后 pin 和天气
+   * 都会落到 ~500 m 外的邻区。
+   */
+  const migrateLegacyPoint = () => {
+    const current = dayDateCity.value
+    const point = current?.point
+    if (!point || point.crs === 'GCJ02') return
+    const lng = Number(point.lng)
+    const lat = Number(point.lat)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+    const [gLng, gLat] = wgs84ToGcj02(lng, lat)
+    dayDateCity.value = {
+      ...current,
+      point: {
+        ...point,
+        lng: Number(gLng.toFixed(4)),
+        lat: Number(gLat.toFixed(4)),
+        crs: 'GCJ02',
+      },
+    }
+  }
+  migrateLegacyPoint()
   /**
    * 地址文案用的短名：优先 CityDetail.name（区县名），否则取 city 串的最后一段。
    *
@@ -357,7 +383,7 @@ export const useWeatherStore = defineStore('Weather', () => {
    *
    * @param {{ lng: number, lat: number, road?: string, district?: string,
    *   districtSource?: string }} point
-   *   WGS-84 坐标；road / district 是选点处的地名与区县名，只用于展示
+   *   落库坐标（和风的坐标系：大陆 GCJ-02）；road / district 是选点处的地名与区县名，只用于展示
    */
   const choosePoint = async ({ lng, lat, road = '', district = '', districtSource = '' }) => {
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
@@ -397,6 +423,8 @@ export const useWeatherStore = defineStore('Weather', () => {
         // 展示与预警保留四位小数，比查询精度更高，方便以后回溯
         lng: Number(lng.toFixed(4)),
         lat: Number(lat.toFixed(4)),
+        // 坐标系标记：和风的（大陆 GCJ-02）。老记录没有它，启动时由 migrateLegacyPoint 补上
+        crs: 'GCJ02',
         // 路名/区县/市名一起存进 point：它会随 store 持久化，卡片地址和「最近」都读它，
         // 比「黄岩区 · 28.66, 121.21」这种两位小数坐标好认。
         // 市名用这次坐标反查到的 adm2：没填高德 key 时地址只能到区县，
@@ -471,7 +499,11 @@ export const useWeatherStore = defineStore('Weather', () => {
 
   /* ---- 坐标：所有天气接口都按经纬度查 ---- */
 
-  /** 当前查询坐标：地图点选优先，否则用区县中心 */
+  /**
+   * 当前查询坐标：地图点选优先，否则用区县中心。
+   * 两者都是和风的坐标系（大陆 GCJ-02，境外 WGS-84）—— 点选坐标在落库前
+   * 已经由地图组件换算过，CityDetail 是接口自己返回的，所以这里不需要再转。
+   */
   const weatherCoord = computed(() => {
     const point = dayDateCity.value.point
     if (point && Number.isFinite(point.lat) && Number.isFinite(point.lng)) {

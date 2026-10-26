@@ -124,18 +124,32 @@ export const WEATHER_CACHE_SPECS = Object.freeze({
  * ------------------------------------------------------------------ */
 
 /**
- * 打包时 vue-cli 会把 process.env 整体替换成对象字面量
- * （见 @vue/cli-service/lib/util/resolveClientEnv.js），所以这里用变量下标访问是安全的。
+ * 只读取「缓存时效」这一组白名单变量，绝不整体访问 process.env。
  *
- * 注意不要写成 `typeof process !== 'undefined'` 守卫：浏览器里没有 process 全局，
- * 这个守卫恒为 false，会把整条 .env 覆盖机制短路掉，用户改了 .env 也不生效。
- * 用 try/catch 是为了兼容没经过打包的环境（例如直接 Node 里 import 这个模块）。
+ * @vue/cli-service 的 DefinePlugin 会把整个 process.env 定义成一个对象字面量
+ * （见 resolveClientEnv.js 的 `{ 'process.env': env }`）。以前这里写
+ * `env = process.env`，结果 .env 里所有 VUE_APP_* 都被原样打进 dist —— 和风
+ * 密钥就是这样泄露的（2026-10-25 修复）。现在只按名字逐个访问下面 5 个变量，
+ * 打包产物里只会出现这几个非敏感的缓存时长，其余变量一个都带不进来。
+ *
+ * 未在 .env 里定义的键，打包后仍会保留对 process 的访问；浏览器里没有
+ * process 全局，所以每个键单独 try/catch 兜住，缺失时退回默认值，互不影响。
+ * 这样没经过打包的 Node 环境（直接 import 本模块）也能正常工作。
  */
-let env = {}
-try {
-  env = process.env || {}
-} catch (error) {
-  // 没有 process 全局的运行时：全部使用下面代码里的默认值
+const readEnvValue = (getter) => {
+  try {
+    return getter()
+  } catch (error) {
+    return undefined
+  }
+}
+
+const env = {
+  VUE_APP_WEATHER_UPDATE_REALTIME: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_REALTIME),
+  VUE_APP_WEATHER_UPDATE_FOURDAYS: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_FOURDAYS),
+  VUE_APP_WEATHER_UPDATE_WARNING: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_WARNING),
+  VUE_APP_WEATHER_UPDATE_INDICES: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_INDICES),
+  VUE_APP_WEATHER_UPDATE_MINUTELY: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_MINUTELY),
 }
 
 const formatMs = (ms) => {
