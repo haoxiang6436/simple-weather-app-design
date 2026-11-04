@@ -11,6 +11,7 @@ import { useStorage } from '@vueuse/core';
 import RaindropFX from './RainEffectCore.js';
 import { rainPresets } from './RainConfig.js';
 import { resolveMinutelyIntensity, resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
+import { useWeatherNow } from '@/features/weather/useWeatherNow';
 import { useWeatherStore } from '@/store';
 import Bus from '@/shared/Bus';
 import { getBackgroundConfig } from '@/features/wallpaper/backgroundConfig';
@@ -43,14 +44,16 @@ const applyRainConfig = (config) => {
     raindropFx.options[key] = merged[key];
   });
 }
-// 自动档：优先分钟级降水的第一条（当前 5 分钟段），没有数据时回退实时天气
+// 自动档：和胶囊 / 弹层用同一个「现在」，读分钟级降水里当前这一格；
+// 没有可用数据（境外 / 失败 / 过期）时回退实时天气。见 rainIntensity.js
+const now = useWeatherNow()
 const autoRainIntensity = computed(() => {
-  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation)
+  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation, now.value)
   return fromMinutely ?? resolveRainIntensity(WeatherStore.nowWeatherData)
 })
 const applyAutoRainConfig = () => {
   if (!raindropFx) return;
-  // 分钟级降水 → 雨量档位（第一条），不可用时回退实时天气，见 rainIntensity.js
+  // 分钟级降水 → 当前 5 分钟段的雨量档位，不可用时回退实时天气，见 rainIntensity.js
   const state = autoRainIntensity.value;
   console.log('自动应用配置:', state);
   applyRainConfig(rainPresets[state] || rainPresets.moderate);
@@ -59,7 +62,7 @@ const handleRainConfigChange = (str) => {
   WallpaperUserConfigRainConfig.value = str;
   if (!raindropFx) return;
   if (str === 'auto') {
-    // 自动模式：根据分钟级降水的第一条匹配雨量强度
+    // 自动模式：按分钟级降水里当前这一格的雨量强度
     applyAutoRainConfig();
   }
   else {

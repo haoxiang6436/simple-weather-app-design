@@ -12,9 +12,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWeatherStore } from '@/store/index'
+import { useWeatherNow } from './useWeatherNow'
 import { analyzeMinutely, minutelyChipText } from './minutelyRain'
 
 const weatherStore = useWeatherStore()
@@ -23,22 +24,9 @@ const { openMinutelyDetails } = weatherStore
 
 /* 文案里的分钟数是相对「现在」算的，而数据 5 分钟才更新一次 ——
    所以除了数据刷新，还需要让「现在」自己往前走。
-   20 秒一次足够（分钟级文案，不需要秒级精度）；页面被隐藏时定时器会被节流，
-   回到前台时再补算一次即可（这里没有用 Worker：晚算几秒只是文案差一分钟，不影响观感）。 */
-const now = ref(Date.now())
-let timer = null
-const tick = () => { now.value = Date.now() }
-const onVisibilityChange = () => { if (!document.hidden) tick() }
-
-onMounted(() => {
-  timer = setInterval(tick, 20000)
-  document.addEventListener('visibilitychange', onVisibilityChange)
-})
-onUnmounted(() => {
-  clearInterval(timer)
-  timer = null
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-})
+   这里用全应用共用的 useWeatherNow（20 秒一次，回前台立刻补一次）：
+   弹层标题、壁纸雨滴读的是同一个 now，三处不会在 5 分钟边界附近各说各话。 */
+const now = useWeatherNow()
 
 const analysis = computed(() => analyzeMinutely(MinutelyPrecipitation.value?.points, now.value))
 
@@ -62,9 +50,14 @@ const tone = computed(() => {
 
 <style lang="scss" scoped>
 /* 和天气预警胶囊同一套尺寸/圆角语言，保证前两颗胶囊看起来是一个系列。
-   字号比预警胶囊（0.95rem）小一档：这颗胶囊装的是完整一句话（「正在下中雨，25 分钟后雨停，
-   隔 15 分钟又有小雨」），0.9rem 时会在 250px 的左栏里被省略号截掉尾巴，压到 0.84rem 才整句放得下；
-   内边距/图标间距也一起收窄（实测最长 216px / 可用 220px），把宽度让给文字。
+   字号比预警胶囊（0.95rem）小一档：这颗胶囊装的是完整一句话（「正在下中雨，30 分钟后停，
+   隔 15 分钟又有小雨」），0.9rem 时会在左栏里被省略号截掉尾巴，压到 0.84rem 才整句放得下；
+   内边距/图标间距也一起收窄，把宽度让给文字。
+   宽度已经没有余量了：1920×1080 + panel-scale 0.75（1rem = 12px）下左栏内容宽 243px，
+   最长的一句是「正在下中雨，40 分钟后停，隔 20 分钟又有暴雨」238px，只剩 5px。
+   带趋势的两段句（「正在下中雨，10 分钟后转大雨」）只有 162px —— 一句话只放两件事，
+   原来那种再跟一句「30 分钟后停」/「持续两小时」的三段写法已经去掉了，读起来太密。
+   改文案前先量一次宽度（或直接比较字数），别让后半场（雨停后隔多久再下）被截掉。
    高度仍由 min-height 管着，和预警胶囊一样高，左栏排版不会因为文案变长而上下跳。 */
 .minutely-chip {
   --rain-accent: var(--text-muted);

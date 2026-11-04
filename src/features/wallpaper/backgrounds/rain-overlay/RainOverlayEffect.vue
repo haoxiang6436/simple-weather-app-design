@@ -27,6 +27,7 @@ import { useStorage } from '@vueuse/core';
 import { createRainOverlay } from './RainOverlayAdapter';
 import { overlayRainPresets } from './RainOverlayConfig';
 import { resolveMinutelyIntensity, resolveRainIntensity } from '@/features/wallpaper/rainIntensity';
+import { useWeatherNow } from '@/features/weather/useWeatherNow';
 import { useWeatherStore } from '@/store';
 import Bus from '@/shared/Bus';
 import { getBackgroundConfig, getBackgroundConfigs } from '@/features/wallpaper/backgroundConfig';
@@ -56,14 +57,16 @@ let appliedScale = null;
 let stopWeatherWatch = null;
 let unmounted = false;
 
-// 自动档：优先分钟级降水的第一条（当前 5 分钟段），没有数据时回退实时天气
+// 自动档：和胶囊 / 弹层用同一个「现在」，读分钟级降水里当前这一格；
+// 没有可用数据时回退实时天气。见 rainIntensity.js
+const now = useWeatherNow();
 const autoRainIntensity = computed(() => {
-  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation);
+  const fromMinutely = resolveMinutelyIntensity(WeatherStore.MinutelyPrecipitation, now.value);
   return fromMinutely ?? resolveRainIntensity(WeatherStore.nowWeatherData);
 });
 
 // 当前生效的雨量预设：
-// auto 时按分钟级降水的第一条自动选档，否则用壁纸属性里选的强度
+// auto 时按分钟级降水里当前这一格自动选档，否则用壁纸属性里选的强度
 const currentPreset = () => {
   const key = WallpaperUserConfigRainConfig.value;
   const state = key === 'auto' ? autoRainIntensity.value : key;
@@ -135,7 +138,7 @@ onMounted(async () => {
     return;
   }
   syncEffect();
-  // 自动模式：分钟级第一条（兜底实时天气）变化时重算雨量
+  // 自动模式：分钟级当前段（兜底实时天气）变化时重算雨量
   stopWeatherWatch = watch(autoRainIntensity, () => {
     if (WallpaperUserConfigRainConfig.value === 'auto') syncEffect();
   });

@@ -13,6 +13,9 @@ export const STEP_MINUTES = 5
 const STEP_MS = STEP_MINUTES * 60 * 1000
 const MINUTE_MS = 60 * 1000
 
+/** 看多久之内的变化：3 个点 = 15 分钟，再远就不能说「10 分钟后」了（也越不准） */
+const TREND_LOOKAHEAD = 3
+
 // 小于这个值就当作没下（0.01 mm/5min ≈ 0.12 mm/h，比「毛毛雨」还小一档）
 const WET_MM = 0.005
 
@@ -52,6 +55,9 @@ export const rateLevel = (rate, type = 'rain') => {
   return { key: level.key, label: type === 'snow' ? level.snow : level.rain }
 }
 
+/** 档位高低（雨越小数字越小）：判断「雨在变大还是变小」时比较这个 */
+const LEVEL_RANK = { light: 0, moderate: 1, heavy: 2, storm: 3 }
+
 /** 分钟数取整到 5 分钟：接口本身就是 5 分钟一个点，说「32 分钟后」只会显得很假 */
 const roundToStep = (minutes) => Math.max(0, Math.round(minutes / STEP_MINUTES) * STEP_MINUTES)
 
@@ -78,6 +84,7 @@ const isWet = (point) => isWetPrecip(point.precip)
  *   index: number, expired: boolean,
  *   raining: boolean, level: { key:string, label:string }, rate: number,
  *   startsIn: number|null, stopsIn: number|null, continuous: boolean,
+ *   trend: {dir:'up'|'down', level:{key:string,label:string}, minutes:number}|null,
  *   resumesIn: number|null, resumeLevel: {key:string,label:string}|null, resumeRate: number,
  *   total: number, peakRate: number, windowEnd: number,
  *   type: 'rain'|'snow',
@@ -132,6 +139,39 @@ export const analyzeMinutely = (points, now = Date.now()) => {
     const spell = runs[0]
     if (spell.end >= remaining.length) continuous = true
     else stopsIn = roundToStep((remaining[spell.end].ts - now) / MINUTE_MS)
+  }
+
+  /* 雨在变大还是变小：拿「现在这一档」和往后 15 分钟内的点比档位。
+   *
+   * 只说「跨档」的变化。同为中雨从 2.6 涨到 3.1mm/h 也算变大，但用户看不出来，
+   * 说一句占地方的废话还挤掉后面的停雨时间。
+   *
+   * 两个必须做的工程处理：
+   * 1. 要求下一个点也在同一侧才算数 —— 5 分钟网格的单点抖动会让文案在
+   *    「10分钟后转大雨」和「正在下中雨，30分钟后停」之间来回闪；
+   * 2. 起变化的时间至少要比停雨早一格（见下面的分钟数判断），否则会出现
+   *    「10分钟后转大雨，10分钟后停」这种自相矛盾的句子。
+   */
+  let trend = null
+  if (raining) {
+    const spell = runs[0]
+    const nowRank = LEVEL_RANK[level.key]
+    // k + 1 < spell.end：确认点也必须是「这一场雨」里还下着的点
+    for (let k = 1; k <= TREND_LOOKAHEAD && k + 1 < spell.end; k += 1) {
+      const point = remaining[k]
+      const pointLevel = rateLevel(precipToRate(point.precip), point.type)
+      const rank = LEVEL_RANK[pointLevel.key]
+      if (rank === nowRank) continue
+      const confirm = remaining[k + 1]
+      const confirmRank = LEVEL_RANK[rateLevel(precipToRate(confirm.precip), confirm.type).key]
+      const goingUp = rank > nowRank
+      if (goingUp ? confirmRank < rank : confirmRank > rank) continue
+      const minutes = roundToStep((point.ts - now) / MINUTE_MS)
+      // 离停雨只剩一格：一会儿就停了，这句「还会变大」说了也没用
+      if (stopsIn !== null && minutes + STEP_MINUTES >= stopsIn) continue
+      trend = { dir: goingUp ? 'up' : 'down', level: pointLevel, minutes }
+      break
+    }
   }
 
   /* 雨停了还会不会再下：记下「第几分钟再来」和那一场的峰值雨强，
@@ -192,6 +232,8 @@ export const analyzeMinutely = (points, now = Date.now()) => {
     stoppedLevel,
     // 现在没下、之后第一场雨：第几分钟开始 + 那一场的等级
     nextLevel,
+    // 正在下、15 分钟内档位会变：{ dir: 'up'|'down', level, minutes }，否则 null
+    trend,
     // 现在在下、一会儿停、之后又会再下时才有值：第几分钟再来 + 那一场的等级/峰值雨强
     resumesIn,
     resumeLevel,
@@ -205,7 +247,7 @@ export const analyzeMinutely = (points, now = Date.now()) => {
 
 /* 「刚停」的分界：接口返回的窗口起点一般比「现在」早 5~10 分钟（服务端网格有延迟），
    所以窗口开头那几段往往是刚刚过去的雨。现在没下时，如果最近这次「在下」结束得还不久，
-   文案要接着说「雨刚停」，否则界面会在雨停的那一刻突然跳成「15分钟后开始下雨」，
+   文案要接着说「雨刚停」，否则界面会在雨停的那一刻突然跳成「15分钟后下中雨」，
    像刚才那场雨凭空消失了。超过这个分钟数就改用「刚才在下…」，再久就完全不再提它。 */
 const JUST_STOPPED_MINUTES = 10
 const RECENT_RAIN_MINUTES = 20
@@ -216,34 +258,55 @@ const gapText = (minutes) => {
   return value < 60 ? `${value}分钟` : `${Math.round(value / 60)}小时`
 }
 
+/** 「10分钟后转大雨」——趋势只说档位，不写「雨会变大」：
+    后者没说变大多少，还多 50px（实测 182.5 vs 131.6）。 */
+const trendText = (analysis) => (analysis.trend
+  ? afterText(analysis.trend.minutes, `转${analysis.trend.level.label}`)
+  : null)
+
 /**
  * 一句完整的人话 —— 胶囊和弹层标题共用同一句。
  * 胶囊是入口、标题是详情，两边说法不一致时用户会以为是两件事；共用一份文案就没有这个问题。
  *
  * 「下一场」一律从**雨停那一刻**开始数，而不是从「现在」：
- * 「30分钟后雨停，45分钟后转小雨」要用户自己把 45 − 30 = 15 减一遍，
+ * 「30分钟后停，45分钟后转小雨」要用户自己把 45 − 30 = 15 减一遍，
  * 还会误读成「45 分钟后（雨还没停就）转小雨」；换成「隔15分钟又有小雨」，两段之间的关系一眼就能看出来。
  *
  * @param {object} analysis
- * @param {boolean} [contrast] 是否在转折句前加「不过」——弹层标题有横向空间，胶囊没有（两个字约 20px，
- *   会把整句顶出 250px 的左栏），所以只有详情里带着它。
+ * @param {boolean} [contrast] 是否在转折句前加「不过」——弹层标题有横向空间，胶囊没有
+ *   （两个字约 20px，会把整句顶出 243px 的左栏，见 MinutelyRainChip.vue），所以只有详情里带着它。
  */
 const phrase = (analysis, contrast = false) => {
   const isSnow = analysis.type === 'snow'
   const wetWord = isSnow ? '降雪' : '降雨'
   const stopWord = isSnow ? '雪停' : '雨停'
   if (analysis.raining) {
-    if (analysis.continuous) return `未来两小时${wetWord}持续`
-    // 5 分钟是这套数据能表达的最小粒度，说「即将」比「5分钟后」更贴近感受
-    const stopText = analysis.stopsIn <= STEP_MINUTES ? `即将${stopWord}` : afterText(analysis.stopsIn, stopWord)
+    /* 一句话只装两件事：现在多大 + 一件「接下来会怎样」。
+       三段（现状 + 趋势 + 停时/持续）读起来太密，信息密度反而下降，
+       所以有趋势时只说趋势，不再跟「30分钟后停」「持续两小时」——
+       停雨时间在弹层的柱状图里一眼就能看到。
+       有「停一会儿又下」的时候让位的是趋势：那一支要讲「几点停、隔多久又有」，
+       而且留趋势会让它变成三段（详见趋势计算的注释）。 */
+    const hasAgain = analysis.resumesIn !== null && Boolean(analysis.resumeLevel)
+    const trend = hasAgain ? null : trendText(analysis)
+    if (trend) return `正在下${analysis.level.label}，${trend}`
+    // 持续到窗口末尾也要先说清现在多大：这一支原来只说「未来两小时降雨持续」，
+    // 胶囊上唯一能看出雨大不大的线索是底色深浅，文字本身反而漏了最有用的那半句。
+    if (analysis.continuous) return `正在下${analysis.level.label}，未来两小时持续${wetWord}`
+    /* 5 分钟是这套数据能表达的最小粒度，说「即将」比「5分钟后」更贴近感受。
+       带时间的那支省掉「雨/雪」字：「正在下中雨，30分钟后停」不会误解主语，
+       而省下的这一个字正好让最长的那句（雨停后隔一阵又下）留在胶囊一行的宽度里
+       —— 见 MinutelyRainChip.vue 里关于「可用 243px」的说明。
+       「即将雨停」保留完整说法：只留「即将停」读起来太生硬。 */
+    const stopText = analysis.stopsIn <= STEP_MINUTES ? `即将${stopWord}` : afterText(analysis.stopsIn, '停')
     const text = `正在下${analysis.level.label}，${stopText}`
-    if (analysis.resumesIn === null || !analysis.resumeLevel) return text
+    if (!hasAgain) return text
     // 「隔」已经说明是以停雨为起点，所以后面直接说「又有」——量级由等级词自己交代
     const again = `隔${gapText(analysis.resumesIn - analysis.stopsIn)}又有${analysis.resumeLevel.label}`
     return `${text}，${contrast ? '不过' : ''}${again}`
   }
   /* 雨刚停的这段里先交代这件事，再接下一场 —— 这是「现在」和「下一场」之间唯一还看得见的联系。
-     少了它，界面会在雨停那一刻从「正在下小雨，即将雨停」直接跳成「15分钟后开始下雨」。 */
+     少了它，界面会在雨停那一刻从「正在下小雨，即将雨停」直接跳成「15分钟后下中雨」。 */
   if (analysis.stoppedAgo !== null && analysis.stoppedAgo <= RECENT_RAIN_MINUTES) {
     const head = analysis.stoppedAgo <= JUST_STOPPED_MINUTES
       ? (isSnow ? '雪刚停' : '雨刚停')
@@ -252,7 +315,11 @@ const phrase = (analysis, contrast = false) => {
     return `${head}，${contrast ? '不过' : ''}${afterText(analysis.startsIn, `又有${analysis.nextLevel.label}`)}`
   }
   if (analysis.startsIn !== null) {
-    return afterText(analysis.startsIn, isSnow ? '开始下雪' : '开始下雨')
+    // 「15分钟后下中雨」而不是「15分钟后开始下雨」：直接带上档位，用户不用点开弹层再判断要不要带伞
+    const next = analysis.nextLevel
+      ? `下${analysis.nextLevel.label}`
+      : (isSnow ? '开始下雪' : '开始下雨')
+    return afterText(analysis.startsIn, next)
   }
   return `未来两小时无${wetWord}`
 }

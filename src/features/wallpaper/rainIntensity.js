@@ -6,8 +6,9 @@
  *   - rain-overlay/RainOverlayEffect.vue（backgroundindex = 5，整页雨珠叠加）
  *
  * 自动档的数据源优先级：
- *   1. 分钟级降水的第一条 —— 它就是最近这个 5 分钟段，见 resolveMinutelyIntensity；
- *   2. 分钟级不可用（境外 / 请求失败 / 尚未加载）时，回退实时天气：
+ *   1. 分钟级降水里「现在」所在的那一个 5 分钟段 —— 和胶囊 / 弹层用同一套分析
+ *      （analyzeMinutely），见 resolveMinutelyIntensity；
+ *   2. 分钟级不可用（境外 / 请求失败 / 尚未加载 / 数据窗口已过期）时，回退实时天气：
  *      先用和风天气的 icon 代码（数字最稳），icon 缺失或未知时再退回文本匹配。
  *
  * 返回 'storm' | 'heavy' | 'moderate' | 'light' | 'none'，各背景用自己的预设表取参数。
@@ -19,7 +20,7 @@
  *   大到暴雨 316   暴雨到大暴雨 317   大暴雨到特大暴雨 318
  */
 
-import { isWetPrecip, precipToRate, rateLevel } from '@/features/weather/minutelyRain'
+import { analyzeMinutely } from '@/features/weather/minutelyRain'
 
 const ICON_STORM = ['308', '310', '311', '312', '316', '317', '318']
 const ICON_HEAVY = ['302', '303', '307', '315', '351']
@@ -51,25 +52,30 @@ export const resolveRainIntensity = (weather) => {
 }
 
 /**
- * 「分钟级降水的第一条」→ 雨量档位
+ * 分钟级降水 → 「现在」所在 5 分钟段的雨量档位
  *
- * 第一条就是最近这个 5 分钟段，所以这里不按时间索引：数据每 5 分钟刷新一次，
- * 刷新后 `points[0]` 自然换成新的当前段，背景跟着变即可。
- * 严格说它是 nowcast（未来 5 分钟），不是观测值；用来驱动「现在多大雨」足够。
+ * 以前这里取 `points[0]`，理由是「第一条就是最近这个 5 分钟段」。实际上接口窗口的起点
+ * 比现在早 5~10 分钟（服务端网格延迟，minutelyRain.js 里也是按这个前提写的），
+ * 所以 `points[0]` 是**已经过去**的那一段：雨刚下起来时雨滴要晚 5~10 分钟才出现，
+ * 雨停了却还在下 —— 和胶囊上那句「正在下 / 雨刚停」正好对不上（胶囊按「现在」索引）。
  *
- * @param {{ points?: Array<{ precip?: number|string, type?: string }> }|null} minutely
- *   store 里的 MinutelyPrecipitation
+ * 现在改成和胶囊、弹层共用 analyzeMinutely：同一份数据、同一个「现在」、同一种「当前段」。
+ * 调用方要把 useWeatherNow() 的 now 传进来（5 分钟边界处会重算），雨滴才会和文案一起变。
+ *
+ * @param {{ points?: Array<{ time?: string, precip?: number|string, type?: string }>,
+ *   fetchedAt?: number }|null} minutely store 里的 MinutelyPrecipitation
+ * @param {number} [now] 「现在」的时间戳，默认取本机时间
  * @returns {'storm'|'heavy'|'moderate'|'light'|'none'|null}
- *   null = 没有可用数据（境外 / 请求失败 / 尚未加载），调用方回退实时天气
+ *   null = 没有可用数据（境外 / 请求失败 / 尚未加载 / 窗口已过期），调用方回退实时天气
  */
-export const resolveMinutelyIntensity = (minutely) => {
-  const first = minutely?.points?.[0]
-  if (!first) return null
+export const resolveMinutelyIntensity = (minutely, now = Date.now()) => {
+  const analysis = analyzeMinutely(minutely?.points, now)
+  // 没有点，或数据窗口已经整个过去：都不要再拿它驱动雨滴
+  if (!analysis || analysis.expired) return null
   // 雪不交给雨滴背景：与原来 icon 4xx → 无雨的策略保持一致
-  if (first.type === 'snow') return 'none'
-  // 小于 WET_MM 的降水当作没下（rateLevel(0) 会返回「小雨」）
-  if (!isWetPrecip(first.precip)) return 'none'
-  return rateLevel(precipToRate(first.precip), first.type).key
+  if (analysis.type === 'snow') return 'none'
+  if (!analysis.raining) return 'none'
+  return analysis.level.key
 }
 
 export default resolveRainIntensity

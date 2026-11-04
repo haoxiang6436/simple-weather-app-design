@@ -137,6 +137,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWeatherStore } from '@/store/index'
+import { useWeatherNow } from './useWeatherNow'
 import { analyzeMinutely, isWetPrecip, LEVEL_STEPS, minutelyTitle, precipToRate, rateLevel, STEP_MINUTES } from './minutelyRain'
 
 const weatherStore = useWeatherStore()
@@ -149,20 +150,16 @@ const close = () => { MinutelyDetailsDialog.value = false }
 const retry = () => retryMinutelyPrecipitation()
 
 /* 「现在」自己往前走：弹层开着不动时，分钟数和柱状图里的时间轴也能跟上。
-   30 秒一次足够（柱子的时间轴是 5 分钟一格）。 */
-const now = ref(Date.now())
-let timer = null
+   用全应用共用的 useWeatherNow（和胶囊、壁纸雨滴同一个 now），
+   否则三个组件各拿一次 Date.now()，5 分钟边界附近会各自落在不同的「当前段」。 */
+const now = useWeatherNow()
 function onKeydown(event) {
   if (event.key === 'Escape') close()
 }
 onMounted(() => {
-  now.value = Date.now()
-  timer = setInterval(() => { now.value = Date.now() }, 30000)
   document.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => {
-  clearInterval(timer)
-  timer = null
   document.removeEventListener('keydown', onKeydown)
 })
 
