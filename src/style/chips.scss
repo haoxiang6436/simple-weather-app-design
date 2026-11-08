@@ -1,0 +1,52 @@
+/* ================= 状态胶囊（预警 / 分钟级降水共用） =================
+   和卡片同一套半透明毛玻璃：低透明度语气色 + 1px 同色细边 + backdrop blur。
+   不加渐变、内高光或投影，颜色只由 --chip-bg / --chip-border /
+   --chip-text / --chip-icon 控制。
+   几何 / 字号 / 圆角只在这里定义一次；无雨 / 加载中 / 不可用保留
+   中性细边或虚线。 */
+
+.status-chip {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--chip-gap);
+  flex: none;
+  width: fit-content;
+  max-width: 100%;
+  min-height: var(--chip-height);
+  padding: var(--chip-pad-y) var(--chip-pad-x);
+  overflow: hidden;
+  font-size: var(--chip-font-size);
+  font-weight: var(--chip-font-weight);
+  line-height: var(--chip-line-height);
+  text-align: left;
+  color: var(--chip-text);
+  background: var(--chip-bg);
+  -webkit-backdrop-filter: blur(var(--chip-glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--chip-glass-blur)) saturate(140%);
+  border: var(--chip-border, 0);
+  border-radius: var(--chip-radius);
+  transition: background-color 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+}
+
+/* 深色玻璃上 hover 是提亮，不是压暗 */
+.status-chip:hover {
+  filter: var(--chip-hover, brightness(1.10));
+}
+
+.status-chip:active {
+  filter: var(--chip-active, brightness(1.16));
+}
+
+/* 焦点环用胶囊自己的文字色（语气亮色）；同时守住胶囊自己的圆角
+   （全局 :focus-visible 里有个 4px） */
+.status-chip:focus-visible {
+  outline-color: var(--chip-text);
+  border-radius: var(--chip-radius);
+}
+
+/* 图标颜色单独取 --chip-icon，让图标比文字亮一档，和参考图一致 */
+.status-chip :where(svg) {
+  color: var(--chip-icon);
+}

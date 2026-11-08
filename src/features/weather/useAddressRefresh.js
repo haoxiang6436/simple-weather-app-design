@@ -1,5 +1,5 @@
 /**
- * 高德密钥变化 → 地址显示（主界面 + 「最近」记录）自动重查。
+ * 默认区县中心补查地址；高德密钥变化时刷新当前地址和「最近」记录。
  *
  * 为什么需要它
  * ------------
@@ -13,8 +13,8 @@
  * 这个模块管的是「已经落库的地址」：主界面卡片和「最近」列表 ——
  * 用户填完 key 时可能正停在天气卡上，不能要求他重新选一遍位置才生效。
  *
- * 触发时机：只在 AmapKey 真的变化时。首屏从 localStorage / 引擎缓存恢复的 key
- * 不会让 AmapKey 的值发生变化，所以不会每次启动都把「最近」记录重查一遍。
+ * 默认中心在选址或恢复旧地址后补查，已保存的同精度地址直接复用。
+ * 「最近」仍只在 AmapKey 真的变化时刷新，不会每次启动都重查整个列表。
  */
 import { onScopeDispose, watch } from 'vue'
 import { AmapKey } from '@/api/credentials'
@@ -48,6 +48,15 @@ export const useAddressRefresh = () => {
   // 每次 key 变化都递增：上一轮还没跑完的查询回来时序号对不上，直接丢弃
   let seq = 0
   let lastQueryAt = 0
+  let historyPending = false
+
+  // 同坐标的中心选择与地图选点也有不同身份，不能互相写入地址。
+  const currentKey = () => {
+    const key = pointKey(weatherStore.CityAddressPoint)
+    if (!key) return ''
+    const mode = weatherStore.dayDateCity?.point ? 'point' : 'center'
+    return `${mode}:${weatherStore.dayDateCity?.location}:${key}`
+  }
 
   // 和风 / 高德的查询都很快，但「最近」可能有 6 条：排队按 QPS 放行
   const resolveThrottled = async (point) => {
@@ -58,7 +67,7 @@ export const useAddressRefresh = () => {
   }
 
   const run = async () => {
-    const mySeq = ++seq
+    const mySeq = seq
 
     // 清空 key 时先把旧路名摘掉：和风反查可能失败（断网 / 境外），
     // 不能让一条高德给的路名继续冒充「附近」等级的地址
@@ -67,31 +76,44 @@ export const useAddressRefresh = () => {
     }
 
     // 1) 当前正在用的位置：卡片地址立刻跟着变
-    const current = weatherStore.dayDateCity?.point
+    const current = weatherStore.CityAddressPoint
     if (current) {
-      const keyAtStart = pointKey(current)
+      const keyAtStart = currentKey()
       const info = await resolveThrottled(current)
       if (mySeq !== seq) return
       // 查询期间用户重新选了位置：这份结果是上一个点的，不能写进新点
-      if (pointKey(weatherStore.dayDateCity?.point) !== keyAtStart) return
+      if (currentKey() !== keyAtStart) return
       if (info) weatherStore.applyPointAddress(info)
     }
 
     // 2) 「最近」记录：每条有坐标的记录都重查一次，并同步 chip 上的 label
-    await refreshLocationHistory(resolveThrottled, {
-      shouldStop: () => mySeq !== seq,
-    })
+    if (historyPending) {
+      await refreshLocationHistory(resolveThrottled, {
+        shouldStop: () => mySeq !== seq,
+      })
+      if (mySeq === seq) historyPending = false
+    }
   }
 
-  watch(AmapKey, () => {
-    // 立刻作废上一轮：新的 key 已经来了，上一轮基于旧 key 的结果不能落库
+  watch([AmapKey, currentKey], ([key], [previousKey] = []) => {
+    // 换密钥或换位置都立即作废上一轮，避免旧坐标的结果落到新地址。
     seq += 1
     clearTimeout(timer)
+    timer = 0
+    const keyChanged = previousKey !== undefined && key !== previousKey
+    if (keyChanged) historyPending = true
+
+    const current = weatherStore.CityAddressPoint
+    const source = current?.districtSource
+    const needsCenterAddress = !weatherStore.dayDateCity?.point && !!current &&
+      (!source || (isReverseGeocodeEnabled() ? source !== 'amap' : source === 'amap'))
+    if (!historyPending && !needsCenterAddress) return
+
     timer = setTimeout(() => {
       timer = 0
-      run().catch((error) => console.error('高德密钥变更后刷新地址失败：', error))
-    }, KEY_REFRESH_DELAY)
-  })
+      run().catch((error) => console.error('刷新地址失败：', error))
+    }, keyChanged ? KEY_REFRESH_DELAY : 0)
+  }, { immediate: true })
 
   onScopeDispose(() => {
     clearTimeout(timer)

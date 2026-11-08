@@ -5,7 +5,6 @@ import '@/style/index.scss'
 import pinia from '@/store';
 import App from './App.vue'
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue'
-import '@arco-design/web-vue/dist/arco.css';
 import { setupWallpaperPropertyListener } from '@/features/wallpaper/properties'
 
 const vueApp = createApp(App)

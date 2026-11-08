@@ -1,335 +1,168 @@
 <template>
-  <div class="EarlyWarningDialog" @click="EarlyWarningDetailsDialog = false">
-    <div class="EarlyPanel" @click.stop>
-      <div class="EarlyHeader">
-        <span class="EarlyHeaderTitle">天气预警<em v-if="WeatherEarlyWarning.length" class="EarlyHeaderCount">×{{ WeatherEarlyWarning.length }}</em></span>
-        <button class="EarlyClose" type="button" aria-label="关闭" @click="EarlyWarningDetailsDialog = false">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              d="M6 6l12 12M18 6L6 18"></path>
-          </svg>
-        </button>
+  <WeatherDialog class="EarlyWarningDialog" labelledby="early-warning-dialog-title" :show-close="false" @close="EarlyWarningDetailsDialog = false"
+    @backdrop-click="handleDialogClick">
+      <span id="early-warning-dialog-title" class="visually-hidden">天气预警详情</span>
+      <div v-if="WeatherEarlyWarning.length" class="EarlyContent">
+        <Swiper class="warning-carousel" :modules="swiperModules" :initial-slide="initialSlide"
+          :slides-per-view="1" :space-between="0" :auto-height="true" :grab-cursor="WeatherEarlyWarning.length > 1"
+          :allow-touch-move="WeatherEarlyWarning.length > 1" :threshold="8" :touch-angle="35"
+          :resistance="false" :speed="swiperSpeed" :keyboard="{ enabled: true, onlyInViewport: true }"
+          :a11y="{ enabled: true, containerMessage: '天气预警详情', slideLabelMessage: '{{index}} / {{slidesLength}}' }"
+          @swiper="onSwiper" @slide-change="onSlideChange">
+          <SwiperSlide v-for="(item, index) in WeatherEarlyWarning" :key="item.id">
+            <StaggerTransition preset="warning" :index="index">
+              <WarningDetailCard :warning="item" :current-time="currentTime" :active="index === currentIndex" />
+            </StaggerTransition>
+          </SwiperSlide>
+        </Swiper>
       </div>
 
-      <!-- 手风琴：一次展开一条；溢出交给 BetterScroll 拖拽滚动 -->
-      <div class="EarlyScroll">
-        <div class="EarlyContent">
-          <div v-for="item in WeatherEarlyWarning" :key="item.id" class="warning-item"
-            :class="['sev-' + severityKey(item.level), { open: expandedId === item.id }]">
-            <button class="warning-head" type="button" @click="toggle(item.id)">
-              <span class="warning-dot"></span>
-              <span class="warning-title-label">{{ item.title }}</span>
-              <span class="warning-level">{{ item.level }}</span>
-              <svg class="warning-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round" d="M6 9l6 6 6-6"></path>
-              </svg>
-            </button>
-            <div class="warning-body">
-              <div class="warning-body-inner">
-                <div class="warning-text">{{ item.text }}</div>
-                <div class="warning-info">{{ DateFormat(item.pubTime) }} - {{ item.sender }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+      <div v-else class="warning-empty">当前没有可展示的天气预警。</div>
+  </WeatherDialog>
 </template>
 
 <script setup>
-import BetterScroll, { useMouseWheelPlugin } from './betterScroll';
-import { nextTick, onMounted, onUnmounted, watch, ref } from 'vue';
-import { useWeatherStore } from '@/store/index';
-import { storeToRefs } from 'pinia';
+import { computed, ref, watch } from 'vue'
+import 'qweather-icons/font/qweather-icons.css'
+import 'swiper/css'
+import { A11y, Keyboard } from 'swiper/modules'
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import WeatherDialog from './WeatherDialog.vue'
+import WarningDetailCard from './WarningDetailCard.vue'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
+import { useWarningClock } from './useWarningClock'
+import { useWeatherStore } from '@/store/index'
+import { storeToRefs } from 'pinia'
+
 const weatherStore = useWeatherStore()
-const { EarlyWarningDetailsDialog, WeatherEarlyWarning } = storeToRefs(weatherStore)
-useMouseWheelPlugin()
+const { EarlyWarningDetailsDialog, EarlyWarningDetailsWarningId, WeatherEarlyWarning } = storeToRefs(weatherStore)
 
-// 手风琴：一次只展开一条，默认展开第一条
-const expandedId = ref(null)
-const toggle = (id) => {
-  expandedId.value = expandedId.value === id ? null : id
-  // 展开/收起会改变内容高度，等待过渡结束后刷新 BetterScroll 的滚动范围
-  setTimeout(() => scroll?.refresh(), 380)
-}
-
-let scroll = null
-const initScroll = async () => {
-  await nextTick()
-  if (!scroll) {
-    scroll = new BetterScroll('.EarlyScroll', {
-      scrollY: true,
-      mouseWheel: {
-        speed: 20,
-        invert: false,
-        easeTime: 300
-      },
-      bounce: true,
-      bounceTime: 800,
-      click: true,
-    })
-  } else {
-    scroll.refresh()
-  }
-}
-
-const onResize = () => scroll?.refresh()
-
-onMounted(async () => {
-  await initScroll()
-  requestAnimationFrame(() => scroll?.refresh())
-  // 默认展开第一条会带动画，等动画结束再刷新一次滚动范围
-  setTimeout(() => scroll?.refresh(), 400)
-  window.addEventListener('resize', onResize)
+const swiperInstance = ref(null)
+const currentIndex = ref(0)
+const currentTime = useWarningClock()
+const swiperModules = [A11y, Keyboard]
+const initialSlide = computed(() => {
+  const index = WeatherEarlyWarning.value.findIndex((item) => item.id === EarlyWarningDetailsWarningId.value)
+  return index >= 0 ? index : 0
 })
-onUnmounted(() => {
-  scroll?.destroy()
-  scroll = null
-  window.removeEventListener('resize', onResize)
-})
+const swiperSpeed = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 300
 
-watch(WeatherEarlyWarning, (list) => {
-  expandedId.value = list?.[0]?.id ?? null
-  initScroll()
-}, { immediate: true })
-
-// 预警等级 -> 强调色 class（与全局 .sev-* 色板对应）
-const severityKey = (level) => {
-  const l = level || ''
-  if (l.includes('红')) return 'red'
-  if (l.includes('橙')) return 'orange'
-  if (l.includes('黄')) return 'yellow'
-  return 'blue'
+const handleDialogClick = (event) => {
+  if (event.target === event.currentTarget) EarlyWarningDetailsDialog.value = false
 }
 
-const DateFormat = (date) => {
-  const inputDate = new Date(date);
-  const now = new Date();
-  const diffInMilliseconds = Math.abs(now - inputDate);
-  if (diffInMilliseconds < 1000 * 60) {
-    return "刚刚";
-  } else if (diffInMilliseconds < 1000 * 60 * 60) {
-    const minutes = Math.floor(diffInMilliseconds / (1000 * 60));
-    return `${minutes} 分钟前`;
-  } else if (diffInMilliseconds < 1000 * 60 * 60 * 24) {
-    const hours = Math.floor(diffInMilliseconds / (1000 * 60 * 60));
-    return `${hours} 小时前`;
-  } else {
-    const days = Math.floor(diffInMilliseconds / (1000 * 60 * 60 * 24));
-    return `${days} 天前`;
-  }
-};
+const onSwiper = (instance) => {
+  swiperInstance.value = instance
+  currentIndex.value = instance.activeIndex
+}
+
+const onSlideChange = (instance) => {
+  currentIndex.value = instance.activeIndex
+  requestAnimationFrame(() => {
+    instance.updateAutoHeight(240)
+    instance.el.closest('.EarlyWarningDialog')?.scrollTo({ top: 0 })
+  })
+}
+
+const syncInitialWarning = () => {
+  currentIndex.value = initialSlide.value
+  swiperInstance.value?.slideTo(currentIndex.value, swiperSpeed, false)
+  requestAnimationFrame(() => swiperInstance.value?.updateAutoHeight(0))
+}
+
+watch(WeatherEarlyWarning, async () => {
+  syncInitialWarning()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  swiperInstance.value?.update()
+  swiperInstance.value?.updateAutoHeight(0)
+}, { deep: true })
+
+watch(EarlyWarningDetailsWarningId, () => {
+  syncInitialWarning()
+})
+
+watch(EarlyWarningDetailsDialog, (open) => {
+  if (!open) return
+  syncInitialWarning()
+})
+
 </script>
 
 <style lang="scss" scoped>
-.EarlyWarningDialog {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  /* 顶部固定：面板从固定 top 位置向下生长，头部不随高度变化上下晃 */
-  align-items: flex-start;
-  padding-top: 6.875rem; /* 110px @设计基准 */
-  background-color: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(1.125rem);
-  -webkit-backdrop-filter: blur(1.125rem);
-  z-index: 60;
-}
-
-/* 卡片滑入 / 滑出 */
-.EarlyWarningDialog.Dialog-enter-active .EarlyPanel,
-.EarlyWarningDialog.Dialog-leave-active .EarlyPanel {
-  transition: transform 0.34s var(--ease), opacity 0.3s ease;
-}
-
-.EarlyWarningDialog.Dialog-enter-from .EarlyPanel {
-  transform: translateY(1.75rem) scale(0.96);
-  opacity: 0;
-}
-
-.EarlyWarningDialog.Dialog-leave-to .EarlyPanel {
-  transform: translateY(1.25rem) scale(0.97);
-  opacity: 0;
-}
-
-/* 面板：不写死高度，只给最大高度；内容少则自动变矮，多则封顶交给 BetterScroll 滚动 */
-.EarlyPanel {
-  width: min(62vw, 51.25rem);
-  max-height: min(78vh, 50rem);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: rgba(18, 30, 52, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 1.375rem;
-  box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.EarlyHeader {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.125rem 1.25rem 0.75rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.EarlyHeaderTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.EarlyHeaderCount {
-  font-style: normal;
-  font-size: 0.62em;
-  font-weight: 700;
-  color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-}
-
-.EarlyClose {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  color: var(--text-secondary);
-  background: var(--glass-bg-soft);
-  border: 1px solid var(--glass-border);
-  border-radius: 50%;
-  transition: background 0.2s ease;
-
-  &:hover {
-    background: var(--glass-border);
-  }
-}
-
-/* BetterScroll 包裹层：固定高度、overflow:hidden、不封顶内容层 */
-.EarlyScroll {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .EarlyContent {
-  padding: 0.875rem 1rem 1.125rem;
-}
-
-/* ===== 手风琴 ===== */
-.warning-item {
-  margin: 0.625rem 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  border-left: 0.25rem solid var(--sev);
-  border-radius: 1rem;
-  overflow: hidden;
-  transition: background 0.2s ease, border-color 0.2s ease, border-left-color 0.2s ease;
-
-  &.open {
-    background: var(--sev-bg);
-    border-color: var(--glass-border-strong);
-    border-left-color: var(--sev);
-  }
-}
-
-.warning-head {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.9375rem 1.25rem;
-  text-align: left;
-  color: var(--text-primary);
-  background: transparent;
-  border: none;
-  font-size: 1.05rem;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.04);
-  }
-}
-
-.warning-dot {
-  flex: none;
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: 50%;
-  background-color: var(--sev);
-}
-
-.warning-title-label {
-  flex: 1;
-  min-width: 0;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.warning-level {
-  flex: none;
-  font-size: 0.82em;
-  font-weight: 700;
-  color: var(--sev-text);
-  background: var(--sev-bg);
-  border: 1px solid var(--sev-border);
-  padding: 0.125rem 0.625rem;
-  border-radius: 999px;
-}
-
-.warning-chevron {
-  flex: none;
-  color: var(--text-muted);
-  transition: transform 0.3s var(--ease);
-}
-
-.warning-item.open .warning-chevron {
-  transform: rotate(180deg);
-}
-
-.warning-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.34s var(--ease);
-}
-
-.warning-item.open .warning-body {
-  grid-template-rows: 1fr;
-}
-
-.warning-body-inner {
+  position: relative;
+  width: min(48vw, 36rem, calc(100vh - 3rem));
   min-height: 0;
+  padding: 0;
+}
+
+.EarlyWarningDialog {
+  --warning-unit: clamp(1rem, calc(1.55vmin * var(--panel-scale)), 1.75rem);
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 1.5rem 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  padding: 0 1.25rem;
-  text-align: left;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.warning-item.open .warning-body-inner {
-  padding-bottom: 1rem;
+.warning-carousel {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
 }
 
-.warning-text {
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: var(--text-secondary);
+.warning-carousel :deep(.swiper-wrapper) {
+  align-items: flex-start;
 }
 
-.warning-info {
-  margin-top: 0.75rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-align: right;
+.warning-carousel :deep(.swiper-slide) {
+  box-sizing: border-box;
+  display: flex;
+  height: auto;
+  align-items: flex-start;
+  padding-inline: calc(var(--warning-unit) * 0.55);
+}
+
+.EarlyWarningDialog :deep(.WeatherDialogPanel) {
+  flex: none;
+  margin-block: auto;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 2rem);
+  max-height: none;
+  aspect-ratio: auto;
+  overflow: visible;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.EarlyWarningDialog :deep(.WeatherDialogHeader) { display: none; }
+.EarlyWarningDialog :deep(.WeatherDialogBody) { flex: initial; overflow: visible; }
+
+.warning-empty { display: grid; place-items: center; color: var(--text-secondary); font-size: var(--warning-unit); }
+
+@media (max-width: 560px) {
+  .EarlyWarningDialog {
+    --warning-unit: clamp(0.9375rem, calc(4vmin * var(--panel-scale)), 1.125rem);
+  }
+  .EarlyContent { width: min(calc(100vw - 2.5rem), calc(100vh - 3rem)); }
 }
 </style>

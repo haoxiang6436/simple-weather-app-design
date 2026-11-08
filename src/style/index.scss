@@ -4,33 +4,50 @@
 @import './weather-panel.scss';
 /* 全站切换动效（进场 / 离场 / 轮播）都定义在这一个文件里 */
 @import './transitions.scss';
+/* 预警 / 分钟级降水共用的状态胶囊（浅底深字、无边框） */
+@import './chips.scss';
 
 :root {
+  color-scheme: dark;
   /* ---- 字体 ---- */
   --font-sans: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'PingFang SC', 'Microsoft YaHei', sans-serif;
 
-  /* ---- 配色（暗色玻璃） ---- */
-  --color-bg: #07192f;
-  --color-primary: #38bdf8;
-  --color-primary-strong: #0ea5e9;
-  --color-accent: #f59e0b;
-  --color-ok: #95d5ae;
-  --color-warn: #eb9b62;
+  /* ---- 字号（组件只引用这几档，不再各写各的小数） ---- */
+  --font-caption: 0.75rem;
+  --font-small: 0.875rem;
+  --font-body: 1rem;
 
-  /* ---- 玻璃质感 ---- */
-  --glass-bg: rgba(16, 27, 48, 0.42);
-  --glass-bg-strong: rgba(12, 22, 42, 0.66);
-  --glass-bg-soft: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.16);
-  --glass-border-strong: rgba(255, 255, 255, 0.26);
+  /* ---- 夜雨玻璃：一组雾蓝材质，靠深浅而非多种颜色区分层级 ---- */
+  --color-bg: #0b213a;
+  --color-primary: #65c7f2;
+  --color-primary-strong: #48b6e5;
+  --color-primary-soft: #b9e9fb;
+  --color-accent: #e9b45c;
+  --color-ok: #8cc8a6;
+  --color-warn: #e3a36e;
+  --color-danger: #df7d78;
+
+  /* ---- 玻璃材质 ---- */
+  --glass-bg: rgba(13, 35, 59, 0.48);
+  --glass-bg-strong: rgba(12, 31, 52, 0.72);
+  --glass-bg-soft: rgba(237, 247, 252, 0.075);
+  --glass-bg-subtle: rgba(237, 247, 252, 0.04);
+  --glass-active: rgba(101, 199, 242, 0.16);
+  --glass-border: rgba(237, 247, 252, 0.16);
+  --glass-border-strong: rgba(237, 247, 252, 0.28);
+  --scrim: rgba(3, 13, 25, 0.48);
+  --surface-modal: rgba(12, 31, 52, 0.92);
+  --weather-dialog-bg: #0d233b7a;
+  --surface-inset: rgba(5, 22, 38, 0.34);
+  --text-on-accent: #082238;
   /* 26px @设计基准；4K 以上不再等比放大（上限 40px），避免磨砂区域的 GPU 开销大幅上升 */
   --glass-blur: min(1.625rem, 40px);
 
   /* ---- 文本 ---- */
-  --text-primary: #f4f7fc;
-  --text-secondary: rgba(235, 242, 251, 0.78);
-  --text-muted: rgba(235, 242, 251, 0.52);
+  --text-primary: #e8f2f8c2;
+  --text-secondary: rgba(232, 242, 248, 0.76);
+  --text-muted: rgba(232, 242, 248, 0.52);
 
   /* ---- 圆角 / 阴影 ---- */
   --radius-lg: 1.75rem; /* 28px */
@@ -38,6 +55,34 @@
   --radius-sm: 0.75rem; /* 12px */
   --shadow-card: 0 1.875rem 5rem -1.875rem rgba(0, 0, 0, 0.7), 0 0.125rem 0.5rem rgba(0, 0, 0, 0.28);
   --shadow-panel: 0 0.875rem 2.75rem -1.25rem rgba(0, 0, 0, 0.55);
+
+  /* ---- 少量功能色：只给警示和数据状态使用，不参与普通界面装饰 ---- */
+  --danger-text: #ffd0cc;
+  --warning-text: #f8d59e;
+  --success-text: #b9e4ca;
+  --rain-chip-bg: rgba(101, 199, 242, 0.22);
+  --rain-chip-border: rgba(101, 199, 242, 0.36);
+  --rain-chip-text: #d8f2fc;
+  --rain-chip-icon: #9cddf7;
+  --hero-gradient: linear-gradient(155deg, rgba(72, 182, 229, 0.28), rgba(101, 199, 242, 0.06) 55%, transparent);
+  --hero-glow: radial-gradient(120% 90% at 18% -10%, rgba(101, 199, 242, 0.22), transparent 60%);
+  --skeleton-gradient: linear-gradient(90deg, rgba(237, 247, 252, 0.04), rgba(237, 247, 252, 0.13), rgba(237, 247, 252, 0.04));
+
+  /* ---- 状态胶囊（预警 / 分钟级降水共用） ----
+     和卡片同一套材质：低透明度语气色 + backdrop blur 的半透明毛玻璃，
+     不用渐变 / 内高光 / 投影。几何 / 字号只在这里定义一次。
+     颜色由 .sev-* / .tone-* 设置 --chip-bg / --chip-text / --chip-icon；
+     无雨 / 不可用仍用 --chip-bg 的暗玻璃或透明。 */
+  --chip-font-size: var(--font-small);
+  --chip-font-weight: 600;
+  --chip-line-height: 1.25;
+  --chip-height: 2.375rem;
+  --chip-pad-y: 0.5rem;
+  --chip-pad-x: 0.75rem;
+  --chip-gap: 0.5rem;
+  --chip-radius: var(--radius-sm);
+  --chip-icon-size: 1.15em;
+  --chip-glass-blur: 0.75rem;
 
   /* ---- 动效 ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -50,6 +95,50 @@
      由壁纸属性面板的 panelscale 通过 JS 覆盖（见 src/features/wallpaper/properties.js），
      1 = 设计原尺寸，这里的默认值需与 constants.js 的 DEFAULT_PANEL_SCALE 一致 */
   --panel-scale: 0.75;
+}
+
+/* 晨雾玻璃不是普通的白色后台：仍让壁纸透进来，只把同一套雾蓝材质翻到明面。
+   组件只引用语义变量，因此切换主题时不会出现局部仍是夜间深蓝的断层。 */
+:root[data-theme='mist'] {
+  color-scheme: light;
+  --color-bg: #b8cddd;
+  --color-primary: #167da9;
+  --color-primary-strong: #0f6f99;
+  --color-primary-soft: #0f6f99;
+  --color-accent: #a96b1d;
+  --color-ok: #3f8567;
+  --color-warn: #b66d33;
+  --color-danger: #bf5f5c;
+
+  --glass-bg: rgba(241, 248, 253, 0.76);
+  --glass-bg-strong: rgba(247, 251, 254, 0.88);
+  --glass-bg-soft: rgba(255, 255, 255, 0.38);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.23);
+  --glass-active: rgba(22, 125, 169, 0.14);
+  --glass-border: rgba(23, 63, 88, 0.16);
+  --glass-border-strong: rgba(23, 63, 88, 0.28);
+  --scrim: rgba(20, 51, 74, 0.34);
+  --surface-modal: rgba(244, 250, 254, 0.94);
+  --weather-dialog-bg: rgba(244, 250, 254, 0.76);
+  --surface-inset: rgba(255, 255, 255, 0.3);
+  --text-on-accent: #f8fbfe;
+
+  --text-primary: #17324b;
+  --text-secondary: rgba(23, 50, 75, 0.76);
+  --text-muted: rgba(23, 50, 75, 0.56);
+  --shadow-card: 0 1.875rem 5rem -1.875rem rgba(23, 55, 77, 0.28), 0 0.125rem 0.5rem rgba(23, 55, 77, 0.12);
+  --shadow-panel: 0 0.875rem 2.75rem -1.25rem rgba(23, 55, 77, 0.2);
+
+  --danger-text: #9e3435;
+  --warning-text: #855016;
+  --success-text: #25684e;
+  --rain-chip-bg: rgba(22, 125, 169, 0.14);
+  --rain-chip-border: rgba(22, 125, 169, 0.31);
+  --rain-chip-text: #195371;
+  --rain-chip-icon: #167da9;
+  --hero-gradient: linear-gradient(155deg, rgba(137, 193, 222, 0.34), rgba(222, 240, 250, 0.1) 55%, transparent);
+  --hero-glow: radial-gradient(120% 90% at 18% -10%, rgba(103, 176, 211, 0.26), transparent 60%);
+  --skeleton-gradient: linear-gradient(90deg, rgba(23, 50, 75, 0.05), rgba(23, 50, 75, 0.13), rgba(23, 50, 75, 0.05));
 }
 
 /* ================= 全局缩放基准（多分辨率 / 系统缩放适配） =================
@@ -75,65 +164,21 @@ html {
       calc(40px * var(--panel-scale)));
 }
 
-/* ---- Arco 组件按设计基准缩放 ----
-   Arco 内部尺寸是写死的 px，不会跟随上面的基准缩放，这里统一换算成 rem。
-   选择位置用的 <Cascader> 在本版本里渲染成 Select 结构，且下拉弹层会被 teleport 到
-   body，所以这些覆盖必须写在全局样式里。数值括号内为设计基准下的原始 px。
-   注：arco.css 在 index.scss 之后引入，同权重会被它盖掉；这里统一加 html 前缀、
-   并按 Arco 自身的组合选择器书写，保证权重一定高于它。 */
-html .arco-select-view-single,
-html .arco-select-view-multiple {
-  padding-right: 0.75rem;
-  padding-left: 0.75rem;
-}
-
-html .arco-select-view-single.arco-select-view-size-large,
-html .arco-select-view-multiple.arco-select-view-size-large {
-  font-size: 0.875rem; /* 14px */
-}
-
-html .arco-select-view-single.arco-select-view-size-large .arco-select-view-input,
-html .arco-select-view-single.arco-select-view-size-large .arco-select-view-value {
-  padding-top: 0.375rem; /* 6px */
-  padding-bottom: 0.375rem;
-  font-size: 0.875rem;
-}
-
-html .arco-select-view-single.arco-select-view-size-large .arco-select-view-value {
-  min-height: 2.125rem; /* 34px */
-}
-
-html .arco-select-view-icon svg {
-  font-size: 0.75rem; /* 12px 箭头 */
-}
-
-html .arco-select-dropdown {
-  padding: 0.25rem 0; /* 4px */
-}
-
-html .arco-select-dropdown-list-wrapper {
-  max-height: 12.5rem; /* 200px */
-}
-
-html .arco-select-dropdown .arco-select-option {
-  height: 2.25rem; /* 36px */
-  padding: 0 0.75rem; /* 12px */
-  font-size: 0.875rem;
-  line-height: 2.25rem;
-}
-
-/* Arco 圆角 token 一并按基准缩放（默认 2px / 4px） */
-html:root {
-  --border-radius-small: 0.125rem;
-  --border-radius-medium: 0.25rem;
-}
-
-/* ---- 预警四级强调色（按当前暗色玻璃风格调校，低饱和、不刺眼） ---- */
+/* ---- 预警四级强调色（低饱和、和暗色玻璃卡同一套语气） ----
+   --sev-* 仍给预警详情弹层用；--chip-* 只给天气卡上的毛玻璃胶囊用。
+   胶囊是低透明度语气色 + 1px 同色细边叠在深色卡上（材质见 chips.scss），
+   文字用亮一档的语气色：在卡片实际底色（约 #0c2c4b）上文字保持 4.5:1、
+   图标 3:1 以上。
+   不要直接照搬参考图的大字橙（#D07C08 在 #FFF3E5 上只有 2.9:1）。 */
 .sev-blue {
   --sev: #3a9bf0;
   --sev-bg: rgba(58, 155, 240, 0.22);
   --sev-border: rgba(58, 155, 240, 0.62);
   --sev-text: #b3d8ff;
+  --chip-bg: rgba(58, 155, 240, 0.26);
+  --chip-border: 1px solid rgba(58, 155, 240, 0.34);
+  --chip-text: #d6e9ff;
+  --chip-icon: #8ec4ff;
 }
 
 .sev-yellow {
@@ -141,6 +186,10 @@ html:root {
   --sev-bg: rgba(238, 179, 50, 0.20);
   --sev-border: rgba(238, 179, 50, 0.62);
   --sev-text: #f8de90;
+  --chip-bg: rgba(238, 179, 50, 0.26);
+  --chip-border: 1px solid rgba(238, 179, 50, 0.34);
+  --chip-text: #ffe3b0;
+  --chip-icon: #f3bd61;
 }
 
 .sev-orange {
@@ -148,6 +197,10 @@ html:root {
   --sev-bg: rgba(240, 137, 68, 0.20);
   --sev-border: rgba(240, 137, 68, 0.62);
   --sev-text: #ffcb9e;
+  --chip-bg: rgba(240, 137, 68, 0.26);
+  --chip-border: 1px solid rgba(240, 137, 68, 0.34);
+  --chip-text: #ffd9c2;
+  --chip-icon: #f4a06a;
 }
 
 .sev-red {
@@ -155,6 +208,55 @@ html:root {
   --sev-bg: rgba(239, 97, 89, 0.20);
   --sev-border: rgba(239, 97, 89, 0.62);
   --sev-text: #ffbab5;
+  --chip-bg: rgba(239, 97, 89, 0.24);
+  --chip-border: 1px solid rgba(239, 97, 89, 0.34);
+  --chip-text: #ffd0cc;
+  --chip-icon: #f58b84;
+}
+
+/* 浅色材质下预警仍只在需要说明风险的位置出现；降低底色饱和度，改用深文字守住对比。 */
+:root[data-theme='mist'] .sev-blue {
+  --sev: #287ca8;
+  --sev-bg: rgba(40, 124, 168, 0.12);
+  --sev-border: rgba(40, 124, 168, 0.38);
+  --sev-text: #174f70;
+  --chip-bg: rgba(40, 124, 168, 0.13);
+  --chip-border: 1px solid rgba(40, 124, 168, 0.28);
+  --chip-text: #174f70;
+  --chip-icon: #287ca8;
+}
+
+:root[data-theme='mist'] .sev-yellow {
+  --sev: #9b691c;
+  --sev-bg: rgba(155, 105, 28, 0.12);
+  --sev-border: rgba(155, 105, 28, 0.36);
+  --sev-text: #70470d;
+  --chip-bg: rgba(155, 105, 28, 0.13);
+  --chip-border: 1px solid rgba(155, 105, 28, 0.28);
+  --chip-text: #70470d;
+  --chip-icon: #9b691c;
+}
+
+:root[data-theme='mist'] .sev-orange {
+  --sev: #a95f2d;
+  --sev-bg: rgba(169, 95, 45, 0.12);
+  --sev-border: rgba(169, 95, 45, 0.36);
+  --sev-text: #79401d;
+  --chip-bg: rgba(169, 95, 45, 0.13);
+  --chip-border: 1px solid rgba(169, 95, 45, 0.28);
+  --chip-text: #79401d;
+  --chip-icon: #a95f2d;
+}
+
+:root[data-theme='mist'] .sev-red {
+  --sev: #af4e50;
+  --sev-bg: rgba(175, 78, 80, 0.12);
+  --sev-border: rgba(175, 78, 80, 0.36);
+  --sev-text: #7f3034;
+  --chip-bg: rgba(175, 78, 80, 0.13);
+  --chip-border: 1px solid rgba(175, 78, 80, 0.28);
+  --chip-text: #7f3034;
+  --chip-icon: #af4e50;
 }
 
 * {
@@ -215,6 +317,162 @@ ul {
     animation-duration: 0.001ms !important;
     -webkit-transition-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Storm atlas: an optional third panel palette. */
+:root[data-theme='atlas'] {
+  --atlas-ink: #08151d;
+  --atlas-ink-soft: #102a36;
+  --atlas-paper: #edf2ec;
+  --atlas-fog: #b8cbd0;
+  --atlas-copper: #d9945d;
+  --atlas-copper-soft: rgba(217, 148, 93, 0.18);
+  --atlas-line: rgba(237, 242, 236, 0.16);
+  --atlas-serif: 'Iowan Old Style', 'Baskerville', 'Times New Roman', serif;
+  --atlas-shell: linear-gradient(120deg, rgba(8, 21, 29, 0.94), rgba(16, 42, 54, 0.84));
+  --atlas-hero: linear-gradient(180deg, rgba(8, 21, 29, 0.98), rgba(8, 21, 29, 0.88));
+  --atlas-shadow: 0 2rem 5rem -2rem rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(217, 148, 93, 0.08);
+  --atlas-stat-bg: rgba(8, 21, 29, 0.28);
+  --atlas-forecast-bg: rgba(8, 21, 29, 0.18);
+  color-scheme: dark;
+  --color-bg: #08151d;
+  --color-primary: #9ec5cf;
+  --color-primary-strong: #83b3bf;
+  --color-primary-soft: #c9e1e4;
+  --color-accent: #d9945d;
+  --color-ok: #93c6ad;
+  --color-warn: #d9945d;
+  --color-danger: #e58b83;
+  --glass-bg: rgba(8, 21, 29, 0.72);
+  --glass-bg-strong: rgba(8, 21, 29, 0.9);
+  --glass-bg-soft: rgba(237, 242, 236, 0.08);
+  --glass-bg-subtle: rgba(237, 242, 236, 0.045);
+  --glass-active: rgba(217, 148, 93, 0.18);
+  --glass-border: rgba(237, 242, 236, 0.16);
+  --glass-border-strong: rgba(237, 242, 236, 0.28);
+  --scrim: rgba(3, 13, 25, 0.56);
+  --surface-modal: rgba(8, 21, 29, 0.95);
+  --weather-dialog-bg: rgba(8, 21, 29, 0.48);
+  --surface-inset: rgba(3, 13, 25, 0.34);
+  --text-on-accent: #08151d;
+  --text-primary: #edf2ec;
+  --text-secondary: rgba(237, 242, 236, 0.76);
+  --text-muted: rgba(184, 203, 208, 0.7);
+  --shadow-card: 0 2rem 5rem -2rem rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(217, 148, 93, 0.08);
+  --shadow-panel: 0 0.875rem 2.75rem -1.25rem rgba(0, 0, 0, 0.56);
+  --rain-chip-bg: rgba(158, 197, 207, 0.18);
+  --rain-chip-border: rgba(158, 197, 207, 0.34);
+  --rain-chip-text: #d8edef;
+  --rain-chip-icon: #9ec5cf;
+  --hero-gradient: linear-gradient(155deg, rgba(217, 148, 93, 0.18), rgba(158, 197, 207, 0.04) 55%, transparent);
+  --hero-glow: radial-gradient(90% 60% at 12% 0%, rgba(217, 148, 93, 0.2), transparent 65%);
+  --skeleton-gradient: linear-gradient(90deg, rgba(237, 242, 236, 0.04), rgba(237, 242, 236, 0.13), rgba(237, 242, 236, 0.04));
+}
+
+/* Atlas overrides stay in global SCSS. Keeping them out of a scoped SFC avoids
+   Vue rewriting the theme root selector onto html and leaking component sizing. */
+:root[data-theme='atlas'] .weather-layer .weather-card {
+  background: transparent;
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .hero {
+  padding: 2.25rem 2rem 2rem;
+  background: var(--atlas-hero);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .hero::before {
+  background: radial-gradient(90% 60% at 12% 0%, rgba(217, 148, 93, 0.2), transparent 65%);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .api-entry {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--atlas-fog);
+  background: transparent;
+  border-color: var(--atlas-line);
+  border-radius: 0.7rem;
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .api-entry:hover {
+  color: var(--atlas-paper);
+  background: rgba(237, 242, 236, 0.08);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .location {
+  color: var(--atlas-paper);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--atlas-line);
+  border-radius: 0;
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .location:hover {
+  background: rgba(237, 242, 236, 0.06);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .location-icon {
+  color: var(--atlas-copper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .date-dayname,
+:root[data-theme='atlas'] .weather-layer .weather-card .details-day {
+  font-family: var(--atlas-serif);
+  color: var(--atlas-paper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .now-temp-num {
+  font-family: var(--atlas-serif);
+  font-size: 6.65rem;
+  letter-spacing: -0.055em;
+  color: var(--atlas-paper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .now-temp-unit {
+  color: var(--atlas-copper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .now-desc-text,
+:root[data-theme='atlas'] .weather-layer .weather-card .stat-value {
+  color: var(--atlas-paper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .details {
+  padding: 2.25rem 2rem 2rem;
+  background: rgba(237, 242, 236, 0.055);
+  border-left: 1px solid var(--atlas-line);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .stat {
+  padding: 0.9rem 0.95rem 0.85rem;
+  background: var(--atlas-stat-bg);
+  border-color: var(--atlas-line);
+  border-radius: 0.75rem;
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .stat:hover {
+  border-color: rgba(217, 148, 93, 0.55);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li {
+  padding: 1rem 0.5rem 0.9rem;
+  background: var(--atlas-forecast-bg);
+  border-color: var(--atlas-line);
+  border-radius: 0.75rem;
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li:hover {
+  background: rgba(237, 242, 236, 0.08);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li.active {
+  background: var(--atlas-copper-soft);
+  border-color: var(--atlas-copper);
+}
+
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li i {
+  color: var(--atlas-copper);
 }

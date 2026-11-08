@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
+    "preview:rain": "vue-cli-service serve src/dev/minutelyRainPreview.js --host 127.0.0.1 --port 8081",
     "build": "vue-cli-service build && node scripts/deploy-wallpaper-engine.js",
     "build:dist": "vue-cli-service build",
     "deploy:we": "node scripts/deploy-wallpaper-engine.js",
@@ -12,6 +13,7 @@
   "dependencies": {
     "@better-scroll/core": "^2.5.1",
     "@better-scroll/mouse-wheel": "^2.5.1",
+    "@better-scroll/slide": "^2.5.1",
     "@formkit/auto-animate": "^0.8.2",
     "@vueuse/core": "^13.1.0",
     "axios": "^1.6.7",
@@ -19,6 +21,7 @@
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.1",
     "qweather-icons": "^1.6.0",
+    "swiper": "^14.4.0",
     "vue": "^3.2.13"
   },
   "devDependencies": {

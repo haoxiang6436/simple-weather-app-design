@@ -9,7 +9,7 @@ import { useAddressRefresh } from '@/features/weather/useAddressRefresh';
 const weatherStore = useWeatherStore()
 const { EarlyWarningDetailsDialog, MinutelyDetailsDialog } = storeToRefs(weatherStore)
 
-// 运行中在属性面板补填 / 清空高德密钥时，卡片地址和「最近」记录跟着重查。
+// 默认区县中心自动补查街道；补填 / 清空高德密钥时，地址和「最近」记录跟着重查。
 // 放在根组件里只实例化一次，地址页是否打开都不影响
 useAddressRefresh()
 

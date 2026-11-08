@@ -55,6 +55,37 @@
             />
           </div>
 
+          <div class="section-title">主界面位置</div>
+          <div class="api-status" id="panel-offset-hint">相对屏幕中心，X 正值向右，Y 正值向下；到达屏幕边缘后停止移动。</div>
+          <div v-for="axis in offsetAxes" :key="axis.key" class="config-row">
+            <div class="config-label">
+              <label :for="axis.key">{{ axis.label }}</label>
+              <span class="config-value">{{ state[axis.key] > 0 ? '+' : '' }}{{ state[axis.key] }}%</span>
+            </div>
+            <input
+              :id="axis.key"
+              v-model.number="state[axis.key]"
+              class="offset-slider"
+              type="range"
+              :min="PANEL_OFFSET_MIN"
+              :max="PANEL_OFFSET_MAX"
+              :step="1"
+              aria-describedby="panel-offset-hint"
+              @input="applyOffsets"
+            />
+          </div>
+          <Button size="mini" long @click="resetPanelPosition">恢复居中</Button>
+
+          <!-- 面板材质主题（对应 project.json 的 colortheme） -->
+          <div class="row">
+            <span class="label">面板配色</span>
+            <Select v-model="state.colortheme" size="small" class="control" @change="applyAll">
+              <Option value="night">夜雨玻璃</Option>
+              <Option value="mist">晨雾玻璃</Option>
+              <Option value="atlas">风暴图谱</Option>
+            </Select>
+          </div>
+
           <!-- 背景切换（全局属性，对应 project.json 的 backgroundindex） -->
           <div class="row">
             <span class="label">背景</span>
@@ -130,6 +161,8 @@
 </template>
 
 <script setup>
+// 与调试面板一起加载，仅进入开发构建。
+import '@arco-design/web-vue/dist/arco.css'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { useWeatherStore } from '@/store'
@@ -148,8 +181,13 @@ import Bus from '@/shared/Bus'
 import {
   BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
+  COLOR_THEME_OPTIONS,
   DEFAULT_BACKGROUND_INDEX,
+  DEFAULT_COLOR_THEME,
+  DEFAULT_PANEL_OFFSET,
   DEFAULT_PANEL_SCALE,
+  PANEL_OFFSET_MAX,
+  PANEL_OFFSET_MIN,
   PANEL_SCALE_MAX,
   PANEL_SCALE_MIN,
   STORAGE_KEYS,
@@ -157,6 +195,9 @@ import {
 } from './constants'
 import {
   BackgroundIndex,
+  ColorTheme,
+  PanelOffsetX,
+  PanelOffsetY,
   applyWallpaperProperties,
 } from './properties'
 import {
@@ -247,6 +288,9 @@ const state = useStorage(
     showweathermain: false,
     rainconfig: rainConfigStorage.value,
     panelscale: DEFAULT_PANEL_SCALE,
+    paneloffsetx: PanelOffsetX.value,
+    paneloffsety: PanelOffsetY.value,
+    colortheme: ColorTheme.value,
   },
   localStorage
 )
@@ -263,6 +307,20 @@ if (!BACKGROUND_INDEX_OPTIONS.includes(state.value.backgroundindex)) {
 if (state.value.panelscale === undefined) {
   state.value.panelscale = DEFAULT_PANEL_SCALE
 }
+const offsetAxes = [
+  { key: WALLPAPER_PROPERTIES.PANEL_OFFSET_X, label: 'X 轴偏移（左右）' },
+  { key: WALLPAPER_PROPERTIES.PANEL_OFFSET_Y, label: 'Y 轴偏移（上下）' },
+]
+offsetAxes.forEach(({ key }) => {
+  const value = state.value[key]
+  const num = Number(value)
+  state.value[key] = value === null || value === undefined || !Number.isFinite(num)
+    ? DEFAULT_PANEL_OFFSET
+    : Math.min(PANEL_OFFSET_MAX, Math.max(PANEL_OFFSET_MIN, num))
+})
+if (!COLOR_THEME_OPTIONS.includes(state.value.colortheme)) {
+  state.value.colortheme = DEFAULT_COLOR_THEME
+}
 
 // 转换为 Wallpaper Engine applyUserProperties 的入参结构
 const toWallpaperProperties = (p) => ({
@@ -270,10 +328,22 @@ const toWallpaperProperties = (p) => ({
   [WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN]: { value: p.showweathermain },
   [WALLPAPER_PROPERTIES.RAIN_CONFIG]: { value: p.rainconfig },
   [WALLPAPER_PROPERTIES.PANEL_SCALE]: { value: p.panelscale },
+  [WALLPAPER_PROPERTIES.PANEL_OFFSET_X]: { value: p.paneloffsetx },
+  [WALLPAPER_PROPERTIES.PANEL_OFFSET_Y]: { value: p.paneloffsety },
+  [WALLPAPER_PROPERTIES.COLOR_THEME]: { value: p.colortheme },
 })
 
 const applyAll = () => {
   applyWallpaperProperties(toWallpaperProperties(state.value))
+}
+
+// 拖动时只下发位置，避免反复广播显示隐藏、雨滴强度等无关属性。
+const applyOffsets = () => {
+  applyWallpaperProperties(Object.fromEntries(offsetAxes.map(({ key }) => [key, { value: state.value[key] }])))
+}
+const resetPanelPosition = () => {
+  offsetAxes.forEach(({ key }) => { state.value[key] = DEFAULT_PANEL_OFFSET })
+  applyOffsets()
 }
 
 // ---------- 当前背景的专属配置 ----------
@@ -365,6 +435,21 @@ onMounted(() => {
 
   .config-row {
     margin-bottom: 6px;
+  }
+
+  .offset-slider {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 24px;
+    margin: 0;
+    accent-color: rgb(var(--primary-6));
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid rgb(var(--primary-6));
+      outline-offset: 2px;
+    }
   }
 
   .config-label {

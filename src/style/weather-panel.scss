@@ -29,8 +29,8 @@
      原先是 43.06rem，比两侧内容实际需要的高度（约 43.4rem）还矮一点，
      底部内边距会被裁掉几像素；加高到 45rem 后解决了裁切，但左下角生活指数改成
      无边框说明时又省掉约 2.4rem。现在恢复成原来带边框的聚焦卡，卡片同步加高到
-     46.5rem，既不用再压内容，正常状态两栏底部约 4rem 空白，出现预警 chip 时左栏
-     仍有约 2.8rem，不会顶到卡片下沿。 */
+     46.5rem；两侧 padding 从 2.5rem 收到 2rem 后又多出约 1rem 余量，正常状态两栏
+     底部约 5rem 空白，出现预警 chip 时左栏仍有约 3.8rem，不会顶到卡片下沿。 */
   height: min(46.5rem, 92vh);
   max-height: 92vh;
   border-radius: var(--radius-lg);
@@ -55,6 +55,15 @@
 .panel-view {
   width: 100%;
   height: 100%;
+}
+
+/* The shell is the instrument frame: flatter edges and a tactile ink surface
+   keep the weather content legible over moving wallpaper. */
+:root[data-theme='atlas'] .weather-shell {
+  border-radius: 1.25rem;
+  background: var(--atlas-shell);
+  border-color: rgba(237, 242, 236, 0.22);
+  box-shadow: var(--atlas-shadow);
 }
 
 /* 面板 / 步骤的切换动效统一挪到了 src/style/transitions.scss ——

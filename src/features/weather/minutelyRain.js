@@ -8,6 +8,9 @@
  * 注意接口返回的 precip 是字符串（"0.00"），也不要假设数组一定有 24 个点。
  */
 
+import { getRateLevelSteps, rateLevel } from './precipitationLevels'
+export { getRateLevelSteps, rateLevel } from './precipitationLevels'
+
 // 每个点代表它之后 5 分钟的累计降水量
 export const STEP_MINUTES = 5
 const STEP_MS = STEP_MINUTES * 60 * 1000
@@ -16,47 +19,17 @@ const MINUTE_MS = 60 * 1000
 /** 看多久之内的变化：3 个点 = 15 分钟，再远就不能说「10 分钟后」了（也越不准） */
 const TREND_LOOKAHEAD = 3
 
-// 小于这个值就当作没下（0.01 mm/5min ≈ 0.12 mm/h，比「毛毛雨」还小一档）
-const WET_MM = 0.005
+// 保留非零的微量降水，低于标准最低阈值时仍能提示零星雨雪。
+const WET_MM = 0
 
-/**
- * 小时雨强分级（按中国气象局的雨量等级折算到小时）。
- * key 与壁纸雨量档位同名（见 features/wallpaper/rainIntensity.js），方便以后直接复用。
- */
-const LEVELS = [
-  { key: 'storm', min: 16, rain: '暴雨', snow: '暴雪' },
-  { key: 'heavy', min: 8, rain: '大雨', snow: '大雪' },
-  { key: 'moderate', min: 2.5, rain: '中雨', snow: '中雪' },
-  { key: 'light', min: 0, rain: '小雨', snow: '小雪' },
-]
-
-/**
- * 各等级的下界，同时换算成「每 5 分钟降水量」（mm/5min）。
- * 图表纵轴就是 mm/5min，画分级参考线时直接拿这个值和柱子比高度——
- * 和柱子的配色取自同一张表，所以「柱子压在哪个带里」和「柱子是什么颜色」永远一致。
- * 顺序按雨量从小到大：小雨 → 中雨 → 大雨 → 暴雨。
- */
-export const LEVEL_STEPS = [...LEVELS].reverse().map((level) => ({
+/** 降雨的参考强度下界；雪图通过 getRateLevelSteps('snow') 取独立阈值。 */
+export const LEVEL_STEPS = getRateLevelSteps('rain').map((level) => ({
   ...level,
   mm: (level.min * STEP_MINUTES) / 60,
 }))
 
 /** 每 5 分钟降水量（mm）→ 小时雨强（mm/h） */
 export const precipToRate = (precip) => (Number(precip) || 0) * (60 / STEP_MINUTES)
-
-/**
- * 小时雨强 → 档位
- * @param {number} rate mm/h
- * @param {'rain'|'snow'} [type]
- * @returns {{ key: 'storm'|'heavy'|'moderate'|'light', label: string }}
- */
-export const rateLevel = (rate, type = 'rain') => {
-  const level = LEVELS.find((item) => rate >= item.min) || LEVELS[LEVELS.length - 1]
-  return { key: level.key, label: type === 'snow' ? level.snow : level.rain }
-}
-
-/** 档位高低（雨越小数字越小）：判断「雨在变大还是变小」时比较这个 */
-const LEVEL_RANK = { light: 0, moderate: 1, heavy: 2, storm: 3 }
 
 /** 分钟数取整到 5 分钟：接口本身就是 5 分钟一个点，说「32 分钟后」只会显得很假 */
 const roundToStep = (minutes) => Math.max(0, Math.round(minutes / STEP_MINUTES) * STEP_MINUTES)
@@ -114,6 +87,9 @@ export const analyzeMinutely = (points, now = Date.now()) => {
   if (expired) index = 0
   const current = list[index]
   const remaining = list.slice(index)
+  const wetTypes = new Set(remaining.filter(isWet).map((point) => point.type))
+  // 当前无降水时，界面应先展示下一场的类型，而不是空白段的占位类型。
+  const displayType = (isWet(current) ? current : remaining.find(isWet))?.type || current.type
   const raining = !expired && isWet(current)
   const rate = precipToRate(current.precip)
   const level = rateLevel(rate, current.type)
@@ -155,15 +131,16 @@ export const analyzeMinutely = (points, now = Date.now()) => {
   let trend = null
   if (raining) {
     const spell = runs[0]
-    const nowRank = LEVEL_RANK[level.key]
+    const nowRank = level.rank
     // k + 1 < spell.end：确认点也必须是「这一场雨」里还下着的点
     for (let k = 1; k <= TREND_LOOKAHEAD && k + 1 < spell.end; k += 1) {
       const point = remaining[k]
+      if (point.type !== current.type || remaining[k + 1].type !== current.type) continue
       const pointLevel = rateLevel(precipToRate(point.precip), point.type)
-      const rank = LEVEL_RANK[pointLevel.key]
+      const rank = pointLevel.rank
       if (rank === nowRank) continue
       const confirm = remaining[k + 1]
-      const confirmRank = LEVEL_RANK[rateLevel(precipToRate(confirm.precip), confirm.type).key]
+      const confirmRank = rateLevel(precipToRate(confirm.precip), confirm.type).rank
       const goingUp = rank > nowRank
       if (goingUp ? confirmRank < rank : confirmRank > rank) continue
       const minutes = roundToStep((point.ts - now) / MINUTE_MS)
@@ -182,7 +159,8 @@ export const analyzeMinutely = (points, now = Date.now()) => {
   const again = raining ? runs[1] : null
   if (again) {
     resumesIn = roundToStep((remaining[again.start].ts - now) / MINUTE_MS)
-    resumeRate = remaining.slice(again.start, again.end)
+    const phaseEnd = remaining.findIndex((point, offset) => offset > again.start && point.type !== remaining[again.start].type)
+    resumeRate = remaining.slice(again.start, phaseEnd < 0 ? again.end : Math.min(phaseEnd, again.end))
       .reduce((peak, point) => Math.max(peak, precipToRate(point.precip)), 0)
     resumeLevel = rateLevel(resumeRate, remaining[again.start].type)
   }
@@ -208,8 +186,9 @@ export const analyzeMinutely = (points, now = Date.now()) => {
     if (start > 0) {
       startsIn = roundToStep((remaining[start].ts - now) / MINUTE_MS)
       const spell = runs.find((run) => run.start === start)
+      const phaseEnd = remaining.findIndex((point, offset) => offset > start && point.type !== remaining[start].type)
       const peak = spell
-        ? remaining.slice(spell.start, spell.end)
+        ? remaining.slice(spell.start, phaseEnd < 0 ? spell.end : Math.min(phaseEnd, spell.end))
           .reduce((best, point) => Math.max(best, precipToRate(point.precip)), 0)
         : precipToRate(remaining[start].precip)
       nextLevel = rateLevel(peak, remaining[start].type)
@@ -223,7 +202,17 @@ export const analyzeMinutely = (points, now = Date.now()) => {
     raining,
     level,
     rate,
-    type: current.type,
+    type: displayType,
+    currentType: current.type,
+    mixed: wetTypes.size > 1,
+    transition: raining ? (() => {
+      const spell = runs[0]
+      const offset = remaining.findIndex((point, i) => i > 0 && i < spell.end && point.type !== current.type)
+      return offset < 0 ? null : {
+        minutes: roundToStep((remaining[offset].ts - now) / MINUTE_MS),
+        level: rateLevel(precipToRate(remaining[offset].precip), remaining[offset].type),
+      }
+    })() : null,
     startsIn,
     stopsIn,
     continuous,
@@ -281,6 +270,7 @@ const phrase = (analysis, contrast = false) => {
   const wetWord = isSnow ? '降雪' : '降雨'
   const stopWord = isSnow ? '雪停' : '雨停'
   if (analysis.raining) {
+    if (analysis.transition) return `正在下${analysis.level.label}，${afterText(analysis.transition.minutes, `转${analysis.transition.level.label}`)}`
     /* 一句话只装两件事：现在多大 + 一件「接下来会怎样」。
        三段（现状 + 趋势 + 停时/持续）读起来太密，信息密度反而下降，
        所以有趋势时只说趋势，不再跟「30分钟后停」「持续两小时」——
@@ -309,7 +299,7 @@ const phrase = (analysis, contrast = false) => {
      少了它，界面会在雨停那一刻从「正在下小雨，即将雨停」直接跳成「15分钟后下中雨」。 */
   if (analysis.stoppedAgo !== null && analysis.stoppedAgo <= RECENT_RAIN_MINUTES) {
     const head = analysis.stoppedAgo <= JUST_STOPPED_MINUTES
-      ? (isSnow ? '雪刚停' : '雨刚停')
+      ? (analysis.stoppedLevel?.type === 'snow' ? '雪刚停' : '雨刚停')
       : `刚才在下${analysis.stoppedLevel?.label || (isSnow ? '雪' : '雨')}`
     if (analysis.startsIn === null || !analysis.nextLevel) return `${head}，未来两小时无${wetWord}`
     return `${head}，${contrast ? '不过' : ''}${afterText(analysis.startsIn, `又有${analysis.nextLevel.label}`)}`
@@ -327,13 +317,13 @@ const phrase = (analysis, contrast = false) => {
 /** 胶囊上那句（= 弹层标题，去掉转折词「不过」，长度才塞得进左栏） */
 export const minutelyChipText = (analysis) => {
   if (!analysis) return ''
-  if (analysis.expired) return '分钟级降水待更新'
+  if (analysis.expired) return `分钟级${analysis.type === 'snow' ? '降雪' : '降水'}待更新`
   return phrase(analysis)
 }
 
 /** 弹层标题那句完整文案 */
 export const minutelyTitle = (analysis) => {
   if (!analysis) return ''
-  if (analysis.expired) return '分钟级降水数据待更新'
+  if (analysis.expired) return `分钟级${analysis.type === 'snow' ? '降雪' : '降水'}数据待更新`
   return phrase(analysis, true)
 }

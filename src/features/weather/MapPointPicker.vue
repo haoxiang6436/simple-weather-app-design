@@ -38,8 +38,8 @@
               <svg class="mp-pin-icon" viewBox="0 0 24 32" aria-hidden="true">
                 <path
                   d="M12 1.2c-5.6 0-10.1 4.5-10.1 10.1 0 7.3 10.1 19 10.1 19s10.1-11.7 10.1-19c0-5.6-4.5-10.1-10.1-10.1z"
-                  fill="#38bdf8" stroke="#04121f" stroke-width="1.5" stroke-linejoin="round" />
-                <circle cx="12" cy="11.3" r="3.9" fill="#04121f" />
+                  fill="var(--color-primary)" stroke="var(--text-on-accent)" stroke-width="1.5" stroke-linejoin="round" />
+                <circle cx="12" cy="11.3" r="3.9" fill="var(--text-on-accent)" />
               </svg>
             </div>
           </div>
@@ -89,50 +89,52 @@
 
       <!-- 缩放：44px 圆形按钮装进一枚胶囊里，壁纸场景下也比原来 28px 好点。
            全屏时多出「全国」和「退出全屏」两颗，胶囊整体靠到卡片矩形的右侧边上 -->
-      <div class="mp-zoom" role="group" aria-label="地图缩放">
-        <button class="mp-zoom-btn" type="button" title="放大（滚轮向上 / 双击左键）" aria-label="放大"
-          :disabled="zooming || fsBusy || zoom >= ZOOM_MAX" @click.stop="zoomIn">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-        <span class="mp-zoom-sep" aria-hidden="true"></span>
-        <button class="mp-zoom-btn" type="button" title="缩小（滚轮向下 / 双击右键）" aria-label="缩小"
-          :disabled="zooming || fsBusy || zoom <= minZoom" @click.stop="zoomOut">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M5 12h14" />
-          </svg>
-        </button>
-        <template v-if="fullscreen">
-          <span class="mp-zoom-sep" aria-hidden="true"></span>
-          <button class="mp-zoom-btn mp-zoom-btn--globe" type="button"
-            :title="zoom <= ZOOM_COUNTRY ? '回到街道级' : '全国视野'" aria-label="全国视野"
-            :disabled="fsBusy" @click.stop="toggleCountry">
+      <StaggerTransition :preset="fullscreen ? 'mapControls' : 'panel'" :index="3">
+        <div v-show="controlsVisible" class="mp-zoom" role="group" aria-label="地图缩放">
+          <button class="mp-zoom-btn" type="button" title="放大（滚轮向上 / 双击左键）" aria-label="放大"
+            :disabled="zooming || fsBusy || zoom >= ZOOM_MAX" @click.stop="zoomIn">
             <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="8.4" />
-              <path d="M3.6 12h16.8" />
-              <path d="M12 3.6c2.7 2.8 2.7 14 0 16.8M12 3.6c-2.7 2.8-2.7 14 0 16.8" />
+              <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
-        </template>
-        <span class="mp-zoom-sep" aria-hidden="true"></span>
-        <button class="mp-zoom-btn" type="button" :title="fullscreen ? '退出全屏（Esc）' : '全屏看地图'"
-          :aria-label="fullscreen ? '退出全屏' : '全屏'" :aria-pressed="fullscreen" :disabled="fsBusy"
-          @click.stop="toggleFullscreen">
-          <svg v-if="!fullscreen" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 9V6.2A2.2 2.2 0 0 1 6.2 4H9" />
-            <path d="M15 4h2.8A2.2 2.2 0 0 1 20 6.2V9" />
-            <path d="M20 15v2.8a2.2 2.2 0 0 1-2.2 2.2H15" />
-            <path d="M9 20H6.2A2.2 2.2 0 0 1 4 17.8V15" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 4v2.8A2.2 2.2 0 0 1 6.8 9H4" />
-            <path d="M20 9h-2.8A2.2 2.2 0 0 1 15 6.8V4" />
-            <path d="M15 20v-2.8a2.2 2.2 0 0 1 2.2-2.2H20" />
-            <path d="M4 15h2.8A2.2 2.2 0 0 1 9 17.2V20" />
-          </svg>
-        </button>
-      </div>
+          <span class="mp-zoom-sep" aria-hidden="true"></span>
+          <button class="mp-zoom-btn" type="button" title="缩小（滚轮向下 / 双击右键）" aria-label="缩小"
+            :disabled="zooming || fsBusy || zoom <= minZoom" @click.stop="zoomOut">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+          <template v-if="fullscreen">
+            <span class="mp-zoom-sep" aria-hidden="true"></span>
+            <button class="mp-zoom-btn mp-zoom-btn--globe" type="button"
+              :title="zoom <= ZOOM_COUNTRY ? '回到街道级' : '全国视野'" aria-label="全国视野"
+              :disabled="fsBusy" @click.stop="toggleCountry">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.4" />
+                <path d="M3.6 12h16.8" />
+                <path d="M12 3.6c2.7 2.8 2.7 14 0 16.8M12 3.6c-2.7 2.8-2.7 14 0 16.8" />
+              </svg>
+            </button>
+          </template>
+          <span class="mp-zoom-sep" aria-hidden="true"></span>
+          <button class="mp-zoom-btn" type="button" :title="fullscreen ? '退出全屏（Esc）' : '全屏看地图'"
+            :aria-label="fullscreen ? '退出全屏' : '全屏'" :aria-pressed="fullscreen" :disabled="fsBusy"
+            @click.stop="toggleFullscreen">
+            <svg v-if="!fullscreen" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9V6.2A2.2 2.2 0 0 1 6.2 4H9" />
+              <path d="M15 4h2.8A2.2 2.2 0 0 1 20 6.2V9" />
+              <path d="M20 15v2.8a2.2 2.2 0 0 1-2.2 2.2H15" />
+              <path d="M9 20H6.2A2.2 2.2 0 0 1 4 17.8V15" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 4v2.8A2.2 2.2 0 0 1 6.8 9H4" />
+              <path d="M20 9h-2.8A2.2 2.2 0 0 1 15 6.8V4" />
+              <path d="M15 20v-2.8a2.2 2.2 0 0 1 2.2-2.2H20" />
+              <path d="M4 15h2.8A2.2 2.2 0 0 1 9 17.2V20" />
+            </svg>
+          </button>
+        </div>
+      </StaggerTransition>
     </div>
 
     <div v-if="bar" class="mp-bar">
@@ -180,6 +182,8 @@ import {
 import { isReverseGeocodeEnabled, reverseGeocode } from './reverseGeocode'
 import { isPlaceLookupAvailable, joinAdminParts, lookupPlaceByCoord, nearbyLabel } from './placeLookup'
 import { AmapKey } from '@/api/credentials'
+import { ColorTheme } from '@/features/wallpaper/properties'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
 
 // eslint-disable-next-line no-undef
 const props = defineProps({
@@ -195,6 +199,7 @@ const props = defineProps({
   // 是否处于全屏。真正的「铺满屏幕」由外层完成（整块面板 teleport 到 body），
   // 这里只负责：量尺寸、算相机、把裁切框从卡片那块展开出去
   fullscreen: { type: Boolean, default: false },
+  controlsVisible: { type: Boolean, default: true },
 })
 // eslint-disable-next-line no-undef
 const emit = defineEmits([
@@ -342,7 +347,7 @@ let roadWaiter = null
 
 const attribution = computed(() => TILE_SOURCES[source].label)
 // OSM 之类亮色底图靠滤镜压暗，贴合壁纸的深色玻璃风格
-const invertTiles = computed(() => !!TILE_SOURCES[source].invert)
+const invertTiles = computed(() => !!TILE_SOURCES[source].invert && ColorTheme.value === 'night')
 
 // 缩放下限：卡片里固定 11（看得到路名才有意义），全屏按视口算到「整个世界正好铺满」
 const minZoom = computed(() => (
@@ -1750,7 +1755,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(120% 100% at 50% 0%, var(--glass-bg-soft), rgba(255, 255, 255, 0) 62%),
     var(--mp-void);
   -webkit-backdrop-filter: blur(var(--mp-void-blur)) saturate(115%);
   backdrop-filter: blur(var(--mp-void-blur)) saturate(115%);
@@ -1890,7 +1895,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   height: 7px;
   margin: 0 0 -3px -8px;
   border-radius: 50%;
-  background: rgba(56, 189, 248, 0.5);
+  background: var(--color-primary);
   animation: mp-ripple 2s ease-out infinite;
 }
 
@@ -1928,7 +1933,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   width: min(22rem, 100%);
   padding: 1.125rem 1.25rem 1rem;
   text-align: center;
-  background: rgba(9, 18, 32, 0.94);
+  background: var(--surface-modal);
   border: 1px solid rgba(248, 113, 113, 0.4);
   border-radius: var(--radius-md);
   box-shadow: 0 1rem 2.5rem -0.75rem rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -1938,7 +1943,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: #ffe0dc;
+  color: var(--danger-text);
 }
 
 .mp-fallback-text {
@@ -1949,7 +1954,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
 
   strong {
     font-weight: 600;
-    color: #bae6fd;
+    color: var(--color-primary-soft);
   }
 }
 
@@ -1978,7 +1983,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   padding: 0.25rem 0.625rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
-  background: rgba(8, 15, 28, 0.82);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
   white-space: nowrap;
@@ -2012,8 +2017,8 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   padding: 0.25rem 0.5625rem;
   font-size: 0.78rem;
   line-height: 1.4;
-  color: #e0f2fe;
-  background: rgba(8, 15, 28, 0.82);
+  color: var(--rain-chip-text);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
   pointer-events: none;
@@ -2049,7 +2054,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   bottom: 0.25rem;
   font-size: 0.625rem;
   line-height: 1.2;
-  color: rgba(235, 242, 251, 0.55);
+  color: var(--text-muted);
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
 }
@@ -2064,10 +2069,10 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   align-items: center;
   gap: 0.125rem;
   padding: 0.25rem;
-  background: rgba(8, 15, 28, 0.8);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
-  box-shadow: 0 0.5rem 1.25rem -0.5rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0.5rem 1.25rem -0.5rem rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--glass-bg-soft);
   -webkit-backdrop-filter: blur(0.5rem);
   backdrop-filter: blur(0.5rem);
 }
@@ -2095,8 +2100,8 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   }
 
   &:hover:not(:disabled) {
-    color: #bae6fd;
-    background: rgba(56, 189, 248, 0.24);
+    color: var(--color-primary-soft);
+    background: var(--glass-active);
   }
 
   &:active:not(:disabled) {
@@ -2104,7 +2109,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   }
 
   &:focus-visible {
-    outline: 2px solid #7dd3fc;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 
@@ -2117,7 +2122,7 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
 .mp-zoom-sep {
   width: 1.5rem;
   height: 1px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--glass-bg-soft);
 }
 
 /* 「全国」那枚线稿地球，用 2.2 的描边会糊成一团，单独压细 */
@@ -2158,8 +2163,8 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
   padding: 0.0625rem 0.4375rem;
   font-size: 0.75rem;
   line-height: 1.5;
-  color: #bae6fd;
-  background: rgba(56, 189, 248, 0.16);
+  color: var(--color-primary-soft);
+  background: var(--glass-active);
   border: 1px solid rgba(56, 189, 248, 0.32);
   border-radius: 999px;
   text-overflow: ellipsis;
@@ -2188,12 +2193,12 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
 
 .mp-btn--primary {
   font-weight: 600;
-  color: #04121f;
-  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+  color: var(--text-on-accent);
+  background: var(--color-primary);
   border-color: transparent;
 
   &:hover {
-    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    background: var(--color-primary);
     filter: brightness(1.08);
   }
 }

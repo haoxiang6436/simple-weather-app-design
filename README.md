@@ -13,12 +13,13 @@
 
 ## 功能特性
 
-- **玻璃拟态 UI**：暗色磨砂玻璃卡片，左右分区信息更均衡、更易读，适配深色动态背景
+- **三套面板配色**：夜雨玻璃（`night`，默认）、晨雾玻璃（`mist`）、风暴图谱（`atlas`），可在壁纸属性中切换；天气、引导、设置、地址页与详情弹层共用主题变量
+- **面板布局调整**：整体缩放与 X / Y 轴偏移可在壁纸属性中实时调整；偏移按屏幕百分比计算，面板到屏幕边缘停止
 - **实时天气**：当前温度、天气状况与天气图标（QWeather 图标字体）+ 体感温度、今日最高/最低温
 - **近 4 天预报**：取和风 7 日预报接口前 4 天数据，支持点击切换查看每天的降雨量、湿度、风向风力、紫外线、平均温度、云量、日出日落
-- **生活指数**：当天 7 项指数（运动 / 洗车 / 穿衣 / 紫外线 / 旅游 / 舒适度 / 感冒，QWeather indices 接口）用「4 列选择器 + 说明文字」呈现——说明区每 12 秒自动轮播一条，选中条目的名称与分类显示在「生活指数」标题行右侧，下方用语气色竖线标出该条指数的完整说明；换条动效是「旧的一条向下渐出 → 新的一条再从上方渐入」（`mode="out-in"`，0.3s + 0.35s ≈ 0.65s 一出一进，方向与预警 chip 刻意相反）；点图标可立刻切过去并重新计时。选择器按「出行 / 健康」分组排成两行（运动·洗车·旅游·舒适度 / 穿衣·紫外线·感冒），末行 3 个拉伸填满整行、右下角不留缺口（末尾只剩 1~2 个时自动改为居中）；首次渲染会自动选中「较不宜」这类需要注意的一条
-- **分钟级降水**：预警胶囊上方常驻一颗降水胶囊，**直接说整句**（和弹层标题同一句，详情里多一个转折词「不过」）：「未来两小时无降雨 / 15 分钟后下中雨 / 正在下中雨，30 分钟后停，隔 15 分钟又有小雨 / 正在下小雨，即将雨停，隔 20 分钟又有小雨 / 雨刚停，15 分钟后又有小雨 / 正在下中雨，10 分钟后转大雨 / 正在下中雨，未来两小时持续降雨」，文案里的分钟数会随时间自己走；雨停了还会再下时，后半场以**停雨那一刻**为起点说「隔 15 分钟又有小雨」，不用读者自己拿两个绝对时间相减，也不会被误读成「45 分钟后（雨还没停就）转小雨」；停雨只剩一格（≤5 分钟）时说「即将雨停」而不是「5 分钟后雨停」；15 分钟内雨势会跨档时再补一句趋势——「10 分钟后转大雨 / 即将转大雨 / 15 分钟后转中雨」，只说档位不写「雨会变大」（「转多大」才是要传达的信息，还省 50px 宽度），判定要**连续两个点**都落在新档位上（单点抖动会让文案在「转大雨」和「中雨」之间来回闪）且必须比停雨早至少一格（否则会出现「10 分钟后转大雨，10 分钟后停」）；**一句只放两段**——有趋势时就到此为止，不再跟「30 分钟后停」「持续两小时」，三段话信息太密、读的人反而抓不住重点（两段句实测 162px、三段 225px，可用只有 243px），停雨时间交给弹层的柱状图；反过来，同时存在「停一会儿又下」时让位的是趋势，那一支要说「几点停、隔多久又有」，比「差一级」更值得占位置；还没下时说「15 分钟后下中雨」而不是「15 分钟后开始下雨」——带不带伞取决于多大，档位在标题里就交代掉；接口窗口的起点本来就比「现在」早 5~10 分钟（服务端网格延迟），所以雨刚停的那几分钟里胶囊接着说「雨刚停，15 分钟后又有小雨」（再久一点改说「刚才在下小雨…」），不会在雨停那一刻突然跳成「15 分钟后下中雨」、像刚才那场雨没发生过；点开是「未来两小时逐 5 分钟」的柱状图弹层——柱子从**现在这一格**画起（已经过去的那几格不画，「现在」才真的指向现在，上面的累计雨量也和柱子对得上），柱子按小时雨强分级上色（小雨 / 中雨 / 大雨 / 暴雨），图里按真实阈值画了分级虚线，右侧竖排标出「小雨 / 中雨 / 大雨 / 暴雨」这几档（纵轴上限会随雨量自适应，放不下的档自动省略）；鼠标悬停任意一根柱子会高亮该时段、把其余柱子压暗，并在上方浮层里显示「这段是哪 5 分钟 + 这段时间的降水量 + 小时雨强 + 雨量等级」，下方给出累计降水量、最大雨强与预计降水时长，并区分「没有数据（境外不支持 / 临时缺测）/ 请求失败 / 加载中」三种状态。数据来自 `/v7/minutely/5m`（仅覆盖中国、1 km、每 5 分钟更新一次，境外坐标会稳定返回 400），因此它**独立于主流程加载**，失败不会把整张天气卡判成加载失败
-- **天气预警**：蓝/黄/橙/红四级配色；主卡片预警自动轮播 + 数量角标；详情采用手风琴展开，溢出内容用 BetterScroll 鼠标拖拽滚动（适配 Wallpaper Engine 无法触发滚轮的场景）
+- **生活指数**：运动、洗车、穿衣、紫外线、旅游、舒适度、感冒共 7 项，按出行 / 健康分成两行选择器；说明卡每 12 秒轮播，点击可立即切换并重新计时，初次优先展示需要注意的条目
+- **分钟级雨雪降水**：常驻胶囊显示当前雨雪等级、预计开始/停止时间、短暂停歇后再降水及近期强度变化；点击查看未来两小时逐 5 分钟柱状图、时段强度、累计水当量、峰值与持续时长。图表从「现在」开始，雨雪分别分级，等级参考线等距排列，柱高采用同一分段映射；雨雪混合时显示数值量程。详情标注分级参考与适用范围，雪量以水当量表达。加载、暂不支持和请求失败分别显示，分钟级数据失败不影响主天气面板
+- **天气预警**：主卡片按等级配色并自动轮播，显示预警数量与动态发布时间；点击后定位到对应预警，详情通过 Swiper 横向拖动或方向键切换，正文与防御指南通过 BetterScroll 拖拽滚动。支持新增 / 更新 / 取消状态，先按替代关系移除旧消息，再按等级、发布单位与时间去重
 - **一言**：卡片右侧每日一句，点击即可换一句（手动限 5 秒一次；文案缓存 2 小时，过期后自动刷新，请求失败会保留上一条并自动重试）
 - **新用户引导（必做）**：引导用户到「壁纸属性」面板填写自己的和风天气 API 域名/密钥，自动检测可用性；只有检测通过并选好位置后才显示天气面板——不再消耗作者的内置公共额度
 - **设置 / 状态页**：天气卡右上角齿轮打开，查看当前连接状态、逐组凭据（域名 + 打码密钥 + 失败原因）、一键重新检测、修改指引，以及面板缩放 / 动态背景的只读值；「重新查看新手引导」进入回顾态（不自动前进）。密钥的写入口只在壁纸属性面板，所以这一页不设输入框与「保存」
@@ -42,14 +43,14 @@
 | 框架 | Vue 3（`<script setup>` 组合式 API）、Vue CLI 5 |
 | 状态管理 | Pinia + pinia-plugin-persistedstate（状态持久化到 localStorage） |
 | 请求 | Axios（拦截器注入密钥、统一错误码处理） |
-| UI | Arco Design Vue（Cascader 级联选择、Button、Icon） |
-| 动效 | raindrop-fx（雨滴 WebGL）、@better-scroll/core、@formkit/auto-animate |
+| UI | 自定义 Vue 面板与共用 WeatherDialog；Arco Design Vue 仅用于开发调试面板 |
+| 动效与交互 | raindrop-fx（雨滴 WebGL）、BetterScroll（拖拽滚动）、Swiper（预警轮播）、Vue Transition / TransitionGroup、@formkit/auto-animate |
 | 工具 | @vueuse/core（useStorage）、mitt（事件总线）、qweather-icons |
 | 样式 | Sass/SCSS、本地化 Montserrat 字体、iconfont 图标 |
 
 ## 快速开始
 
-环境要求：Node.js 14+，推荐使用 Yarn（项目同时提供 `package-lock.json`，npm 亦可）。
+建议使用 Node.js 24；本次验证环境为 Node.js 24.14.1 / npm 11.11.0。项目提供 `yarn.lock` 与 `package-lock.json`，可选择 Yarn 或 npm，避免混用包管理器安装依赖。
 
 ```bash
 # 安装依赖
@@ -67,6 +68,8 @@ yarn build:dist
 # 代码检查与修复
 yarn lint
 ```
+
+npm 对应命令为 `npm ci`、`npm run serve`、`npm run build:dist`、`npm run build` 与 `npm run lint`。
 
 也可以直接双击根目录下的 `start.bat`（等价于执行 `yarn serve`）。
 
@@ -97,6 +100,33 @@ WE_PROJECT_DIR="D:/path/to/we/project" yarn deploy:we
 > 为什么必须合并属性定义：壁纸引擎读的是**工程目录里**的 `project.json`，而不是 `public/project.json`。
 > 只改 `public/project.json` 而不合并的话，属性面板里看不到新加的选项（例如 `backgroundindex` 的「整页雨珠叠加」），
 > 于是「明明代码支持，却没法在壁纸属性里打开」。
+
+### 本地验证与降水预览
+
+以下检查均在本地运行；三组回归脚本不需要真实天气 API 凭据：
+
+```bash
+# 代码检查（不自动改写文件）
+npm run lint -- --no-fix
+
+# 雨雪分级、时间边界、强度变化与图表映射
+node scripts/test-minutely-precipitation.mjs
+
+# 预警生命周期、相对时间与消息去重
+node scripts/test-weather-warnings.mjs
+
+# 地址持久化、异步刷新与切换位置时的竞态
+node --experimental-vm-modules scripts/test-location-address.mjs
+
+# 验证生产构建
+npm run build:dist
+
+# 降水假数据预览（127.0.0.1:8081）
+npm run preview:rain
+```
+
+降水预览入口位于 `src/dev/`，可切换雨雪等级、微量降水、混合降水与配色，使用假数据独立展示胶囊和图表。
+预览入口不由主应用导入。`dist/`、`dist-check/`、`.pnpm-store/` 均为本地产物，不提交 Git。
 
 ## 环境变量配置
 
@@ -133,6 +163,7 @@ simple-weather-app-design
 │   ├── preview.gif                # 创意工坊预览图
 │   └── fonts/                     # QWeather 图标字体
 ├── src/
+│   ├── dev/                       # 降水与预警的独立假数据预览入口
 │   ├── main.js                    # 应用入口（注册 Pinia、auto-animate）
 │   ├── App.vue                    # 根组件：背景 + 天气面板 + 预警/分钟级降水弹窗
 │   ├── api/
@@ -161,12 +192,18 @@ simple-weather-app-design
 │   │   │   ├── useLocationHistory.js  # 最近选择记录（支持按新密钥重查坐标级地名）
 │   │   │   ├── useAddressRefresh.js   # 高德密钥变化 → 卡片地址与「最近」记录自动重查
 │   │   │   ├── betterScroll.js        # BetterScroll 统一入口（只注册一次滚轮插件）
-│   │   │   ├── SelectLocationDialog.vue # 旧版城市选择弹窗（已停用，保留文件）
-│   │   │   ├── WelcomeModal.vue       # 旧版首次使用欢迎弹窗（已停用，保留文件）
-│   │   │   ├── EarlyWarningDetails.vue# 天气预警详情（手风琴 + BetterScroll）
+│   │   │   ├── EarlyWarningDetails.vue# 天气预警详情（Swiper 横向轮播）
+│   │   │   ├── WarningDetailCard.vue  # 单条预警正文、防御指南与拖拽滚动
+│   │   │   ├── WeatherWarningChip.vue # 主卡片预警胶囊与相对发布时间
+│   │   │   ├── warnings.js            # 预警归一化、生命周期与去重
+│   │   │   ├── useWarningClock.js     # 预警相对时间的共用时钟
+│   │   │   ├── WeatherDialog.vue      # 共用详情弹层、焦点管理与 Esc 关闭
 │   │   │   ├── MinutelyRainChip.vue   # 分钟级降水胶囊（常驻在预警胶囊前面）
 │   │   │   ├── MinutelyRainDialog.vue # 分钟级降水弹层（未来两小时柱状图，悬停看单柱明细）
-│   │   │   ├── minutelyRain.js        # 分钟级降水的解读：雨强分级、几分钟后停/下
+│   │   │   ├── minutelyRain.js        # 分钟级雨雪解读与时间文案
+│   │   │   ├── precipitationLevels.js # 雨雪强度、累计量分级与显示名称
+│   │   │   ├── minutelyRainScale.js   # 动态量程与等距等级的柱高映射
+│   │   │   ├── PrecipitationIcon.vue  # 雨、雪与混合降水图标
 │   │   │   ├── WeatherStateIndicator.vue# 加载/更新状态提示
 │   │   │   ├── useWeatherRefresh.js   # 定时刷新 + 失败重试
 │   │   │   └── useWeatherStore.js     # 天气状态：数据、缓存、加载状态
@@ -195,6 +232,7 @@ simple-weather-app-design
 │   │                   ├── raindrop-fx.js    # raindrop-fx v1.0.8 bundle
 │   │                   └── html2canvas.min.js# 1.4.1，把 DOM 光栅化成折射纹理
 │   ├── shared/
+│   │   ├── motion/                # 共用错峰动效组件、预设与使用说明
 │   │   ├── Bus.js                 # mitt 事件总线
 │   │   ├── clipboard.js           # 复制到剪贴板（execCommand 兜底）+ 控制台网址
 │   │   └── env.js                 # 运行环境判定（壁纸引擎 / 普通浏览器）
@@ -203,6 +241,7 @@ simple-weather-app-design
 │   │   └── modules/
 │   │       └── useWallpaperOptionsStore.js # 壁纸选项 store
 │   ├── style/                      # 全局样式、设计令牌、字体、图标
+│   │   ├── chips.scss              # 降水与预警胶囊的共用样式
 │   │   ├── weather-panel.scss      # 天气卡/引导页/设置页/地址页共用的层级与尺寸外壳
 │   │   └── transitions.scss        # 全站切换动效（进场/离场/轮播）的唯一定义处
 │   ├── assets/
@@ -214,7 +253,10 @@ simple-weather-app-design
 ├── jsconfig.json                   # 路径别名 @ -> src
 ├── scripts/
 │   ├── deploy-wallpaper-engine.js  # 把 dist/ 同步到壁纸工程目录（合并属性面板定义）
-│   └── sync-taiwan-city-list.js    # 用和风官方城市列表刷新 CityList.js 里的台湾省数据
+│   ├── sync-taiwan-city-list.js    # 用和风官方城市列表刷新 CityList.js 里的台湾省数据
+│   ├── test-minutely-precipitation.mjs # 降水分级、分析与图表回归
+│   ├── test-weather-warnings.mjs   # 预警生命周期回归
+│   └── test-location-address.mjs   # 地址持久化与异步竞态回归
 └── start.bat                       # 一键启动脚本
 ```
 
@@ -291,6 +333,8 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 | `showweathermain` | 开关 | 雨滴模式下隐藏/显示天气面板 |
 | `rainconfig` | 下拉框 | 雨滴强度：自动 / 暴雨 / 大雨 / 中雨 / 小雨 / 雨停 |
 | `panelscale` | 滑块 | 天气面板整体缩放（0.5 ~ 1.5，默认 0.75） |
+| `paneloffsetx` / `paneloffsety` | 滑块 | X / Y 轴偏移（-50 ~ 50，默认 0），按屏幕宽 / 高百分比计算，到屏幕边缘停止 |
+| `colortheme` | 下拉框 | 面板配色：`night` 夜雨玻璃（默认）/ `mist` 晨雾玻璃 / `atlas` 风暴图谱 |
 | `qweatherhost` | 文本框 | 用户自己的和风天气 API 域名；多个用英文逗号分隔 |
 | `qweatherkey` | 文本框 | 用户自己的和风天气 API 密钥；与域名按顺序一一配对 |
 | `amapkey` | 文本框 | **选填**。用户自己的高德「Web服务」key：填了地图选点显示最近道路名；留空时改用和风区县反查显示「市 区县附近」 |
@@ -362,8 +406,7 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
    （缩放胶囊最右一颗，Esc 退出）：全屏时底部「重选地区」不再退回三列页，
    而是叠一块 `RegionPickerDialog`（省/市/区三列 + 草稿路径）——取消不动地图，确认后按街道级原地飞过去，
    全屏和刚调好的视野都不会丢。卡片形态下点「重选地区」仍回到三列页（那里本来就是一整块选择界面）。
-5. **进入天气面板**：选好位置后才会请求天气并显示面板；日常点左上角地址同样打开这个地址页
-   （旧的 `SelectLocationDialog.vue` 已不再调用，文件保留）。
+5. **进入天气面板**：选好位置后才会请求天气并显示面板；日常点左上角地址同样打开这个地址页。
    这里有三条不能改坏的约束：① 只有 `WeatherLocationPath` 真的保存过且与当前路径一致时，才把
    `WeatherChosenCity.point` 摆成地图上的 pin（否则「有旧坐标、没旧路径」会让地址页一打开就跳过三列直接进地图，
    按钮直接是「就用这里」）；② `markLocationChosen` 必须在用户点确认时**无条件**调用——它同时负责让引导页让位，
@@ -421,7 +464,8 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 
 **开发环境调试**：`window.wallpaperPropertyListener` 只在 Wallpaper Engine 中存在，
 因此在开发模式下由 `WallpaperDebugPanel.vue`（页面右上角，基于 Arco Design 组件构建）
-模拟壁纸属性面板。面板按 `public/project.json` 中 `backgroundindex` 的 condition 划分：
+模拟壁纸属性面板。Arco 保留在 `devDependencies`，调试面板只在开发构建分支中异步导入，
+其 CSS 随面板加载；生产构建不包含调试面板、Arco 代码及样式。面板按 `public/project.json` 中 `backgroundindex` 的 condition 划分：
 `背景` 是全局切换属性，`隐藏天气面板` 只在“实时雨滴”背景显示，
 `雨滴配置` 在“实时雨滴”与“整页雨珠叠加”两个背景下都显示，均出现在对应背景的“专属配置”区块中。
 它和壁纸引擎走同一套 `applyWallpaperProperties` 处理逻辑（见 `src/features/wallpaper/properties.js`），
@@ -474,11 +518,11 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 
   | 档位 | 小时雨强 |
   | --- | --- |
-  | 暴雨 | ≥ 16 mm/h |
-  | 大雨 | 8 ~ 16 mm/h |
-  | 中雨 | 2.5 ~ 8 mm/h |
-  | 小雨 | > 0.06 mm/h（> 0.005 mm/5min） |
-  | 无雨 | 其余（含 0） |
+  | 暴雨 | ≥ 15 mm/h（包含更高等级） |
+  | 大雨 | 5 ≤ 雨强 < 15 mm/h |
+  | 中雨 | 1 ≤ 雨强 < 5 mm/h |
+  | 小雨 | 当前时段有有效降雨且雨强 < 1 mm/h（包含微量降雨） |
+  | 无雨 | 当前时段无有效降雨 |
 
   **为什么不是 `points[0]`**：接口窗口的起点比「现在」早 5~10 分钟（服务端网格延迟），
   取第一条等于拿已经过去的那段去驱动雨滴 —— 雨刚下起来时雨滴晚 5~10 分钟才出现、
@@ -525,19 +569,8 @@ store 中的 `TheWeatherDataIsLoaded` 用于驱动天气面板的状态提示：
 
 ## 注意事项
 
-- 天气卡是**固定高度**（`min(46.5rem, 92vh)`，见 `src/style/weather-panel.scss`），和引导页 / 设置页 / 地址页保持一样大：
-  `panelscale` 把整体放大到上限时，`46.5rem + 上下各 3.5rem 留白`正好等于一屏（`index.scss` 里对应的兜底项是 `1.87vh`），
-  面板再高就会被屏幕截断。早期版本用的是 43.06rem，比两栏内容实际需要的高度（约 43.4rem）还矮几像素，
-  底部内边距会被裁掉；先加高到 45rem 解决了裁切，后来左下角聚焦卡一度改成无边框说明、省下约 2.4rem，
-  但视觉上不如原来的卡片，于是恢复成带边框的聚焦卡，并把卡片同步加高到 46.5rem。实测（1920×1080、`panelscale` 0.75）：
-  左栏内容底边距卡片下沿约 48px，出现天气预警 chip 时约 33px；右栏约 65px。
-  这次左栏没有删内容：日期从「星期 + 日期」两行合成一行（省 21px）；左栏间距从 1.125rem 提到与右栏一致的 1.625rem
-  （内边距也改成 2.5rem，和右栏对齐），当前温度放大到 6rem；省出的高度一部分换成间距，一部分留给底部。
-  聚焦卡恢复为原来的「图标 + 名称 · 分类」标题行 + 3 行正文，`min-height: 7rem`（实测约 84px）；
-  正文固定预留 3 行、更长的用 `line-clamp` 截断（`mode="out-in"` 换条时旧内容已移除、新内容还没插入，
-  中间有一帧是空的，靠 `min-height` 兜底），所以高度恒定、不随数据长短波动；
-  **选择器必须保持在 2 行以内**——排到第 3 行会吃掉全部余量（实测 2 行 81px、3 行 134px，差 53px）。
-  以后往左栏加内容时，记得同步确认这几个尺寸（改完用 1920×1080 / `panelscale` 0.75 量一次最紧的情形，含预警 chip）；
+- 天气卡、引导页、设置页与地址页共用固定外壳（`min(46.5rem, 92vh)`，见 `src/style/weather-panel.scss`）。调整内容密度、缩放或偏移后，应检查最长地址、预警胶囊、生活指数和地图全屏状态是否被裁切。
+- **错峰动效**：`src/shared/motion/` 提供 `StaggerTransition` 与 `StaggerGroup`，预设集中在 `stagger.js`，样式集中在 `src/style/transitions.scss`；支持系统减少动态效果偏好，使用方式见 [动效说明](src/shared/motion/README.md)。
 - **改版后让老缓存立刻失效**：新版本若改了数据结构（例如生活指数从 6 条变 7 条），把 `useWeatherStore.js` 里的
   `CACHE_VERSION` +1 即可 —— 它和凭据指纹一样参与 `isFresh` 判定，版本对不上时所有接口缓存立刻过期，
   壁纸重载（＝ 用户更新到新版本）后自动重拉一次、指数也随主周期一起走，用户不需要重选地址；

@@ -1,5 +1,5 @@
-/* ================= 切换动效（全站唯一定义处） =================
-   所有 <Transition> 的类名都定义在这里，改手感只改这个文件。
+/* ================= 全局面板切换与错峰渐入 =================
+   面板切换类名与错峰样式在这里；错峰参数统一在 shared/motion/stagger.js。
 
    方向约定「从上渐入、往下渐出」：
      新内容从上方 -0.75rem 处落位，旧内容向下 +0.75rem 沉出去。
@@ -7,7 +7,7 @@
 
    ⚠️ 这些类必须保持全局（不要挪进组件的 scoped 样式）：
       一次切换的两端常常分属不同组件，scoped 的作用域命中不到对方。
-   ⚠️ 用到的 <Transition> 都要写 mode="out-in"，否则两段内容会同时出现。
+   ⚠️ 文字轮播用 mode="out-in"；叠放的面板与错峰列表按各自的生命周期运行。
    ⚠️ 嵌套切换（如引导页第 1 步 ↔ 第 2 步）时，内层元素的根节点必须是普通元素，
       不能直接是 <Transition> —— 否则外层 out-in 会取不到元素、卡在"正在离场"（只剩一张空壳卡）。
 
@@ -55,23 +55,55 @@
   @include swap-down(0.3s, 0.35s);
 }
 
-/* 外壳首次出现：淡入 + 轻微上抬（不是"换内容"，所以不套上面的 mixin） */
+/* 外壳首次出现 / 隐藏：让天气卡像从壁纸里浮出来。
+   内容错峰由内层 StaggerGroup 独立托管，外壳结束不会截断子项进场。 */
+.panel-in-enter-active,
+.panel-in-leave-active {
+  will-change: opacity, transform;
+}
+
 .panel-in-enter-active {
-  transition: opacity 0.26s var(--ease-enter), transform 0.3s var(--ease-enter);
+  transition: opacity 0.46s var(--ease-enter), transform 0.52s var(--ease-enter);
 }
 
 .panel-in-enter-from {
   opacity: 0;
-  transform: translateY(1.25rem) scale(0.985);
+  transform: translate3d(0, 2rem, 0) scale(0.97);
 }
 
 .panel-in-leave-active {
-  transition: opacity 0.12s var(--ease-leave), transform 0.16s var(--ease-leave);
+  transition: opacity 0.24s var(--ease-leave), transform 0.3s var(--ease-leave);
 }
 
 .panel-in-leave-to {
   opacity: 0;
-  transform: translateY(-0.75rem) scale(0.99);
+  transform: translate3d(0, -1.5rem, 0) scale(0.985);
+}
+
+/* 错峰渐入统一由 StaggerTransition / StaggerGroup 交给 Vue 托管。
+   参数只在 shared/motion/stagger.js 定义；这里不依赖父级 active 类或 nth-child。
+   使用独立 translate / scale，保留地图控件自身用于定位的 transform。
+   active 期间优先使用生命周期过渡，防止按钮等组件的 hover transition 覆盖进场声明。 */
+.stagger-enter-active {
+  transition:
+    opacity var(--stagger-duration) var(--stagger-easing) var(--stagger-delay),
+    translate var(--stagger-duration) var(--stagger-easing) var(--stagger-delay),
+    scale var(--stagger-duration) var(--stagger-easing) var(--stagger-delay) !important;
+}
+
+.stagger-enter-from,
+.stagger-leave-to {
+  opacity: var(--stagger-opacity);
+  translate: 0 var(--stagger-travel);
+  scale: var(--stagger-scale);
+}
+
+.stagger-leave-active {
+  pointer-events: none;
+  transition:
+    opacity var(--stagger-leave-duration) var(--ease-leave),
+    translate var(--stagger-leave-duration) var(--ease-leave),
+    scale var(--stagger-leave-duration) var(--ease-leave) !important;
 }
 
 /* 天气预警 chip 轮播：原作者设计的方向，与上面相反（从下往上）。
@@ -100,4 +132,18 @@
 .Dialog-enter-from,
 .Dialog-leave-to {
   opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-enter-active,
+  .stagger-leave-active {
+    transition: none !important;
+  }
+
+  .stagger-enter-from,
+  .stagger-leave-to {
+    opacity: 1;
+    translate: none;
+    scale: none;
+  }
 }

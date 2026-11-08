@@ -44,10 +44,10 @@ const glyph = computed(
 /* ---- 检测结果卡：所有 tone 共用的骨架，颜色由下面 .tone-* 变量给出 ---- */
 .cred-status {
   --tone-glyph: var(--text-secondary);
-  --tone-wash: rgba(255, 255, 255, 0.075);
+  --tone-wash: var(--glass-bg-soft);
   --tone-line: var(--glass-border);
-  --tone-tint: rgba(255, 255, 255, 0.03);
-  --tone-halo: rgba(255, 255, 255, 0.05);
+  --tone-tint: var(--glass-bg-subtle);
+  --tone-halo: var(--glass-bg-subtle);
 
   position: relative;
   z-index: 1;
@@ -59,10 +59,10 @@ const glyph = computed(
   border-radius: var(--radius-md);
   background:
     linear-gradient(158deg, var(--tone-tint), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+    linear-gradient(180deg, var(--glass-bg-soft), var(--glass-bg-subtle));
   box-shadow:
     0 1.125rem 2.5rem -1.875rem rgba(0, 0, 0, 0.85),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    inset 0 1px 0 var(--glass-border);
 }
 
 /* 从左上角透出的状态色，让卡片有颜色倾向但不喧宾夺主 */
@@ -83,35 +83,35 @@ const glyph = computed(
 }
 
 .tone-ok {
-  --tone-glyph: #a7ecc9;
-  --tone-wash: rgba(111, 220, 174, 0.15);
-  --tone-line: rgba(111, 220, 174, 0.34);
-  --tone-tint: rgba(111, 220, 174, 0.1);
-  --tone-halo: rgba(111, 220, 174, 0.24);
+  --tone-glyph: var(--success-text);
+  --tone-wash: rgba(140, 200, 166, 0.12);
+  --tone-line: rgba(140, 200, 166, 0.28);
+  --tone-tint: rgba(140, 200, 166, 0.08);
+  --tone-halo: rgba(140, 200, 166, 0.16);
 }
 
 .tone-error {
-  --tone-glyph: #ffb3ae;
-  --tone-wash: rgba(239, 97, 89, 0.16);
-  --tone-line: rgba(239, 97, 89, 0.36);
-  --tone-tint: rgba(239, 97, 89, 0.12);
-  --tone-halo: rgba(239, 97, 89, 0.28);
+  --tone-glyph: var(--danger-text);
+  --tone-wash: rgba(191, 95, 92, 0.12);
+  --tone-line: rgba(191, 95, 92, 0.28);
+  --tone-tint: rgba(191, 95, 92, 0.08);
+  --tone-halo: rgba(191, 95, 92, 0.16);
 }
 
 .tone-warn {
-  --tone-glyph: #ffcf9e;
-  --tone-wash: rgba(235, 155, 98, 0.16);
-  --tone-line: rgba(235, 155, 98, 0.34);
-  --tone-tint: rgba(235, 155, 98, 0.11);
-  --tone-halo: rgba(235, 155, 98, 0.24);
+  --tone-glyph: var(--warning-text);
+  --tone-wash: rgba(227, 163, 110, 0.12);
+  --tone-line: rgba(227, 163, 110, 0.28);
+  --tone-tint: rgba(227, 163, 110, 0.08);
+  --tone-halo: rgba(227, 163, 110, 0.16);
 }
 
 .tone-loading {
-  --tone-glyph: #a5dcff;
-  --tone-wash: rgba(56, 189, 248, 0.16);
-  --tone-line: rgba(56, 189, 248, 0.36);
-  --tone-tint: rgba(56, 189, 248, 0.12);
-  --tone-halo: rgba(56, 189, 248, 0.26);
+  --tone-glyph: var(--color-primary-soft);
+  --tone-wash: var(--glass-active);
+  --tone-line: var(--rain-chip-border);
+  --tone-tint: var(--glass-active);
+  --tone-halo: var(--rain-chip-bg);
 }
 
 /* 圆角方块而不是实心彩球：色更浅、更克制，和面板里的其他玻璃块同一家族 */
@@ -129,7 +129,7 @@ const glyph = computed(
   background: var(--tone-wash);
   border: 1px solid var(--tone-line);
   border-radius: 0.875rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0.75rem 1.5rem -0.9375rem var(--tone-halo);
+  box-shadow: inset 0 1px 0 var(--glass-bg-soft), 0 0.75rem 1.5rem -0.9375rem var(--tone-halo);
 }
 
 .cred-status-glyph {
@@ -176,7 +176,7 @@ const glyph = computed(
   gap: 0.375rem;
   margin: 0;
   padding: 0.75rem 0 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--glass-bg-soft);
   list-style: none;
 
   li {
@@ -195,12 +195,12 @@ const glyph = computed(
   height: 0.375rem;
   border-radius: 50%;
   background: var(--color-ok);
-  box-shadow: 0 0 0 0.1875rem rgba(149, 213, 174, 0.14);
+  box-shadow: 0 0 0 0.1875rem rgba(140, 200, 166, 0.12);
 }
 
 .cred-status-list li.bad .cred-status-dot {
   background: var(--color-warn);
-  box-shadow: 0 0 0 0.1875rem rgba(235, 155, 98, 0.14);
+  box-shadow: 0 0 0 0.1875rem rgba(227, 163, 110, 0.12);
 }
 
 .cred-status-host {
@@ -217,6 +217,6 @@ const glyph = computed(
 }
 
 .cred-status-list li.bad .cred-status-msg {
-  color: #ffcb9e;
+  color: var(--warning-text);
 }
 </style>

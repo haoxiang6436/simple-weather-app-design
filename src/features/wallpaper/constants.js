@@ -11,6 +11,10 @@ export const WALLPAPER_PROPERTIES = {
   SHOW_WEATHER_MAIN: 'showweathermain',
   RAIN_CONFIG: 'rainconfig',
   PANEL_SCALE: 'panelscale',
+  PANEL_OFFSET_X: 'paneloffsetx',
+  PANEL_OFFSET_Y: 'paneloffsety',
+  // 面板材质主题：夜雨玻璃 / 晨雾玻璃
+  COLOR_THEME: 'colortheme',
   // 用户自带的 和风天气 API 域名 / 密钥（textinput）
   QWEATHER_HOST: 'qweatherhost',
   QWEATHER_KEY: 'qweatherkey',
@@ -30,11 +34,20 @@ export const DEFAULT_BACKGROUND_INDEX = '4'
 // rainconfig 的合法取值（与 public/project.json 的 options 一一对应）
 export const RAIN_CONFIG_OPTIONS = ['auto', 'storm', 'heavy', 'moderate', 'light', 'none']
 
+// 面板主题（与 public/project.json 的 options 一一对应）
+export const COLOR_THEME_OPTIONS = ['night', 'mist', 'atlas']
+export const DEFAULT_COLOR_THEME = 'night'
+
 // panelscale：天气面板整体缩放（1 = 设计原尺寸）
 // 与 public/project.json 里的 min / max / value 保持一致，改一处要同步另一处
 export const PANEL_SCALE_MIN = 0.5
 export const PANEL_SCALE_MAX = 1.5
 export const DEFAULT_PANEL_SCALE = 0.75
+
+// 主界面相对屏幕中心的偏移（屏幕宽 / 高的百分比）；实际位置由 CSS 限制在屏幕内。
+export const PANEL_OFFSET_MIN = -50
+export const PANEL_OFFSET_MAX = 50
+export const DEFAULT_PANEL_OFFSET = 0
 
 // Bus 事件名
 export const BUS_EVENTS = {
@@ -54,6 +67,7 @@ export const STORAGE_KEYS = {
   WALLPAPER_DEBUG_PROPERTIES: 'WallpaperDebugProperties',
   // 引擎上一次下发过的属性快照（页面重载后引擎不一定再补发，用它兜底）
   WALLPAPER_PROPERTY_SNAPSHOT: 'WallpaperPropertySnapshot',
+  WALLPAPER_COLOR_THEME: 'WallpaperColorTheme',
   // 一言缓存（文案 + 来源 + 成功时间），用于 2 小时有效期和首屏兜底
   HITOKOTO_CACHE: 'HitokotoCache',
 }

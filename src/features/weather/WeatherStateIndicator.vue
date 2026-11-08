@@ -1,5 +1,5 @@
 <template>
-  <div class="state">
+  <div class="state" role="status" aria-live="polite">
     <transition mode="out-in">
       <p v-if="state === 100">
         <svg t="1706878677922" class="location-icon state-icon move" viewBox="0 0 1024 1024" version="1.1"

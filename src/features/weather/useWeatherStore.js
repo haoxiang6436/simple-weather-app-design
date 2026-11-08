@@ -10,6 +10,7 @@ import { ChosenLocationPath } from '@/features/onboarding/onboardingState';
 import { getCacheTtl, isCacheFresh } from '@/config/weatherCache';
 import { isSameAdminName, lookupPlaceByCoord, pointAddressLabel } from '@/features/weather/placeLookup';
 import { wgs84ToGcj02 } from '@/features/weather/mapTiles';
+import { normalizeWarning, deduplicateWarnings } from './warnings';
 
 // 天气数据缓存的 localStorage key。
 // 注意：它必须定义在模块作用域 —— 下面 defineStore 的 persist 选项是在模块加载时求值的，
@@ -87,6 +88,8 @@ export const useWeatherStore = defineStore('Weather', () => {
     area_code: null,
     // 地图点选的坐标（和风的坐标系：大陆 GCJ-02，境外 WGS-84）。null = 按区县选择，天气用 LocationID
     point: null,
+    // 区县中心的反查地址，只用于展示；point 仍表示用户实际选过的地图坐标。
+    centerAddress: null,
   }
   // 一次性迁移：老版本把地址塞在天气缓存的 blob 里，这里在 useStorage 初始化之前先原样搬过来。
   // 顺序很关键 —— useStorage 在 key 缺失时会立刻写入默认值，写在它后面就晚了。
@@ -139,6 +142,19 @@ export const useWeatherStore = defineStore('Weather', () => {
     const parts = String(dayDateCity.value?.city || '').split(',')
     return (parts[parts.length - 1] || '').trim()
   })
+  // 地址反查与天气使用同一个位置：地图点选优先，否则使用 CityDetail 的中心坐标。
+  // 中心地址带着坐标保存，旧结果不能显示在另一个区县上。
+  const CityAddressPoint = computed(() => {
+    const current = dayDateCity.value
+    if (current?.point) return current.point
+    if (current?.CityDetail?.lon == null || current?.CityDetail?.lat == null) return null
+    const lng = Number(current?.CityDetail?.lon)
+    const lat = Number(current?.CityDetail?.lat)
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+    const address = current.centerAddress
+    const matches = address && Number(address.lng) === lng && Number(address.lat) === lat
+    return { ...(matches ? address : {}), lng, lat }
+  })
   /**
    * 当前地址的区县名（点选场景）。
    *
@@ -151,7 +167,7 @@ export const useWeatherStore = defineStore('Weather', () => {
    *   3. 最后才退到地址页持久化的区县路径标签（同样是下拉框来源，只作兜底）。
    */
   const CityDistrictLabel = computed(() => {
-    const point = dayDateCity.value?.point
+    const point = CityAddressPoint.value
     if (!point) return ''
     const fromPoint = String(point.district || '').trim()
     const source = String(point.districtSource || '').trim()
@@ -177,8 +193,10 @@ export const useWeatherStore = defineStore('Weather', () => {
    * 所以两边写法必然一致。
    */
   const CityAddressLabel = computed(() => {
-    const point = dayDateCity.value?.point
+    const point = CityAddressPoint.value
     if (!point) return dayDateCity.value?.city || ''
+    // 中心点尚未查到地址时，继续显示用户选中的地区。
+    if (!dayDateCity.value.point && !point.districtSource) return dayDateCity.value?.city || ''
     const district = CityDistrictLabel.value || CityDisplayName.value
     const city = String(point.city || dayDateCity.value?.CityDetail?.adm2 || '').trim()
     return pointAddressLabel({ district, city, road: point.road })
@@ -248,6 +266,8 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 天气预警信息
   const WeatherEarlyWarning = ref([])
   const EarlyWarningDetailsDialog = ref(false)
+  // 记录从天气卡片点击打开时对应的那一条预警，详情弹窗据此定位初始页
+  const EarlyWarningDetailsWarningId = ref(null)
   /* ---- 分钟级降水 ----
      独立于主流程的一套状态：只覆盖中国，境外坐标查询会稳定 400，
      混进上面那个 Promise.allSettled 就会把整张卡判成「部分加载失败」。
@@ -314,6 +334,9 @@ export const useWeatherStore = defineStore('Weather', () => {
         CityDetail: city,
         // 传 null 会清掉上一次的地图点选，保证「按区县选」和「按坐标选」不会串
         point,
+        centerAddress: !point && isSameSelectedLocation(option)
+          ? dayDateCity.value.centerAddress || null
+          : null,
       }
     }
     // 三个接口并发请求，单个失败不影响其它数据落库
@@ -439,15 +462,15 @@ export const useWeatherStore = defineStore('Weather', () => {
     return city
   }
   /**
-   * 用重新查到的坐标级地名更新当前点（高德密钥变更后由 useAddressRefresh 调用）。
+   * 更新当前天气坐标的地址（地图选点或默认区县中心）。
    *
    * 只改展示字段，不重发天气请求：坐标没变，天气缓存仍然有效。
    * 路名允许被更新成空串（清空高德 key 时要退回「xx附近」，不能留着旧路名）；
    * 区县 / 市名只在拿到非空值时才覆盖，避免一次失败的兜底把已有地址冲掉。
-   * @param {{road?:string, district?:string, city?:string, districtSource?:string}} [address]
+   * @param {{road?:string, district?:string, city?:string, source?:string, districtSource?:string}} [address]
    */
   const applyPointAddress = (address = {}) => {
-    const point = dayDateCity.value?.point
+    const point = CityAddressPoint.value
     if (!point) return
     const next = { ...point }
     if (address.road !== undefined) next.road = String(address.road || '')
@@ -455,48 +478,11 @@ export const useWeatherStore = defineStore('Weather', () => {
     if (district) next.district = district
     const city = String(address.city || '').trim()
     if (city) next.city = city
-    if (address.districtSource !== undefined) next.districtSource = String(address.districtSource || '')
-    dayDateCity.value = { ...dayDateCity.value, point: next }
+    const source = address.districtSource ?? address.source
+    if (source !== undefined) next.districtSource = String(source || '')
+    const field = dayDateCity.value.point ? 'point' : 'centerAddress'
+    dayDateCity.value = { ...dayDateCity.value, [field]: next }
   }
-  /**
-   * 新版预警接口（/weatheralert/v1/current）的字段和旧版（/v7/warning/now）完全不同，
-   * 这里统一归一化成模板一直在用的那套字段名，UI 侧（天气卡预警 chip、预警详情弹窗）
-   * 就不用跟着改。额外的 criteria / instruction 也一并带上，需要时可以取。
-   */
-  const WARNING_COLOR_CN = {
-    white: '白色',
-    gray: '灰色',
-    green: '绿色',
-    blue: '蓝色',
-    yellow: '黄色',
-    amber: '橙色',
-    orange: '橙色',
-    red: '红色',
-    purple: '紫色',
-    black: '黑色',
-  }
-  const normalizeWarning = (alert) => ({
-    id: alert.id,
-    // 旧字段名 ← 新字段名
-    title: alert.headline || alert.eventType?.name || '',
-    text: alert.description || '',
-    type: alert.eventType?.code || '',
-    typeName: alert.eventType?.name || '',
-    // 中国预警只会用到蓝/黄/橙/红四种颜色，其余档位做个兜底映射
-    level: WARNING_COLOR_CN[alert.color?.code] || '',
-    severity: alert.severity || '',
-    urgency: alert.urgency || '',
-    certainty: alert.certainty || '',
-    // alert（新增）/ update（更新）/ cancel（取消）
-    status: alert.messageType?.code || '',
-    sender: alert.senderName || '',
-    pubTime: alert.issuedTime || '',
-    startTime: alert.onsetTime || alert.effectiveTime || '',
-    endTime: alert.expireTime || '',
-    criteria: alert.criteria || '',
-    instruction: alert.instruction || '',
-  })
-
   /* ---- 坐标：所有天气接口都按经纬度查 ---- */
 
   /**
@@ -567,7 +553,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     console.log(`天气预警过期、重新获取`);
     const { alerts } = await getWeatherWarnings(await resolveWarningCoord())
     // 当地没有预警时返回空数组（metadata.zeroResult = true），不是错误
-    WeatherEarlyWarning.value = (alerts || []).map(normalizeWarning)
+    WeatherEarlyWarning.value = deduplicateWarnings((alerts || []).map(normalizeWarning))
     WeatherDataUpdatedAtATime.value.EarlyWarning = Date.now()
   }
   // 获取生活指数
@@ -675,8 +661,9 @@ export const useWeatherStore = defineStore('Weather', () => {
     getMinutelyPrecipitation().catch(() => {})
   }
 
-  const openWarningDetails = () => {
+  const openWarningDetails = (warningId = null) => {
     MinutelyDetailsDialog.value = false
+    EarlyWarningDetailsWarningId.value = warningId
     EarlyWarningDetailsDialog.value = true
   }
 
@@ -787,6 +774,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     dayDateCity,
     // 地址文案：区县名（「黄岩区」）/ 完整地址（「黄岩区 中学路」）
     CityDisplayName,
+    CityAddressPoint,
     CityDistrictLabel,
     CityAddressLabel,
     // 近四天天气
@@ -801,6 +789,7 @@ export const useWeatherStore = defineStore('Weather', () => {
     WeatherEarlyWarning,
     WeatherIndices,
     EarlyWarningDetailsDialog,
+    EarlyWarningDetailsWarningId,
     MinutelyPrecipitation,
     MinutelyStatus,
     MinutelyDetailsDialog

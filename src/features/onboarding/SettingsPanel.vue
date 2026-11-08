@@ -7,102 +7,122 @@
     <section class="set-left">
       <div class="set-aura" aria-hidden="true"></div>
 
-      <header class="set-head">
-        <span class="set-kicker"><i class="set-kicker-dot"></i>设置</span>
-        <h1 class="set-title">连接与凭据</h1>
-        <p class="set-lead">
-          天气数据走你自己的和风天气 <b>域名 + 密钥</b>。这里看当前状态；
-          要修改请到右侧「壁纸属性」面板，改完回到这一页会自动重新检测。
-        </p>
-      </header>
+      <StaggerTransition preset="panel" :index="0">
+        <header class="set-head">
+          <span class="set-kicker"><i class="set-kicker-dot"></i>设置</span>
+          <h1 class="set-title">连接与凭据</h1>
+          <p class="set-lead">
+            天气数据走你自己的和风天气 <b>域名 + 密钥</b>。这里看当前状态；
+            要修改请到右侧「壁纸属性」面板，改完回到这一页会自动重新检测。
+          </p>
+        </header>
+      </StaggerTransition>
 
       <!-- 和引导页共用同一张状态卡；逐组明细交给下面的「当前凭据」，不重复列 -->
-      <CredentialStatusCard :list="false" />
+      <StaggerTransition preset="panel" :index="1">
+        <CredentialStatusCard :list="false" />
+      </StaggerTransition>
 
-      <div class="set-actions">
-        <button class="set-btn" type="button" :disabled="retryDisabled" @click="runApiCheck()">
-          {{ CheckStatus === 'checking' ? '检测中…' : '重新检测' }}
-        </button>
-        <span class="set-actions-hint">每组只发 1 次地址查询，几乎不占额度</span>
-      </div>
-
-      <div class="set-cred">
-        <div class="set-card-head">
-          <span class="set-card-title">当前凭据</span>
-          <span class="set-card-pill">{{ entries.length }} 组</span>
+      <StaggerTransition preset="panel" :index="2">
+        <div class="set-actions">
+          <button class="set-btn" type="button" :disabled="retryDisabled" @click="runApiCheck()">
+            {{ CheckStatus === 'checking' ? '检测中…' : '重新检测' }}
+          </button>
+          <span class="set-actions-hint">每组只发 1 次地址查询，几乎不占额度</span>
         </div>
+      </StaggerTransition>
 
-        <p v-if="!credentialRows.length" class="set-cred-empty">还没有读取到域名与密钥。</p>
-        <div v-for="item in credentialRows" :key="item.host" class="set-cred-item">
-          <div class="set-cred-row">
-            <span class="set-cred-host" :title="item.host">{{ item.host }}</span>
-            <span class="set-cred-key">{{ item.key }}</span>
-            <span class="set-cred-state" :class="'is-' + item.tone">{{ item.state }}</span>
+      <StaggerTransition preset="panel" :index="3">
+        <div class="set-cred">
+          <div class="set-card-head">
+            <span class="set-card-title">当前凭据</span>
+            <span class="set-card-pill">{{ entries.length }} 组</span>
           </div>
-          <p v-if="item.detail" class="set-cred-detail">{{ item.detail }}</p>
-        </div>
 
-        <div class="set-cred-row set-cred-amap">
-          <span class="set-cred-host">高德密钥（路名）</span>
-          <span class="set-cred-key">{{ amapFilled ? '已填写' : '未填写' }}</span>
-          <span class="set-cred-state is-muted">{{ amapFilled ? '选点显示路名' : '不影响使用' }}</span>
-        </div>
-      </div>
+          <p v-if="!credentialRows.length" class="set-cred-empty">还没有读取到域名与密钥。</p>
+          <div v-for="item in credentialRows" :key="item.host" class="set-cred-item">
+            <div class="set-cred-row">
+              <span class="set-cred-host" :title="item.host">{{ item.host }}</span>
+              <span class="set-cred-key">{{ item.key }}</span>
+              <span class="set-cred-state" :class="'is-' + item.tone">{{ item.state }}</span>
+            </div>
+            <p v-if="item.detail" class="set-cred-detail">{{ item.detail }}</p>
+          </div>
 
-      <p class="set-hint">改完属性面板里的输入框后，点一下输入框外的空白处让它生效。</p>
+          <div class="set-cred-row set-cred-amap">
+            <span class="set-cred-host">高德密钥（路名）</span>
+            <span class="set-cred-key">{{ amapFilled ? '已填写' : '未填写' }}</span>
+            <span class="set-cred-state is-muted">{{ amapFilled ? '选点显示路名' : '不影响使用' }}</span>
+          </div>
+        </div>
+      </StaggerTransition>
+
+      <StaggerTransition preset="panel" :index="4">
+        <p class="set-hint">改完属性面板里的输入框后，点一下输入框外的空白处让它生效。</p>
+      </StaggerTransition>
     </section>
 
     <section class="set-right">
-      <header class="set-right-head">
-        <div class="set-right-head-text">
-          <span class="set-right-kicker">怎么修改</span>
-          <p class="set-right-sub">这一页只显示状态，不回写任何凭据</p>
-        </div>
-        <button class="set-close" type="button" @click="closeSettings()">返回天气</button>
-      </header>
-
-      <ol class="set-steps">
-        <li v-for="(step, index) in changeSteps" :key="step.title">
-          <span class="set-step-no">{{ index + 1 }}</span>
-          <div class="set-step-body">
-            <div class="set-step-title">{{ step.title }}</div>
-            <p class="set-step-text">{{ step.text }}</p>
+      <StaggerTransition preset="panel" :index="0">
+        <header class="set-right-head">
+          <div class="set-right-head-text">
+            <span class="set-right-kicker">怎么修改</span>
+            <p class="set-right-sub">这一页只显示状态，不回写任何凭据</p>
           </div>
-        </li>
-      </ol>
+          <button class="set-close" type="button" @click="closeSettings()">返回天气</button>
+        </header>
+      </StaggerTransition>
 
-      <button class="set-help" type="button" @click="showHelp = true">
-        <svg class="set-help-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
-            d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-        </svg>
-        打开图文教程：怎么申请域名与密钥
-      </button>
+      <StaggerTransition preset="panel" :index="1">
+        <ol class="set-steps">
+          <li v-for="(step, index) in changeSteps" :key="step.title">
+            <span class="set-step-no">{{ index + 1 }}</span>
+            <div class="set-step-body">
+              <div class="set-step-title">{{ step.title }}</div>
+              <p class="set-step-text">{{ step.text }}</p>
+            </div>
+          </li>
+        </ol>
+      </StaggerTransition>
 
-      <div class="set-appearance">
-        <div class="set-card-head">
-          <span class="set-card-title">外观与背景</span>
-          <span class="set-card-pill">只读</span>
+      <StaggerTransition preset="panel" :index="2">
+        <button class="set-help" type="button" @click="showHelp = true">
+          <svg class="set-help-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+              d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
+          </svg>
+          打开图文教程：怎么申请域名与密钥
+        </button>
+      </StaggerTransition>
+
+      <StaggerTransition preset="panel" :index="3">
+        <div class="set-appearance">
+          <div class="set-card-head">
+            <span class="set-card-title">外观与背景</span>
+            <span class="set-card-pill">只读</span>
+          </div>
+          <ul class="set-appearance-list">
+            <li><span>面板缩放</span><b>{{ panelScaleText }}</b></li>
+            <li><span>动态背景</span><b>{{ backgroundText }}</b></li>
+          </ul>
+          <p class="set-hint">{{ appearanceHint }}</p>
         </div>
-        <ul class="set-appearance-list">
-          <li><span>面板缩放</span><b>{{ panelScaleText }}</b></li>
-          <li><span>动态背景</span><b>{{ backgroundText }}</b></li>
-        </ul>
-        <p class="set-hint">{{ appearanceHint }}</p>
-      </div>
+      </StaggerTransition>
 
-      <div class="set-foot">
-        <div class="set-repo">
-          <span class="set-repo-label">开源仓库</span>
-          <button class="set-repo-url" type="button" :title="'点击复制：' + repoUrl"
-            @click="copyRepoUrl()">{{ repoShort }}</button>
-          <span class="set-repo-state">{{ repoCopyState }}</span>
+      <StaggerTransition preset="panel" :index="4">
+        <div class="set-foot">
+          <div class="set-repo">
+            <span class="set-repo-label">开源仓库</span>
+            <button class="set-repo-url" type="button" :title="'点击复制：' + repoUrl"
+              @click="copyRepoUrl()">{{ repoShort }}</button>
+            <span class="set-repo-state">{{ repoCopyState }}</span>
+          </div>
+          <p class="set-disclaimer">
+            本壁纸为开源项目（无盈利）；你填写的域名与密钥只保存在本机、不会上传；天气数据来自和风天气，仅供参考。
+          </p>
+          <button class="set-review" type="button" @click="reviewOnboarding">重新查看新手引导 →</button>
         </div>
-        <p class="set-disclaimer">
-          本壁纸为开源项目（无盈利）；你填写的域名与密钥只保存在本机、不会上传；天气数据来自和风天气，仅供参考。
-        </p>
-        <button class="set-review" type="button" @click="reviewOnboarding">重新查看新手引导 →</button>
-      </div>
+      </StaggerTransition>
     </section>
 
     <ApiHelpPanel :open="showHelp" @close="showHelp = false" />
@@ -110,6 +130,7 @@
 </template>
 
 <script setup>
+import StaggerTransition from '@/shared/motion/StaggerTransition'
 import { computed, ref } from 'vue'
 import CredentialStatusCard from './CredentialStatusCard.vue'
 import ApiHelpPanel from './ApiHelpPanel.vue'
@@ -130,7 +151,7 @@ const showHelp = ref(false)
 
 // 「怎么修改」只有一条路径：去壁纸属性面板（浏览器里就是右上角的调试悬浮块）
 const changeSteps = [
-  { title: '右键这张壁纸 →「设置」', text: '属性面板在窗口右侧，最上方就是域名与密钥' },
+  { title: '打开「壁纸属性」面板', text: '它位于 Wallpaper Engine 窗口右侧，最上方就是域名与密钥' },
   { title: '改「域名」和「密钥」', text: '多个用英文逗号分隔、按顺序一一配对' },
   { title: '回到这一页，自动重新检测', text: '也可以直接点左边的「重新检测」' },
 ]
@@ -201,7 +222,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   flex-direction: column;
   gap: 1.0625rem;
   padding: 2.125rem;
-  background: linear-gradient(155deg, rgba(14, 165, 233, 0.34), rgba(56, 189, 248, 0.1) 55%, transparent);
+  background: var(--hero-gradient);
   /* 凭据组数多时让左栏自己滚，不把外壳撑高 */
   overflow-y: auto;
 }
@@ -212,8 +233,8 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 90% at 18% -10%, rgba(56, 189, 248, 0.3), transparent 60%),
-    radial-gradient(95% 70% at 108% 106%, rgba(56, 189, 248, 0.16), transparent 62%);
+    var(--hero-glow),
+    radial-gradient(95% 70% at 108% 106%, var(--glass-active), transparent 62%);
 }
 
 .set-head {
@@ -234,7 +255,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  background: rgba(4, 18, 31, 0.26);
+  background: var(--surface-inset);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
 }
@@ -245,7 +266,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   height: 0.375rem;
   border-radius: 50%;
   background: var(--color-primary);
-  box-shadow: 0 0 0 0.1875rem rgba(56, 189, 248, 0.16);
+  box-shadow: 0 0 0 0.1875rem var(--glass-active);
 }
 
 .set-title {
@@ -339,7 +360,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
 }
@@ -391,7 +412,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
 }
 
 .set-cred-state.is-bad {
-  color: #ffcb9e;
+  color: var(--warning-text);
 }
 
 .set-cred-state.is-wait,
@@ -403,7 +424,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   margin: 0.1875rem 0 0;
   font-size: 0.7rem;
   line-height: 1.5;
-  color: #ffcb9e;
+  color: var(--warning-text);
 }
 
 /* 高德是选填项，用一条分隔线和上面的和风凭据分开 */
@@ -429,8 +450,8 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   gap: 1.0625rem;
   padding: 2.125rem;
   background:
-    radial-gradient(118% 80% at 100% 0%, rgba(56, 189, 248, 0.15), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.016));
+    var(--hero-glow),
+    linear-gradient(180deg, var(--glass-bg-soft), var(--glass-bg-subtle));
   overflow-y: auto;
 }
 
@@ -455,7 +476,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: #8ed3f7;
+  color: var(--color-primary-soft);
 }
 
 .set-right-kicker::before {
@@ -463,7 +484,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   display: block;
   width: 0.875rem;
   height: 0.0625rem;
-  background: linear-gradient(90deg, rgba(125, 211, 252, 0.2), #7dd3fc);
+  background: linear-gradient(90deg, rgba(125, 211, 252, 0.2), var(--color-primary));
 }
 
 .set-right-sub {
@@ -517,8 +538,8 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   height: 1.5rem;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #eaf7ff;
-  background: linear-gradient(160deg, rgba(56, 189, 248, 0.56), rgba(14, 165, 233, 0.28));
+  color: var(--text-on-accent);
+  background: var(--glass-active);
   border: 1px solid rgba(125, 211, 252, 0.56);
   border-radius: 50%;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
@@ -550,16 +571,16 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   padding: 0.5rem 0.875rem;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #8ed3f7;
-  background: rgba(56, 189, 248, 0.1);
-  border: 1px solid rgba(56, 189, 248, 0.34);
+  color: var(--color-primary-soft);
+  background: var(--glass-active);
+  border: 1px solid var(--rain-chip-border);
   border-radius: 999px;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 
   &:hover {
-    color: #bae6fd;
-    background: rgba(56, 189, 248, 0.18);
-    border-color: rgba(56, 189, 248, 0.6);
+    color: var(--color-primary-soft);
+    background: var(--glass-active);
+    border-color: var(--glass-border-strong);
   }
 }
 
@@ -574,7 +595,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem 0.875rem;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-subtle);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
 }
@@ -612,7 +633,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   gap: 0.4375rem;
   margin-top: auto;
   padding-top: 0.875rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--glass-bg-soft);
 }
 
 .set-repo {
@@ -636,7 +657,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   font-size: 0.78rem;
   text-align: left;
   color: var(--text-secondary);
-  background: rgba(4, 18, 31, 0.38);
+  background: var(--surface-inset);
   border: 1px solid rgba(56, 189, 248, 0.32);
   border-radius: 0.5rem;
   overflow: hidden;
@@ -646,7 +667,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
 
   &:hover {
     color: var(--text-primary);
-    border-color: rgba(56, 189, 248, 0.75);
+    border-color: var(--glass-border-strong);
   }
 }
 
@@ -655,7 +676,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   min-width: 3.25rem;
   font-size: 0.72rem;
   text-align: right;
-  color: #95d5ae;
+  color: var(--success-text);
 }
 
 .set-disclaimer {
@@ -669,7 +690,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   align-self: flex-start;
   padding: 0;
   font-size: 0.75rem;
-  color: #8ed3f7;
+  color: var(--color-primary-soft);
   background: none;
   border: none;
   text-decoration: underline;
@@ -677,7 +698,7 @@ const reviewOnboarding = () => openOnboarding({ review: true })
   transition: color 0.2s ease;
 
   &:hover {
-    color: #bae6fd;
+    color: var(--color-primary-soft);
   }
 }
 

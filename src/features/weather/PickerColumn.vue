@@ -210,7 +210,7 @@ watch(
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -222,7 +222,7 @@ watch(
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-muted);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--glass-bg-soft);
 }
 
 .pc-body {
@@ -272,7 +272,7 @@ watch(
   }
 
   &.active {
-    background: rgba(56, 189, 248, 0.18);
+    background: var(--glass-active);
     color: var(--text-primary);
     font-weight: 600;
   }
@@ -305,7 +305,7 @@ watch(
   width: 0.375rem;
   margin: 0.5rem 0.25rem 0.5rem 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-soft);
   opacity: 0;
   transition: opacity 0.2s ease;
 
@@ -320,12 +320,12 @@ watch(
   left: 0;
   width: 100%;
   border-radius: 999px;
-  background: rgba(235, 242, 251, 0.42);
+  background: var(--text-muted);
   cursor: grab;
   transition: background 0.16s ease;
 
   &:hover {
-    background: rgba(235, 242, 251, 0.68);
+    background: var(--text-secondary);
   }
 
   &:active {

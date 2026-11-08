@@ -1,42 +1,31 @@
 <template>
-  <div class="MinutelyDialog" role="presentation" @click="close">
-    <div class="MinutelyPanel" role="dialog" aria-modal="true" aria-labelledby="MinutelyDialogTitle" @click.stop>
-      <header class="MinutelyHeader">
+  <WeatherDialog class="MinutelyDialog" labelledby="MinutelyDialogTitle" :show-close="false" @close="close" @backdrop-click="close">
+      <template #title>
         <div class="MinutelyHeading">
-          <span id="MinutelyDialogTitle" class="MinutelyTitle">分钟级降水</span>
+          <span id="MinutelyDialogTitle" class="MinutelyTitle">{{ presentation.title }}</span>
           <span v-if="metaText" class="MinutelyMeta">{{ metaText }}</span>
         </div>
-        <button class="MinutelyClose" type="button" aria-label="关闭" @click="close">
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"></path>
-          </svg>
-        </button>
-      </header>
+      </template>
 
-      <div class="MinutelyBody">
+      <div class="MinutelyBody" :class="{ 'is-state': !analysis }" :style="{ '--minutely-axis-gutter': `${axisGutter}rem` }">
         <!-- 有数据：标题 + 未来两小时柱状图 + 汇总 -->
         <template v-if="analysis">
           <p class="MinutelyHeadline">{{ headline }}</p>
           <p v-if="subline" class="MinutelySubline">{{ subline }}</p>
 
           <!-- 悬停看明细：上方留出一条给浮层的位置，避免柱子长高时把浮层顶出弹层 -->
-          <div class="MinutelyChartWrap" @mouseleave="clearHover">
+          <div class="MinutelyChartWrap" :class="{ 'is-empty': !hasRain }" @mouseleave="clearHover">
             <div ref="chartRef" class="MinutelyChart" :class="{ 'is-empty': !hasRain }" aria-hidden="true">
-              <span class="MinutelyGridLine" style="top: 0%"></span>
-              <!-- 分级参考线：横线是「小雨 / 中雨 / 大雨 / 暴雨」的真实阈值，右侧小字标出每档的范围 -->
-              <span
-                v-for="line in levelLines"
-                :key="`line-${line.key}`"
-                class="MinutelyLevelLine"
-                :style="{ bottom: `${line.top * 100}%` }"
-              ></span>
-              <span
-                v-for="zone in levelZones"
-                v-show="zone.showLabel"
-                :key="`zone-${zone.key}`"
-                class="MinutelyLevelLabel"
-                :style="{ bottom: `${zone.center * 100}%` }"
-              >{{ zone.label }}</span>
+              <div class="MinutelyGrid">
+                <template v-for="tick in rainTicks" :key="tick.key">
+                  <div
+                    class="MinutelyGridLine"
+                    :class="{ 'is-baseline': tick.position === 0 }"
+                    :style="{ bottom: `${tick.position}%` }"
+                  ></div>
+                  <span class="MinutelyGridLabel" :style="{ bottom: `${tick.position}%` }">{{ tick.label }}</span>
+                </template>
+              </div>
               <span v-if="band" class="MinutelyHoverBand" :style="{ left: `${band.left}px`, width: `${band.width}px` }"></span>
               <div class="MinutelyBars" :class="{ 'has-hover': activeIndex !== null }">
                 <div
@@ -46,17 +35,18 @@
                   :class="[`tone-${bar.tone}`, { 'is-active': activeIndex === index }]"
                   @mouseenter="focusBar(index, $event)"
                 >
-                  <span class="MinutelyBar" :style="barStyle(bar, index)"></span>
+                  <StaggerTransition preset="bar" :index="index">
+                    <span class="MinutelyBar" :style="{ height: `${(bar.height * 100).toFixed(2)}%` }"></span>
+                  </StaggerTransition>
                 </div>
               </div>
             </div>
 
             <div
               v-if="activeBar"
-              ref="tipRef"
               class="MinutelyTooltip"
               :class="`tone-${activeBar.tone}`"
-              :style="{ left: `${tipCenter}px` }"
+              :style="{ '--tip-center': `${tipCenter}px`, '--tip-plot-width': `${tipPlotWidth}px` }"
               aria-hidden="true"
             >
               <span class="MinutelyTipHead">
@@ -73,34 +63,30 @@
 
           <div class="MinutelyStats">
             <div class="MinutelyStat">
-              <span class="MinutelyStatLabel">未来两小时累计</span>
+              <span class="MinutelyStatLabel">两小时累计{{ presentation.noun }}</span>
               <span class="MinutelyStatValue">{{ totalLabel }}</span>
             </div>
             <div class="MinutelyStat">
-              <span class="MinutelyStatLabel">最大雨强</span>
+              <span class="MinutelyStatLabel">最大{{ presentation.strength }}</span>
               <span class="MinutelyStatValue">{{ peakLabel }}</span>
             </div>
             <div class="MinutelyStat">
-              <span class="MinutelyStatLabel">预计降水时长</span>
+              <span class="MinutelyStatLabel">预计{{ presentation.noun }}时长</span>
               <span class="MinutelyStatValue">{{ durationLabel }}</span>
             </div>
           </div>
 
           <p class="MinutelySource">
-            每根柱 = {{ STEP_MINUTES }} 分钟降水量，悬停可看该时段雨强 · 数据来自
-            <a href="https://www.qweather.com" target="_blank" rel="noopener noreferrer">和风天气</a>
-            · 仅覆盖中国区域
+            <span>数据来源：</span><a href="https://www.qweather.com" target="_blank" rel="noopener noreferrer">和风天气</a>
+            <span> · 仅中国地区可用 · </span>
+            <span class="MinutelyReferenceNote" :title="referenceExplanation">{{ referenceSource }}</span>
           </p>
         </template>
 
         <!-- 没有数据（境外坐标或临时缺测）：说清原因是覆盖范围，而不是凭据问题 -->
         <div v-else-if="status === 'unsupported'" class="MinutelyState">
-          <svg class="MinutelyStateIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3.1c3.35 4.27 4.85 6.87 4.85 9.3a4.85 4.85 0 0 1-9.7 0c0-2.43 1.5-5.03 4.85-9.3z"
-              fill="none" stroke="currentColor" stroke-width="1.6"></path>
-            <path d="M5 21L19 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-          </svg>
-          <p class="MinutelyStateTitle">这里暂时没有分钟级降水数据</p>
+          <PrecipitationIcon class="MinutelyStateIcon" :type="presentation.type" />
+          <p class="MinutelyStateTitle">这里暂时没有{{ presentation.title }}数据</p>
           <p class="MinutelyStateText">
             分钟级降水目前只覆盖中国区域（1 km 网格，未来两小时）。如果你就在中国境内，
             这一时段可能是临时缺测，稍后会自动重试；其它天气数据不受影响。
@@ -109,39 +95,43 @@
 
         <!-- 请求失败：给一个明确的重试入口 -->
         <div v-else-if="status === 'error'" class="MinutelyState">
-          <p class="MinutelyStateTitle">分钟级降水暂时取不到</p>
+          <p class="MinutelyStateTitle">{{ presentation.title }}暂时取不到</p>
           <p class="MinutelyStateText">可能是网络或服务波动，稍后也会自动重试。</p>
           <button class="MinutelyRetry" type="button" @click="retry">重新获取</button>
         </div>
 
         <!-- 接口返回成功、但一个点都没给（罕见）：别一直转圈，给个重试 -->
         <div v-else-if="status === 'ready'" class="MinutelyState">
-          <p class="MinutelyStateTitle">暂时没有分钟级降水数据</p>
+          <p class="MinutelyStateTitle">暂时没有{{ presentation.title }}数据</p>
           <p class="MinutelyStateText">接口这次返回的点位是空的，稍后会自动重试。</p>
           <button class="MinutelyRetry" type="button" @click="retry">重新获取</button>
         </div>
 
         <!-- 首次加载 / 重试中 -->
         <div v-else class="MinutelyState is-loading">
-          <p class="MinutelyStateTitle">正在获取未来两小时的降水…</p>
+          <p class="MinutelyStateTitle">正在获取未来两小时的{{ presentation.noun }}…</p>
           <div class="MinutelySkeleton" aria-hidden="true">
             <span v-for="(height, index) in skeleton" :key="index" :style="{ height: `${height}%` }"></span>
           </div>
         </div>
       </div>
-    </div>
-  </div>
+  </WeatherDialog>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWeatherStore } from '@/store/index'
 import { useWeatherNow } from './useWeatherNow'
-import { analyzeMinutely, isWetPrecip, LEVEL_STEPS, minutelyTitle, precipToRate, rateLevel, STEP_MINUTES } from './minutelyRain'
+import WeatherDialog from './WeatherDialog.vue'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
+import { analyzeMinutely, isWetPrecip, minutelyTitle, precipToRate, rateLevel, STEP_MINUTES } from './minutelyRain'
+import { createGradeHeightScale, selectRainScale } from './minutelyRainScale'
+import { formatPrecipRate, getReferenceLevelSteps, precipitationPresentation } from './precipitationLevels'
+import PrecipitationIcon from './PrecipitationIcon.vue'
 
 const weatherStore = useWeatherStore()
-const { MinutelyPrecipitation, MinutelyStatus, MinutelyDetailsDialog, dayDateCity, CityAddressLabel } = storeToRefs(weatherStore)
+const { MinutelyPrecipitation, MinutelyStatus, MinutelyDetailsDialog, CityAddressLabel, nowWeatherData } = storeToRefs(weatherStore)
 const { retryMinutelyPrecipitation } = weatherStore
 // 模板里直接用 status 判断是「加载中 / 不支持 / 出错」中的哪一种
 const status = MinutelyStatus
@@ -164,6 +154,18 @@ onUnmounted(() => {
 })
 
 const analysis = computed(() => analyzeMinutely(MinutelyPrecipitation.value?.points, now.value))
+const presentation = computed(() => precipitationPresentation(analysis.value, nowWeatherData.value))
+const referenceSource = computed(() => {
+  const rain = '降雨分级参考来自南昌市地方标准 DB3601/T 13-2025《短时降雨量等级分类规范》'
+  const snow = '降雪分级参考来自新疆维吾尔自治区地方标准 DB65/T 3273-2026《降水量级别》 · 雪量为水当量'
+  return presentation.value.type === 'snow' ? snow : presentation.value.type === 'mixed' ? `${rain}；${snow}` : rain
+})
+const referenceExplanation = computed(() => {
+  const rain = '降雨参考南昌市地方标准 DB3601/T 13—2025 表1的1小时阈值，标准适用范围为南昌市，其他地区仅作显示参考。图中雨强由5分钟降雨量折算，不代表实际1小时累计量。'
+  const snow = '降雪参考新疆维吾尔自治区地方标准 DB65/T 3273-2026 表2的1小时水当量阈值，其他地区仅作显示参考。图中强度由5分钟降雪水当量折算，不代表实际1小时累计量或积雪深度。特大暴雪为大于8.0毫米，8.0毫米仍属大暴雪；小于0.1毫米的零星小雪仅为微量提示，非表内等级。'
+  const explanation = presentation.value.type === 'snow' ? snow : presentation.value.type === 'mixed' ? `${rain}${snow}` : rain
+  return presentation.value.type === 'mixed' ? explanation : `${explanation}纵轴按等级等距分段显示，段内线性缩放，实际强度见明细。`
+})
 const hasRain = computed(() => (analysis.value?.total || 0) > 0)
 const headline = computed(() => minutelyTitle(analysis.value))
 
@@ -191,12 +193,8 @@ const updatedLabel = computed(() => {
 })
 
 const metaText = computed(() => {
-  // 跟着天气卡走：点选过就是「区县 路名」/「区县附近」，没点选才是完整的「省, 区县」。
-  // 不再在这里自己拼 district / road —— 卡片换成了「附近」写法后，两处必须一致
-  const point = dayDateCity.value.point
-  const city = point
-    ? CityAddressLabel.value
-    : (dayDateCity.value.city || '')
+  // 地址与天气卡保持一致，包括默认区县中心补查到的街道。
+  const city = CityAddressLabel.value
   if (!updatedLabel.value) return city
   return city ? `${city} · ${updatedLabel.value} 更新` : `${updatedLabel.value} 更新`
 })
@@ -206,10 +204,11 @@ const subline = computed(() => {
   const data = analysis.value
   if (!data || data.expired) return data?.expired ? '数据已超过两小时没有更新' : ''
   if (data.raining) {
-    return `当前小时雨强 ${data.rate.toFixed(1)} mm/h`
+    return `当前${presentation.value.strength} ${formatPrecipRate(data.rate, data.currentType)}${presentation.value.type === 'snow' ? '（水当量）' : ''}`
   }
   if (data.startsIn !== null) {
-    return `预计 ${clock(now.value + data.startsIn * 60000)} 开始`
+    const nextWet = data.points.slice(data.index).find((point) => isWetPrecip(point.precip))
+    return nextWet ? `预计 ${clock(nextWet.ts)} 开始` : ''
   }
   return ''
 })
@@ -223,77 +222,63 @@ const chartPoints = computed(() => {
   return data.points.slice(data.index)
 })
 
-/* 柱状图：未来两小时逐 5 分钟（不假设一定是 24 根，按实际长度渲染）。
-   纵轴刻度取固定的几档，而不是「按本次最大值拉满」——
-   否则一场毛毛雨也会画成满屏柱子，和暴雨看起来一模一样。 */
-const scaleSteps = [0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-const scale = computed(() => {
-  const max = Math.max(0, ...chartPoints.value.map((point) => point.precip))
-  return scaleSteps.find((step) => max <= step) ?? scaleSteps[scaleSteps.length - 1]
+/* 单一雨雪类型按参考等级等距分段；混合降水继续使用线性数值轴。 */
+const chartRef = ref(null)
+const scaleMax = ref(5)
+const chartPeakRate = computed(() => Math.max(0, ...chartPoints.value.map((point) => precipToRate(point.precip))))
+const referenceLevels = computed(() => {
+  if (!hasRain.value || presentation.value.type === 'mixed') return []
+  const rate = analysis.value?.raining ? analysis.value.rate : chartPeakRate.value
+  return getReferenceLevelSteps(rate, presentation.value.type)
 })
+watch([chartPeakRate, () => presentation.value.type], ([peak, type], previous) => {
+  scaleMax.value = selectRainScale(peak, previous?.[1] === type ? scaleMax.value : 0, type)
+}, { immediate: true })
+const gradeScale = computed(() => createGradeHeightScale(referenceLevels.value, chartPeakRate.value))
+// 正在下时围绕当前等级，无降水时围绕预报峰值；参考线与柱体使用相同映射。
+const rainTicks = computed(() => {
+  if (!hasRain.value) return [{ key: 'dry', label: presentation.value.dry, position: 0 }]
+  // 雨雪混合时使用数值刻度，每根柱子的等级由悬停明细说明。
+  if (presentation.value.type === 'mixed') return [0, 0.5, 1].map((fraction) => ({
+    key: `mixed-${fraction}`, label: `${scaleMax.value * fraction}`, position: fraction * 100,
+  }))
+  return gradeScale.value.ticks.map((tick) => ({
+    key: tick.key, label: tick.label, position: tick.position * 100,
+  }))
+})
+// 刻度字号为 0.7rem，按最长标签留出文字宽度及 0.5rem 间隔。
+const axisGutter = computed(() => Math.max(1.9, ...rainTicks.value.map((tick) => [...tick.label].length * 0.7 + 0.5)))
 
-/** 5 分钟降水量 → 每小时雨强：柱子高度是「这 5 分钟下了多少」，浮层统一显示更直观的 mm/h */
+/** 5 分钟量折算强度后映射柱高，浮层保留实际 mm/h。 */
 const bars = computed(() => chartPoints.value.map((point) => {
   const wet = isWetPrecip(point.precip)
   const rate = precipToRate(point.precip)
   const level = rateLevel(rate, point.type)
   return {
     wet,
-    tone: wet ? level.key : 'dry',
-    height: wet ? Math.min(1, point.precip / scale.value) : 0,
+    tone: wet ? level.tone : 'dry',
+    height: wet ? (presentation.value.type === 'mixed' ? Math.min(1, rate / scaleMax.value) : gradeScale.value.height(rate)) : 0,
     // 悬停浮层用：这一格覆盖的时间段 + 雨强 + 等级
     range: `${clock(point.ts)} – ${clock(point.ts + STEP_MINUTES * 60000)}`,
-    level: wet ? level.label : '无降水',
-    rate: `${rate.toFixed(1)} mm/h`,
+    level: wet ? level.label : `无${point.type === 'snow' ? '降雪' : '降雨'}`,
+    rate: `${formatPrecipRate(rate, point.type)}${point.type === 'snow' ? '（水当量）' : ''}`,
   }
 }))
-
-/* 分级参考线 —— 纵轴是「每 5 分钟降水量」，所以阈值也要换成 mm/5min 来比高度：
-   2.5 mm/h（≈0.21 mm/5min）起算中雨，8 mm/h 起算大雨，16 mm/h 起算暴雨。
-   和柱子配色共用 LEVELS 表，改阈值时线、色、右侧小字会一起变。
-   两小时都不下雨时整张图是一排空柱子，画分级线只是噪音，干脆不画。 */
-const levelZones = computed(() => {
-  if (!hasRain.value) return []
-  const top = scale.value
-  const type = analysis.value?.type || 'rain'
-  const zones = []
-  LEVEL_STEPS.forEach((step, index) => {
-    if (step.mm >= top) return
-    const next = LEVEL_STEPS[index + 1]
-    const upper = Math.min(next ? next.mm : top, top) / top
-    const lower = step.mm / top
-    zones.push({
-      key: step.key,
-      label: type === 'snow' ? step.snow : step.rain,
-      top: upper,
-      center: (upper + lower) / 2,
-      // 带子太窄就写不下字了：比如暴雨那张图里，小雨只占底下几个像素
-      showLabel: upper - lower >= 0.12,
-    })
-  })
-  return zones
-})
-
-// 每档只画「上边界」；最上面那档的顶就是图表顶，不用再画一条线
-const levelLines = computed(() => levelZones.value
-  .filter((zone) => zone.top < 0.999)
-  .map((zone) => ({ key: zone.key, top: zone.top })))
 
 /* —— 悬停明细 ——
    位置全部按「被悬停那一格的实测矩形」来算，而不是「第几根 × 平均宽度」：
    柱间有 gap，用平均宽度算会越往右偏得越多。浮层再夹一次，保证第一根、最后一根都不溢出。 */
-const chartRef = ref(null)
-const tipRef = ref(null)
 const hoverIndex = ref(null)
 const band = ref(null)
 const tipCenter = ref(0)
+const tipPlotWidth = ref(0)
 
 const activeIndex = computed(() => (
   hoverIndex.value !== null && hoverIndex.value < bars.value.length ? hoverIndex.value : null
 ))
 const activeBar = computed(() => (activeIndex.value === null ? null : bars.value[activeIndex.value]))
 
-async function focusBar(index, event) {
+function focusBar(index, event) {
   const chart = chartRef.value
   const slot = event?.currentTarget
   if (!chart || !slot) return
@@ -302,16 +287,9 @@ async function focusBar(index, event) {
   const left = slotRect.left - chartRect.left
   band.value = { left, width: slotRect.width }
   hoverIndex.value = index
-  // 先摆在柱子正中，量到浮层宽度后再夹进边界（避免第一帧从左边滑进来）
+  // CSS 直接用浮层自身宽度夹紧位置，首帧和内容变化时均不越界。
   tipCenter.value = left + slotRect.width / 2
-
-  await nextTick()
-  const tip = tipRef.value
-  const half = tip ? tip.offsetWidth / 2 : 0
-  const center = left + slotRect.width / 2
-  const min = half + 2
-  const max = chartRect.width - half - 2
-  tipCenter.value = max > min ? Math.min(Math.max(center, min), max) : center
+  tipPlotWidth.value = chartRect.width
 }
 
 function clearHover() {
@@ -323,19 +301,6 @@ function clearHover() {
 const onResize = () => clearHover()
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
-
-// 进场时让柱子从 0 长起来；prefers-reduced-motion 由全局样式兜底
-const grown = ref(false)
-onMounted(() => {
-  nextTick(() => { requestAnimationFrame(() => { grown.value = true }) })
-})
-const barStyle = (bar, index) => (grown.value
-  ? {
-    height: `${Math.max(bar.height * 100, 4).toFixed(1)}%`,
-    // 用变量传延迟：内联的 transition-delay 会连悬停时的透明度 / 发光一起延迟
-    '--bar-delay': `${Math.min(index * 16, 240)}ms`,
-  }
-  : { height: '0%' })
 
 const ticks = computed(() => {
   const points = chartPoints.value
@@ -352,12 +317,12 @@ const ticks = computed(() => {
 const totalLabel = computed(() => {
   const total = analysis.value?.total || 0
   if (!total) return '0 mm'
-  return `${total >= 10 ? total.toFixed(0) : total.toFixed(1)} mm`
+  return `${total.toFixed(total >= 10 ? 0 : total < 0.1 ? 3 : total < 1 ? 2 : 1)} mm`
 })
 const peakLabel = computed(() => {
   const peak = analysis.value?.peakRate || 0
-  if (peak < 0.1) return '—'
-  return `${peak.toFixed(1)} mm/h`
+  if (!peak) return '—'
+  return formatPrecipRate(peak, presentation.value.type)
 })
 const durationLabel = computed(() => {
   const points = chartPoints.value
@@ -371,58 +336,7 @@ const skeleton = [18, 26, 34, 30, 44, 62, 78, 70, 52, 40, 30, 24, 20, 16, 13, 11
 </script>
 
 <style lang="scss" scoped>
-/* 右侧留给「小雨 / 中雨 / 大雨 / 暴雨」这列小字的地儿，柱状图和横轴都要让出来 */
-$chart-gutter: 2.25rem;
-
-.MinutelyDialog {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 6.875rem; /* 与预警弹层同一条基线，两个弹层切换时不会上下跳 */
-  background-color: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(1.125rem);
-  -webkit-backdrop-filter: blur(1.125rem);
-}
-
-/* 进场 / 离场：整层淡入淡出由全局 .Dialog-* 负责，这里只做面板的位移与缩放 */
-.MinutelyDialog.Dialog-enter-active .MinutelyPanel,
-.MinutelyDialog.Dialog-leave-active .MinutelyPanel {
-  transition: transform 0.34s var(--ease), opacity 0.3s ease;
-}
-
-.MinutelyDialog.Dialog-enter-from .MinutelyPanel {
-  transform: translateY(1.75rem) scale(0.96);
-  opacity: 0;
-}
-
-.MinutelyDialog.Dialog-leave-to .MinutelyPanel {
-  transform: translateY(1.25rem) scale(0.97);
-  opacity: 0;
-}
-
-.MinutelyPanel {
-  width: min(52vw, 46rem);
-  max-height: min(82vh, 48rem);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: rgba(18, 30, 52, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 1.375rem;
-  box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.MinutelyHeader {
-  flex: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.125rem 1.25rem 0 1.5rem;
-}
+/* 左侧刻度栏与正文左边界对齐，柱子和时间轴共用其余宽度。 */
 
 .MinutelyHeading {
   display: flex;
@@ -445,26 +359,19 @@ $chart-gutter: 2.25rem;
   white-space: nowrap;
 }
 
-.MinutelyClose {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  color: var(--text-secondary);
-  background: var(--glass-bg-soft);
-  border: 1px solid var(--glass-border);
-  border-radius: 50%;
-  transition: background 0.2s ease;
-
-  &:hover {
-    background: var(--glass-border);
-  }
+.MinutelyBody {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.45rem 1rem 1.05rem;
 }
 
-.MinutelyBody {
-  padding: 0.625rem 1.5rem 1.375rem;
+.MinutelyBody.is-state {
+  overflow-y: auto;
 }
 
 .MinutelyHeadline {
@@ -484,52 +391,50 @@ $chart-gutter: 2.25rem;
 /* ================= 柱状图 ================= */
 .MinutelyChartWrap {
   position: relative;
-  margin-top: 1.25rem;
+  display: flex;
+  flex: 1 1 0;
+  min-height: 4.5rem;
+  margin-top: 0.55rem;
   /* 上方留出悬停浮层的位置：柱子长到 100% 也不会把浮层顶出弹层，浮层出现时也不会挤动图表 */
-  padding-top: 3.75rem;
-  padding-right: $chart-gutter;
+  padding-top: 1.05rem;
+  padding-left: var(--minutely-axis-gutter);
+}
+
+.MinutelyChartWrap.is-empty {
+  min-height: 3rem;
 }
 
 .MinutelyChart {
   position: relative;
-  height: 8.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
 
-  /* 两小时都不下雨时整块图是一排空柱子，压矮成一条「平线」，别让弹层中间挂着一大片空白 */
-  &.is-empty {
-    height: 3.5rem;
-  }
+.MinutelyGrid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .MinutelyGridLine {
   position: absolute;
-  left: 0;
   right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.07);
-  pointer-events: none;
+  left: 0;
+  border-top: 1px dashed var(--glass-border);
 }
 
-/* 雨量等级的分界线：虚线，比顶上的网格线亮一点，才看得出「这不是装饰」 */
-.MinutelyLevelLine {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 4px, transparent 4px 9px);
-  pointer-events: none;
+.MinutelyGridLine.is-baseline {
+  border-top-style: solid;
 }
 
-/* 每档的名字写在右侧留白里，垂直居中在这一档的中间 */
-.MinutelyLevelLabel {
+.MinutelyGridLabel {
   position: absolute;
-  right: -$chart-gutter;
-  width: $chart-gutter;
-  font-size: 0.66rem;
+  left: calc(-1 * var(--minutely-axis-gutter));
+  color: var(--text-secondary);
+  font-size: 0.7rem;
   line-height: 1;
-  text-align: right;
-  color: rgba(235, 242, 251, 0.42);
   white-space: nowrap;
-  pointer-events: none;
   transform: translateY(50%);
 }
 
@@ -538,9 +443,9 @@ $chart-gutter: 2.25rem;
   position: absolute;
   top: 0;
   bottom: 0;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--glass-border);
   border-radius: 0.4rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.045) 62%, rgba(255, 255, 255, 0.015));
+  background: linear-gradient(180deg, var(--glass-bg-soft), var(--glass-bg-subtle) 62%, transparent);
   pointer-events: none;
   transition: left 0.14s var(--ease), width 0.14s var(--ease);
 }
@@ -549,56 +454,61 @@ $chart-gutter: 2.25rem;
 .MinutelyTooltip {
   position: absolute;
   top: 0;
+  left: 0;
   z-index: 3;
   display: flex;
   flex-direction: column;
+  width: max-content;
+  max-width: calc(var(--tip-plot-width) - 4px);
+  min-width: 0;
   gap: 0.2rem;
   padding: 0.4rem 0.7rem 0.5rem;
-  background: rgba(11, 20, 36, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--surface-modal);
+  border: 1px solid var(--glass-border);
   border-radius: 0.65rem;
   box-shadow: 0 0.85rem 2rem -0.85rem rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(0.5rem);
   -webkit-backdrop-filter: blur(0.5rem);
   white-space: nowrap;
   pointer-events: none;
-  transform: translateX(-50%);
-  /* left 用位移而不是瞬间跳过去，扫过一排柱子时浮层是滑着走的 */
-  transition: left 0.14s var(--ease);
+  margin-left: var(--minutely-axis-gutter);
+  /* 50% / 100% 取浮层自身宽度，不需要先渲染越界再测量并移回。 */
+  transform: translateX(clamp(2px, calc(var(--tip-center) - 50%), calc(var(--tip-plot-width) - 100% - 2px)));
   animation: minutely-tip-in 0.16s ease-out;
 
   /* 浮层里的点、等级文字跟着柱子的色调走 */
-  --tip-color: rgba(255, 255, 255, 0.3);
+  --tip-color: var(--text-muted);
   --tip-glow: transparent;
   --tip-accent: var(--text-muted);
 
   &.tone-light {
-    --tip-color: #7dd3fc;
-    --tip-glow: rgba(125, 211, 252, 0.5);
-    --tip-accent: #bae6fd;
+    --tip-color: var(--color-primary);
+    --tip-glow: var(--rain-chip-border);
+    --tip-accent: var(--color-primary-soft);
   }
 
   &.tone-moderate {
-    --tip-color: #38bdf8;
-    --tip-glow: rgba(56, 189, 248, 0.5);
-    --tip-accent: #7dd3fc;
+    --tip-color: var(--color-primary);
+    --tip-glow: var(--color-primary);
+    --tip-accent: var(--color-primary);
   }
 
   &.tone-heavy {
-    --tip-color: #0ea5e9;
-    --tip-glow: rgba(14, 165, 233, 0.5);
-    --tip-accent: #38bdf8;
+    --tip-color: var(--color-primary-strong);
+    --tip-glow: var(--rain-chip-border);
+    --tip-accent: var(--color-primary);
   }
 
   &.tone-storm {
-    --tip-color: #3b82f6;
-    --tip-glow: rgba(59, 130, 246, 0.55);
-    --tip-accent: #60a5fa;
+    --tip-color: var(--color-primary-strong);
+    --tip-glow: var(--rain-chip-border);
+    --tip-accent: var(--color-primary-soft);
   }
 }
 
 .MinutelyTipHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.74rem;
@@ -630,17 +540,17 @@ $chart-gutter: 2.25rem;
   line-height: 1.2;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 @keyframes minutely-tip-in {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(0.25rem);
   }
 
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -653,41 +563,63 @@ $chart-gutter: 2.25rem;
 }
 
 .MinutelyBarSlot {
+  position: relative;
   display: flex;
   flex: 1 1 0;
   align-items: flex-end;
   height: 100%;
   min-width: 0;
+
+  &::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    border-radius: 0.4rem;
+    corner-shape: squircle;
+    background: var(--glass-border);
+    opacity: 0.56;
+  }
 }
 
 .MinutelyBar {
+  transform-origin: center bottom;
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
   display: block;
   width: 100%;
-  min-height: 3px; /* 没雨的格子留一条细线，时间轴才连得起来 */
-  border-radius: 0.25rem 0.25rem 0.125rem 0.125rem;
-  background: rgba(255, 255, 255, 0.16);
+  min-height: 2px;
+  border-radius: 0.4rem;
+  corner-shape: squircle;
+  background: var(--glass-border);
   transition:
-    height 0.5s var(--ease-enter) var(--bar-delay, 0s),
     opacity 0.18s ease,
     filter 0.18s ease,
     box-shadow 0.2s ease;
 }
 
+.MinutelyBarSlot.tone-dry .MinutelyBar {
+  visibility: hidden;
+}
+
 .MinutelyBarSlot.tone-light .MinutelyBar {
-  background: linear-gradient(180deg, #bae6fd, #7dd3fc);
+  background: linear-gradient(180deg, var(--color-primary-soft), var(--color-primary));
 }
 
 .MinutelyBarSlot.tone-moderate .MinutelyBar {
-  background: linear-gradient(180deg, #7dd3fc, #38bdf8);
+  background: linear-gradient(180deg, var(--color-primary), var(--color-primary));
 }
 
 .MinutelyBarSlot.tone-heavy .MinutelyBar {
-  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+  background: linear-gradient(180deg, var(--color-primary), var(--color-primary-strong));
 }
 
 .MinutelyBarSlot.tone-storm .MinutelyBar {
-  background: linear-gradient(180deg, #60a5fa, #3b82f6);
-  box-shadow: 0 0 0.75rem rgba(96, 165, 250, 0.45);
+  background: linear-gradient(180deg, var(--color-primary-soft), var(--color-primary-strong));
+  box-shadow: 0 0 0.75rem var(--rain-chip-border);
 }
 
 /* 有柱子被悬停时，其余柱子退到后面，被悬停的那根提亮 + 发光。
@@ -703,20 +635,20 @@ $chart-gutter: 2.25rem;
 }
 
 .MinutelyBars.has-hover .MinutelyBarSlot.is-active.tone-dry .MinutelyBar {
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--glass-border-strong);
   box-shadow: none;
 }
 
-.MinutelyChart.is-empty .MinutelyBar {
-  background: rgba(255, 255, 255, 0.14);
+.MinutelyChart.is-empty .MinutelyBarSlot::before {
+  background: var(--glass-bg-soft);
 }
 
 .MinutelyAxis {
   display: flex;
   justify-content: space-between;
-  margin-top: 0.5rem;
-  /* 和柱状图一样让出右侧那列小字，刻度才对得上柱子的位置 */
-  padding-right: $chart-gutter;
+  flex: none;
+  margin-top: 0.3rem;
+  padding-left: var(--minutely-axis-gutter);
   font-size: 0.76rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -729,20 +661,22 @@ $chart-gutter: 2.25rem;
 
 /* ================= 汇总 ================= */
 .MinutelyStats {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  margin-top: 1.375rem;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
 }
 
 .MinutelyStat {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
-  padding: 0.75rem 0.875rem;
-  background: rgba(255, 255, 255, 0.045);
+  gap: 0.2rem;
+  padding: 0.45rem 0.55rem;
+  background: var(--glass-bg-subtle);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
+  corner-shape: squircle;
 }
 
 .MinutelyStatLabel {
@@ -758,15 +692,17 @@ $chart-gutter: 2.25rem;
 }
 
 .MinutelySource {
-  margin: 1rem 0 0;
+  flex: none;
+  margin: 0.35rem 0 0;
   font-size: 0.74rem;
   line-height: 1.5;
   color: var(--text-muted);
+  white-space: normal;
 
   a {
     color: var(--text-secondary);
     text-decoration: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    border-bottom: 1px solid var(--glass-border-strong);
   }
 
   a:hover {
@@ -833,7 +769,7 @@ $chart-gutter: 2.25rem;
   flex: 1 1 0;
   min-height: 3px;
   border-radius: 0.25rem;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+  background: var(--skeleton-gradient);
   background-size: 200% 100%;
   animation: minutely-sheen 1.3s ease infinite;
 }
@@ -847,13 +783,77 @@ $chart-gutter: 2.25rem;
   }
 }
 
-@media (max-width: 880px) {
-  .MinutelyPanel {
-    width: min(92vw, 46rem);
+/* 高度紧张时，优先压缩图表留白，保证统计项和来源说明仍在弹窗内。 */
+@media (max-height: 760px) {
+  .MinutelyBody {
+    padding-bottom: 0.85rem;
   }
 
+  .MinutelyHeadline {
+    font-size: 1.45rem;
+    line-height: 1.2;
+  }
+
+  .MinutelyChartWrap {
+    min-height: 4.5rem;
+    margin-top: 0.4rem;
+    padding-top: 0.8rem;
+  }
+
+  .MinutelyChartWrap.is-empty {
+    min-height: 2.5rem;
+  }
+
+  .MinutelyStats {
+    margin-top: 0.45rem;
+  }
+
+  .MinutelyStat {
+    padding: 0.35rem 0.5rem;
+  }
+
+  .MinutelySource {
+    margin-top: 0.25rem;
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 560px) {
+  .MinutelyBody {
+    padding-right: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .MinutelyHeadline {
+    font-size: 1.32rem;
+  }
+
+  .MinutelyStats {
+    gap: 0.35rem;
+  }
+
+  .MinutelyStatLabel {
+    font-size: 0.68rem;
+  }
+
+  .MinutelyStatValue {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 880px) {
   .MinutelyChart {
-    height: 6.5rem;
+    min-height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .MinutelyBar,
+  .MinutelyHoverBand,
+  .MinutelyTooltip {
+    animation: none;
+    transition: none;
   }
 }
 </style>

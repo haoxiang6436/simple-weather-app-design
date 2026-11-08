@@ -2,18 +2,19 @@
   <!-- display: contents（见样式）：根节点不生成盒子，三列直接成为外层容器的 grid 项。
        卡片里的三列页和全屏地图上的「重选地区」卡片共用这一份结构，
        列的宽高、间距都由各自的容器决定（.lp-columns / .rpd-body） -->
-  <div class="RegionCascade">
-    <PickerColumn title="省 / 直辖市" :items="provinceItems" :active="provinceId"
+  <StaggerGroup class="RegionCascade" preset="panel" :start-index="2">
+    <PickerColumn key="province" title="省 / 直辖市" :items="provinceItems" :active="provinceId"
       @select="handleProvince" />
-    <PickerColumn title="市 / 区" :items="cityItems" :active="cityId" empty-text="请先选择省份"
+    <PickerColumn key="city" title="市 / 区" :items="cityItems" :active="cityId" empty-text="请先选择省份"
       @select="handleCity" />
-    <PickerColumn title="区 / 县" :items="districtItems" :active="districtId"
+    <PickerColumn key="district" title="区 / 县" :items="districtItems" :active="districtId"
       empty-text="选到市或区县后可在地图上选点" @select="handleDistrict" />
-  </div>
+  </StaggerGroup>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import StaggerGroup from '@/shared/motion/StaggerGroup'
 import CityList from '@/data/CityList'
 import PickerColumn from './PickerColumn.vue'
 import { findNode, toItems } from './regionTree'

@@ -63,7 +63,7 @@
                   <div class="step-body">
                     <div class="step-title">填进壁纸属性面板</div>
                     <p class="step-text">
-                      右键这张壁纸 →「设置」，属性面板在窗口右侧：最上方的「域名」和「密钥」分别粘贴。
+                      在 Wallpaper Engine 窗口右侧的「壁纸属性」面板中，将「域名」和「密钥」分别粘贴到最上方的输入框。
                       多个用英文逗号分隔、按顺序一一配对，填好后壁纸会自动检测
                     </p>
                   </div>
@@ -154,7 +154,7 @@ const PRICE_ROWS = [
   align-items: center;
   justify-content: center;
   padding: 3.5rem 2rem;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
   -webkit-backdrop-filter: blur(1.125rem);
   backdrop-filter: blur(1.125rem);
 }
@@ -199,7 +199,7 @@ const PRICE_ROWS = [
   width: min(76vw, 56.25rem);
   max-height: min(84vh, 45rem);
   overflow: hidden;
-  background: rgba(18, 30, 52, 0.9);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: 1.375rem;
   box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -212,7 +212,7 @@ const PRICE_ROWS = [
   justify-content: space-between;
   gap: 1rem;
   padding: 1.375rem 1.5rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--glass-bg-soft);
 }
 
 .help-title {
@@ -264,7 +264,7 @@ const PRICE_ROWS = [
   justify-content: space-between;
   gap: 1rem;
   padding: 0.875rem 1.5rem 1.125rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--glass-bg-soft);
 }
 
 .help-foot-hint {
@@ -277,8 +277,8 @@ const PRICE_ROWS = [
   padding: 0.5rem 1.375rem;
   font-size: 0.86rem;
   font-weight: 600;
-  color: #04121f;
-  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+  color: var(--text-on-accent);
+  background: var(--color-primary);
   border: none;
   border-radius: 999px;
 
@@ -311,8 +311,8 @@ const PRICE_ROWS = [
   height: 1.5rem;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #04121f;
-  background: rgba(125, 211, 252, 0.9);
+  color: var(--text-on-accent);
+  background: var(--color-primary);
   border-radius: 50%;
 }
 
@@ -336,7 +336,7 @@ const PRICE_ROWS = [
     padding: 0 0.25rem;
     font-size: 0.95em;
     color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg-soft);
     border-radius: 0.25rem;
   }
 }
@@ -354,9 +354,9 @@ const PRICE_ROWS = [
   padding: 0.125rem 0.5rem;
   font-size: 0.68rem;
   font-weight: 600;
-  color: #95d5ae;
-  background: rgba(149, 213, 174, 0.12);
-  border: 1px solid rgba(149, 213, 174, 0.4);
+  color: var(--success-text);
+  background: rgba(140, 200, 166, 0.12);
+  border: 1px solid rgba(140, 200, 166, 0.3);
   border-radius: 999px;
 }
 
@@ -365,8 +365,8 @@ const PRICE_ROWS = [
   align-items: center;
   gap: 0.625rem;
   padding: 0.4375rem 0.5rem 0.4375rem 0.75rem;
-  background: rgba(4, 18, 31, 0.45);
-  border: 1px dashed rgba(56, 189, 248, 0.45);
+  background: var(--surface-inset);
+  border: 1px dashed var(--rain-chip-border);
   border-radius: 0.625rem;
 }
 
@@ -385,8 +385,8 @@ const PRICE_ROWS = [
   padding: 0.3125rem 0.6875rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #04121f;
-  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+  color: var(--text-on-accent);
+  background: var(--color-primary);
   border: none;
   border-radius: 999px;
 
@@ -397,8 +397,8 @@ const PRICE_ROWS = [
 
 .quota-card {
   padding: 0.875rem 1rem;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.38);
+  background: var(--glass-active);
+  border: 1px solid var(--rain-chip-border);
   border-radius: var(--radius-sm);
 }
 
@@ -408,7 +408,7 @@ const PRICE_ROWS = [
   color: var(--text-primary);
 
   b {
-    color: #7dd3fc;
+    color: var(--color-primary);
     font-size: 1.1em;
   }
 }
@@ -427,7 +427,7 @@ const PRICE_ROWS = [
   color: var(--text-secondary);
 
   b {
-    color: #7dd3fc;
+    color: var(--color-primary);
   }
 }
 
@@ -442,13 +442,13 @@ const PRICE_ROWS = [
   td {
     padding: 0.3125rem 0.5rem;
     text-align: left;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid var(--glass-bg-soft);
   }
 
   th {
     font-weight: 600;
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--glass-bg-subtle);
   }
 
   td:last-child,
@@ -457,7 +457,7 @@ const PRICE_ROWS = [
   }
 
   tbody tr:first-child td {
-    color: #95d5ae;
+    color: var(--success-text);
     font-weight: 600;
   }
 }

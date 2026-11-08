@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootRef" class="panel-view LocationPicker" :class="{ 'is-restoring': fsRestoring }">
+  <div ref="rootRef" class="panel-view LocationPicker">
     <!-- ⚠️ 这段说明必须放在根节点「里面」：模板最外层多一条 HTML 注释，根节点就变成
          「注释 + div」的多根 Fragment，Vue 的 <Transition> 会报
          "Component inside <Transition> renders non-element root node that cannot be animated"，
@@ -12,92 +12,102 @@
          两种形态的排版差异全由 .lp-frame.is-fs 承担（见样式） -->
     <Teleport to="body" :disabled="!mapFullscreen">
       <div class="lp-frame"
-        :class="{ 'is-fs': mapFullscreen, 'is-fs-ready': fsReady, 'is-fs-leaving': fsLeaving }">
+        :class="{ 'is-fs': mapFullscreen }">
         <!-- 标题和热门/最近：卡片里原样参与排版（display: contents），
              全屏时整体变成屏幕上沿那块悬浮卡片 -->
-        <div class="lp-top">
-          <header class="lp-head">
-            <div class="lp-head-text">
-              <!-- 地图步骤标题直接用当前选中的详细地址（省-市-区-街道-路）；
-                   地址还没拿到时退回原本文案 -->
-              <h2 class="lp-title">{{ title }}</h2>
-              <p class="lp-sub">{{ subText }}</p>
-            </div>
-            <!-- 日常地址页只留「返回天气」；面板不会自己关，用户想待多久就待多久 -->
-            <div v-if="dismissable" class="lp-head-side">
-              <button class="lp-back" type="button" @click="requestClose">返回天气</button>
-            </div>
-          </header>
+        <StaggerTransition preset="mapTop" :enabled="mapFullscreen" :appear="false">
+          <div v-show="chromeVisible" class="lp-top">
+            <StaggerTransition preset="panel" :enabled="!mapFullscreen">
+              <header v-show="mapFullscreen || chromeVisible" class="lp-head">
+                <div class="lp-head-text">
+                  <!-- 地图步骤标题直接用当前选中的详细地址（省-市-区-街道-路）；
+                       地址还没拿到时退回原本文案 -->
+                  <h2 class="lp-title">{{ title }}</h2>
+                  <p class="lp-sub">{{ subText }}</p>
+                </div>
+                <!-- 日常地址页只留「返回天气」；面板不会自己关，用户想待多久就待多久 -->
+                <div v-if="dismissable" class="lp-head-side">
+                  <button class="lp-back" type="button" @click="requestClose">返回天气</button>
+                </div>
+              </header>
+            </StaggerTransition>
 
-          <!-- 热门 / 最近：两步都常驻。选完区县进地图后依然留在页面上，
-               方便在"精确选点"这一步直接换城市，而不用退回三列重选 -->
-          <div class="lp-chips">
-            <div class="lp-chip-row">
-              <span class="lp-chip-label">热门</span>
-              <button v-for="city in HOT_CITIES" :key="city.label" class="lp-chip" type="button"
-                :class="{ 'is-current': isHotCitySelected(city.path) }"
-                :aria-pressed="isHotCitySelected(city.path)"
-                :disabled="submitting || locating" @click="applyIds(city.path)">{{ city.label }}</button>
-            </div>
-            <div v-if="history.length" class="lp-chip-row">
-              <span class="lp-chip-label">最近</span>
-              <!-- 一条记录 = 「选中」和「删除」两个按钮。不能把删除按钮嵌进选中按钮里：
-                   <button> 里面套 <button> 是非法结构，键盘和读屏都会乱 -->
-              <div v-for="item in history" :key="locationHistoryKey(item)" class="lp-chip-history"
-                :class="{ 'is-current': isHistoryCurrent(item) }">
-                <button class="lp-chip-main" type="button" :aria-pressed="isHistoryCurrent(item)"
-                  :disabled="submitting || locating" @click="applyHistory(item)">{{ item.label }}</button>
-                <button class="lp-chip-remove" type="button"
-                  :aria-label="`删除最近地址：${item.label}`" :title="`删除「${item.label}」`"
-                  :disabled="submitting || locating" @click="removeHistoryItem(item)">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6 6 18" />
-                  </svg>
-                </button>
+            <!-- 热门 / 最近：两步都常驻。选完区县进地图后依然留在页面上，
+                 方便在"精确选点"这一步直接换城市，而不用退回三列重选 -->
+            <StaggerTransition preset="panel" :index="1" :enabled="!mapFullscreen">
+              <div v-show="mapFullscreen || chromeVisible" class="lp-chips">
+                <div class="lp-chip-row">
+                  <span class="lp-chip-label">热门</span>
+                  <button v-for="city in HOT_CITIES" :key="city.label" class="lp-chip" type="button"
+                    :class="{ 'is-current': isHotCitySelected(city.path) }"
+                    :aria-pressed="isHotCitySelected(city.path)"
+                    :disabled="submitting || locating" @click="applyIds(city.path)">{{ city.label }}</button>
+                </div>
+                <div v-if="history.length" class="lp-chip-row">
+                  <span class="lp-chip-label">最近</span>
+                  <!-- 一条记录 = 「选中」和「删除」两个按钮。不能把删除按钮嵌进选中按钮里：
+                       <button> 里面套 <button> 是非法结构，键盘和读屏都会乱 -->
+                  <div v-for="item in history" :key="locationHistoryKey(item)" class="lp-chip-history"
+                    :class="{ 'is-current': isHistoryCurrent(item) }">
+                    <button class="lp-chip-main" type="button" :aria-pressed="isHistoryCurrent(item)"
+                      :disabled="submitting || locating" @click="applyHistory(item)">{{ item.label }}</button>
+                    <button class="lp-chip-remove" type="button"
+                      :aria-label="`删除最近地址：${item.label}`" :title="`删除「${item.label}」`"
+                      :disabled="submitting || locating" @click="removeHistoryItem(item)">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6 6 18" />
+                      </svg>
+                    </button>
+                  </div>
+                  <button class="lp-chip-clear" type="button" :disabled="submitting || locating"
+                    @click="clearLocationHistory()">清空</button>
+                </div>
               </div>
-              <button class="lp-chip-clear" type="button" :disabled="submitting || locating"
-                @click="clearLocationHistory()">清空</button>
-            </div>
+            </StaggerTransition>
           </div>
-        </div>
+        </StaggerTransition>
 
         <!-- 中间区域：三列 ↔ 地图。只换这一块，热门/最近与页脚都不动 -->
-        <div class="lp-body" :class="{ 'is-locating': locating }">
-          <Transition name="lp-swap" mode="out-in">
-            <div v-if="step === 'cascade'" key="cascade" class="lp-columns">
-              <RegionCascade :path="selectedPath" @select="handleCascadeSelect" />
-            </div>
+        <StaggerTransition preset="mapSurface">
+          <div class="lp-body" :class="{ 'is-locating': locating }">
+            <Transition name="lp-swap" mode="out-in">
+              <div v-if="step === 'cascade'" key="cascade" class="lp-columns">
+                <RegionCascade :path="selectedPath" @select="handleCascadeSelect" />
+              </div>
 
-            <!-- 第二步：选完区县后，在地图上点一个更精确的位置 -->
-            <div v-else key="map" class="lp-map">
-              <MapPointPicker ref="mapRef" :center="districtCenter" :initial-point="mapInitialPoint" :fill="true"
-                :bar="false" :fullscreen="mapFullscreen" @pick="handlePick" @road="handleRoad"
-                @confirm="handleMapConfirm" @update:fullscreen="handleFullscreenChange"
-                @fs-leaving="handleFsLeaving" />
-            </div>
-          </Transition>
-        </div>
-
-        <footer class="lp-foot">
-          <span class="lp-path">{{ step === 'cascade' ? pathText : coordText }}</span>
-          <div class="lp-foot-right">
-            <span v-if="locating" class="lp-hint">正在定位…</span>
-            <span v-if="errorText" class="lp-error">{{ errorText }}</span>
-            <template v-if="step === 'cascade'">
-              <button class="lp-confirm" type="button" :disabled="!canConfirm || submitting || locating"
-                @click="handleFooterAction">
-                {{ submitting ? '正在获取天气…' : confirmText }}
-              </button>
-            </template>
-            <template v-else>
-              <button ref="reselectBtnRef" class="lp-back" type="button" :disabled="submitting || locating"
-                @click="handleReselect">重选地区</button>
-              <button class="lp-confirm" type="button" :disabled="submitting || locating" @click="confirm(pickedPoint)">
-                {{ submitting ? '正在获取天气…' : pickedPoint ? '就用这里' : '用中心坐标' }}
-              </button>
-            </template>
+              <!-- 第二步：选完区县后，在地图上点一个更精确的位置 -->
+              <div v-else key="map" class="lp-map">
+                <MapPointPicker ref="mapRef" :center="districtCenter" :initial-point="mapInitialPoint" :fill="true"
+                  :bar="false" :fullscreen="mapFullscreen" :controls-visible="chromeVisible" @pick="handlePick" @road="handleRoad"
+                  @confirm="handleMapConfirm" @update:fullscreen="handleFullscreenChange"
+                  @fs-leaving="handleFsLeaving" />
+              </div>
+            </Transition>
           </div>
-        </footer>
+        </StaggerTransition>
+
+        <StaggerTransition :preset="mapFullscreen ? 'mapBottom' : 'panel'" :index="mapFullscreen ? 1 : 5">
+          <footer v-show="chromeVisible" class="lp-foot">
+            <span class="lp-path">{{ step === 'cascade' ? pathText : coordText }}</span>
+            <div class="lp-foot-right">
+              <span v-if="locating" class="lp-hint">正在定位…</span>
+              <span v-if="errorText" class="lp-error">{{ errorText }}</span>
+              <template v-if="step === 'cascade'">
+                <button class="lp-confirm" type="button" :disabled="!canConfirm || submitting || locating"
+                  @click="handleFooterAction">
+                  {{ submitting ? '正在获取天气…' : confirmText }}
+                </button>
+              </template>
+              <template v-else>
+                <button ref="reselectBtnRef" class="lp-back" type="button" :disabled="submitting || locating"
+                  @click="handleReselect">重选地区</button>
+                <button class="lp-confirm" type="button" :disabled="submitting || locating" @click="confirm(pickedPoint)">
+                  {{ submitting ? '正在获取天气…' : pickedPoint ? '就用这里' : '用中心坐标' }}
+                </button>
+              </template>
+            </div>
+          </footer>
+        </StaggerTransition>
 
         <!-- 点卡片外返回时，如果 pin 已经移动过，先确认再丢掉这次修改。
              Teleport 到 body：卡片外壳有 overflow: hidden，弹层留在里面会被裁掉 -->
@@ -144,6 +154,7 @@ import { isPlaceLookupAvailable, isSameAdminName, joinAdminParts, lookupPlaceByC
 import RegionCascade from './RegionCascade.vue'
 import RegionPickerDialog from './RegionPickerDialog.vue'
 import MapPointPicker from './MapPointPicker.vue'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
 import { canLocateRegion, findNode, isLeaf, needsCityFirst as pathNeedsCityFirst, pathLabels } from './regionTree'
 import {
   LocationHistory,
@@ -192,16 +203,9 @@ const reselectBtnRef = ref(null)
 // 地图全屏：面板整块 teleport 到 body，header/chips 和底部条改成悬浮块。
 // 真正的展开/收回动画在地图组件里（它才知道相机和裁切框），这里只跟着切换布局
 const mapFullscreen = ref(false)
-// 悬浮块的三段状态。地图只管相机和裁切框，这三段排版动画留在这里：
-//   is-fs-ready    进场——面板挂到 body、淡入起点先画一帧，再淡进来
-//   is-fs-leaving  退场——地图开始收窄之前，先把两块悬浮玻璃散掉
-//   is-restoring   回到卡片——标题 / 热门 / 页脚补一次进场，否则整块内容同一帧跳出来
-// 顺序上「地图先动、布局后动」，动画不跟着这个顺序排就会在一帧里同时跳变。
-const fsReady = ref(false)
-const fsLeaving = ref(false)
-const fsRestoring = ref(false)
-let fsReadyTimer = 0
-let fsRestoreTimer = 0
+// 控件的进退场交给 Vue；只在布局切换时改变可见性，不用计时器猜动画终点。
+const chromeVisible = ref(true)
+let chromeRevision = 0
 // 全屏里的「重选地区」卡片：打开时遮住地图、但不退出全屏。
 // 卡片里的选择先存成草稿（RegionPickerDialog 内部），确认后才落到 selectedPath 上，
 // 所以「打开又取消」不会动到地图和当前 pin
@@ -557,47 +561,22 @@ const handleUseDistrictCenter = () => {
  * 全屏开关由地图发出（按钮在它的缩放胶囊里，全国档也在那儿）：
  * 布局切换留在这里，相机和裁切动画留在地图组件里，两边只靠这一个布尔值对齐。
  */
-const handleFullscreenChange = (on) => {
-  const next = !!on
-  clearTimeout(fsReadyTimer)
-  clearTimeout(fsRestoreTimer)
-  fsReadyTimer = 0
-  fsRestoreTimer = 0
-  mapFullscreen.value = next
-  // 全屏一旦收掉，地区卡片就没有存在的理由了（它压的是一块已经不在地图上的界面）
-  if (!next) {
+const handleFullscreenChange = async (on) => {
+  const revision = ++chromeRevision
+  mapFullscreen.value = !!on
+  chromeVisible.value = false
+  if (!on) {
     regionDialogOpen.value = false
     regionDialogError.value = ''
   }
-
-  if (next) {
-    fsLeaving.value = false
-    fsRestoring.value = false
-    fsReady.value = false
-    // 等一拍再淡入：teleport 之后那一帧得真的以「隐藏态」画出来，
-    // 下一拍改 class 才有过渡的起点（同一帧里改两次是不会播动画的）
-    fsReadyTimer = setTimeout(() => {
-      fsReadyTimer = 0
-      fsReady.value = true
-    }, 64)
-    return
-  }
-
-  fsReady.value = false
-  fsLeaving.value = false
-  // 地图已经收进卡片了：页头 / 热门 / 页脚补一段进场，
-  // 别让它们和刚落位的地图在同一帧里同时出现
-  fsRestoring.value = true
-  fsRestoreTimer = setTimeout(() => {
-    fsRestoreTimer = 0
-    fsRestoring.value = false
-  }, 320)
+  // 先提交隐藏状态；下一次渲染由 Transition 安排起止帧，地图节点保持挂载。
+  await nextTick()
+  if (revision === chromeRevision) chromeVisible.value = true
 }
 
-// 地图开始收窄：先把悬浮块淡掉（比 320ms 的裁切短，收窄结束时它们已经看不见了）
+// 地图开始收窄时，先让浮层离场；v-show 保留表单和地图的状态。
 const handleFsLeaving = () => {
-  if (!mapFullscreen.value) return
-  fsLeaving.value = true
+  if (mapFullscreen.value) chromeVisible.value = false
 }
 
 /**
@@ -977,8 +956,7 @@ const handleLeaveKeydown = (event) => {
 onMounted(() => window.addEventListener('keydown', handleLeaveKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', handleLeaveKeydown)
-  clearTimeout(fsReadyTimer)
-  clearTimeout(fsRestoreTimer)
+  chromeRevision += 1
 })
 
 watch(leaveConfirmOpen, async (open) => {
@@ -1229,8 +1207,8 @@ const removeHistoryItem = (item) => {
   }
 
   &.is-current {
-    color: #04121f;
-    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    color: var(--text-on-accent);
+    background: var(--color-primary);
     border-color: transparent;
     font-weight: 600;
   }
@@ -1259,22 +1237,22 @@ const removeHistoryItem = (item) => {
   }
 
   &.is-current {
-    color: #04121f;
-    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    color: var(--text-on-accent);
+    background: var(--color-primary);
     border-color: transparent;
 
     .lp-chip-main {
-      color: #04121f;
+      color: var(--text-on-accent);
       font-weight: 600;
     }
 
     .lp-chip-remove {
-      color: rgba(4, 18, 31, 0.62);
-      border-left-color: rgba(4, 18, 31, 0.18);
+      color: var(--text-muted);
+      border-left-color: var(--glass-border);
 
       &:hover:not(:disabled) {
-        color: #04121f;
-        background: rgba(4, 18, 31, 0.1);
+        color: var(--text-on-accent);
+        background: var(--glass-bg-subtle);
       }
     }
   }
@@ -1298,7 +1276,7 @@ const removeHistoryItem = (item) => {
   }
 
   &:focus-visible {
-    outline: 2px solid #7dd3fc;
+    outline: 2px solid var(--color-primary);
     outline-offset: -2px;
   }
 }
@@ -1329,7 +1307,7 @@ const removeHistoryItem = (item) => {
 
   &:hover:not(:disabled) {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--glass-bg-soft);
   }
 
   &:disabled {
@@ -1338,7 +1316,7 @@ const removeHistoryItem = (item) => {
   }
 
   &:focus-visible {
-    outline: 2px solid #7dd3fc;
+    outline: 2px solid var(--color-primary);
     outline-offset: -2px;
   }
 }
@@ -1431,14 +1409,7 @@ const removeHistoryItem = (item) => {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
-    /* 「还没进场」就是默认状态，进场由 .is-fs-ready 触发过渡。
-       过渡写在 ready 里而不是这里：写在隐藏态上，进全屏那一拍会先按
-       「1 → 0」启动一次过渡（teleport 换了排版，透明度目标值变了），
-       64ms 后再被 ready 掰回来，肉眼就是先暗一下再亮起来。
-       也不用 keyframes：teleport 搬节点 / display 切换之后 keyframes 不保证重播，
-       第二次进全屏就不动了；过渡每次都从当前计算值起算 */
-    opacity: 0;
-    transform: translate(-50%, -0.5rem);
+    transform: translateX(-50%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
     backdrop-filter: blur(var(--glass-blur)) saturate(150%);
   }
@@ -1448,24 +1419,6 @@ const removeHistoryItem = (item) => {
     position: absolute;
     inset: 0;
     z-index: 1;
-  }
-
-  /* 缩放胶囊在两种排版里锚的不是同一条边：全屏时贴着卡片右侧、垂直居中，
-     回到卡片是地图右上角，中间差着两百多像素。不跟着一起淡，
-     退出时就变成「地图在收、胶囊在半空停一下再瞬移」，前面那些淡入淡出全白做 */
-  .lp-body :deep(.mp-zoom) {
-    opacity: 0;
-  }
-
-  &.is-fs-ready .lp-body :deep(.mp-zoom) {
-    opacity: 1;
-    transition: opacity 0.24s var(--ease);
-  }
-
-  &.is-fs-leaving .lp-body :deep(.mp-zoom) {
-    opacity: 0;
-    transition-duration: 0.16s;
-    transition-delay: 0s;
   }
 
   .lp-foot {
@@ -1480,89 +1433,13 @@ const removeHistoryItem = (item) => {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-panel);
-    /* 底部条从下往上浮，和上沿那块「从上往下」的方向相反，两块才像同一套动作 */
-    opacity: 0;
-    transform: translate(-50%, 0.5rem);
+    transform: translateX(-50%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
     backdrop-filter: blur(var(--glass-blur)) saturate(150%);
   }
 
-  /* 地图开始展开（或已经挂到 body 上）：两块悬浮玻璃淡进来。
-     和 320ms 的收放同时起步，观感是「地图长出来，卡片浮在上面」。
-     过渡声明放在这里：它既定义了进场的时长，也是退场那条规则要覆盖的基准 */
-  &.is-fs-ready {
-    .lp-top {
-      opacity: 1;
-      transform: translate(-50%, 0);
-      transition: opacity 0.24s var(--ease), transform 0.24s var(--ease);
-    }
-
-    .lp-foot {
-      opacity: 1;
-      transform: translate(-50%, 0);
-      transition: opacity 0.24s var(--ease) 0.04s, transform 0.24s var(--ease) 0.04s;
-    }
-  }
-
-  /* 退场：收窄开始之前先散掉（160ms，比 320ms 短），
-     于是收窄那一段屏幕上只剩地图，最后一起落回卡片。
-     淡出期间不再接收点击 —— 半透明的「就用这里」还挂着太容易误触 */
-  &.is-fs-leaving {
-    .lp-top,
-    .lp-foot {
-      opacity: 0;
-      pointer-events: none;
-      transition-duration: 0.16s;
-      transition-delay: 0s;
-    }
-
-    .lp-top {
-      transform: translate(-50%, -0.5rem);
-    }
-
-    .lp-foot {
-      transform: translate(-50%, 0.5rem);
-    }
-  }
 }
 
-/* 全屏浮层进场 / 退场的时长都写在上面的过渡里，这里只剩「回到卡片」这一段。
-   地图是连续收回来的（它的动画在地图组件里，动的是裁切框），
-   而页头 / 热门 / 页脚是全屏那一套排版散掉之后才重新出现的：
-   不补一段进场，它们就会在一帧里同时跳出来，和正在落位的地图撞在一起。
-   只动这三块 —— .lp-body 里的地图必须保持连续，一淡就露馅了 */
-.LocationPicker.is-restoring {
-  .lp-head,
-  .lp-chips,
-  .lp-foot {
-    animation: lp-card-in 0.22s var(--ease) both;
-  }
-
-  .lp-chips {
-    animation-delay: 0.04s;
-  }
-
-  .lp-foot {
-    animation-delay: 0.02s;
-  }
-
-  /* 胶囊和页头同一批落位：它刚淡出去，得跟卡片一起回来 */
-  .lp-body :deep(.mp-zoom) {
-    animation: lp-card-in 0.22s var(--ease) 0.02s both;
-  }
-}
-
-@keyframes lp-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.375rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 
 /* 三列 ↔ 地图：只做淡入淡出，不做缩放，避免动效期间量到错误尺寸 */
 .lp-swap-enter-active,
@@ -1601,7 +1478,7 @@ const removeHistoryItem = (item) => {
 .lp-error {
   max-width: 22rem;
   font-size: 0.82rem;
-  color: #ffbab5;
+  color: var(--danger-text);
   /* 错误提示可能带换行，保留换行符 */
   white-space: pre-line;
 }
@@ -1617,8 +1494,8 @@ const removeHistoryItem = (item) => {
   padding: 0.5625rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: #04121f;
-  background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+  color: var(--text-on-accent);
+  background: var(--color-primary);
   border: none;
   border-radius: 999px;
   transition: filter 0.2s ease, opacity 0.2s ease;
@@ -1644,7 +1521,7 @@ const removeHistoryItem = (item) => {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: rgba(0, 0, 0, 0.44);
+  background: var(--scrim);
   -webkit-backdrop-filter: blur(1.125rem);
   backdrop-filter: blur(1.125rem);
 }
@@ -1653,7 +1530,7 @@ const removeHistoryItem = (item) => {
   width: min(25rem, 100%);
   padding: 1.5rem;
   color: var(--text-primary);
-  background: rgba(18, 30, 52, 0.94);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: 1.25rem;
   box-shadow: 0 1.75rem 4.375rem -1.75rem rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -1696,18 +1573,18 @@ const removeHistoryItem = (item) => {
   }
 
   &:focus-visible {
-    outline: 2px solid #7dd3fc;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 
   &.is-danger {
-    color: #ffd7d3;
-    background: rgba(248, 113, 113, 0.14);
-    border-color: rgba(248, 113, 113, 0.38);
+    color: var(--danger-text);
+    background: rgba(223, 125, 120, 0.14);
+    border-color: rgba(223, 125, 120, 0.32);
 
     &:hover {
-      background: rgba(248, 113, 113, 0.22);
-      border-color: rgba(248, 113, 113, 0.55);
+      background: rgba(223, 125, 120, 0.2);
+      border-color: rgba(223, 125, 120, 0.48);
     }
   }
 }

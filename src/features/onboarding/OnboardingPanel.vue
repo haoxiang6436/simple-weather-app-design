@@ -14,8 +14,8 @@
         <section class="onb-left">
           <div class="onb-aura" aria-hidden="true"></div>
 
-          <div class="onb-body">
-            <header class="onb-head">
+          <StaggerGroup tag="div" preset="panel" class="onb-body">
+            <header key="intro-0" class="onb-head">
               <span class="onb-kicker">
                 <i class="onb-kicker-dot"></i>{{ reviewCopy ? '引导回顾' : '首次使用' }}
               </span>
@@ -29,9 +29,9 @@
               </p>
             </header>
 
-            <CredentialStatusCard />
+            <CredentialStatusCard key="intro-1" />
 
-            <div class="onb-actions">
+            <div key="intro-2" class="onb-actions">
               <button v-if="primaryAction" class="onb-btn primary" type="button" :disabled="primaryAction.disabled"
                 @click="primaryAction.run()">{{ primaryLabel }}</button>
               <button v-if="secondaryAction" class="onb-btn ghost" type="button" :disabled="secondaryAction.disabled"
@@ -49,27 +49,29 @@
                 怎么获取域名与密钥？
               </button>
             </div>
-          </div>
+          </StaggerGroup>
 
-          <div class="onb-progress">
-            <span class="onb-progress-dots"><i class="on" :class="{ done: stepDone }"></i><i></i></span>
-            <span>{{ stepHint }}</span>
-          </div>
+          <StaggerTransition preset="panel" :index="3">
+            <div class="onb-progress">
+              <span class="onb-progress-dots"><i class="on" :class="{ done: stepDone }"></i><i></i></span>
+              <span>{{ stepHint }}</span>
+            </div>
+          </StaggerTransition>
         </section>
 
         <section class="onb-right">
-          <div class="onb-right-body">
-            <header class="onb-right-head">
+          <StaggerGroup tag="div" preset="panel" class="onb-right-body">
+            <header key="instructions-0" class="onb-right-head">
               <span class="onb-right-kicker">操作指引</span>
               <p class="onb-right-sub">按顺序完成下面 3 步即可</p>
             </header>
 
-            <ol class="onb-steps">
+            <ol key="instructions-1" class="onb-steps">
               <li>
                 <span class="onb-step-no">1</span>
                 <div class="onb-step-body">
                   <div class="onb-step-title">打开「壁纸属性」面板</div>
-                  <p class="onb-step-text">右键这张壁纸 →「设置」，面板在窗口右侧</p>
+                  <p class="onb-step-text">在 Wallpaper Engine 窗口右侧打开「壁纸属性」面板</p>
                 </div>
               </li>
               <li>
@@ -88,7 +90,7 @@
               </li>
             </ol>
 
-            <div v-if="entries.length" class="onb-readout">
+            <div key="instructions-2" v-if="entries.length" class="onb-readout">
               <div class="onb-card-head">
                 <span class="onb-card-title">已读取到</span>
                 <span class="onb-card-pill">{{ entries.length }} 组</span>
@@ -99,21 +101,23 @@
               </div>
             </div>
 
-            <p class="onb-hint">在右侧「壁纸属性」面板改完后，点一下输入框外的空白处让它生效。</p>
-          </div>
+            <p key="instructions-3" class="onb-hint">在右侧「壁纸属性」面板改完后，点一下输入框外的空白处让它生效。</p>
+          </StaggerGroup>
 
           <!-- 底部：开源地址 + 免责声明 -->
-          <div class="onb-foot">
-            <div class="onb-repo">
-              <span class="onb-repo-label">开源仓库</span>
-              <button class="onb-console-url" type="button" :title="'点击复制：' + repoUrl"
-                @click="copyRepoUrl()">{{ repoShort }}</button>
-              <span class="onb-console-state">{{ repoCopyState }}</span>
+          <StaggerTransition preset="panel" :index="4">
+            <div class="onb-foot">
+              <div class="onb-repo">
+                <span class="onb-repo-label">开源仓库</span>
+                <button class="onb-console-url" type="button" :title="'点击复制：' + repoUrl"
+                  @click="copyRepoUrl()">{{ repoShort }}</button>
+                <span class="onb-console-state">{{ repoCopyState }}</span>
+              </div>
+              <p class="onb-disclaimer">
+                本壁纸为开源项目（无盈利）；你填写的域名与密钥只保存在本机、不会上传；天气数据来自和风天气，仅供参考。
+              </p>
             </div>
-            <p class="onb-disclaimer">
-              本壁纸为开源项目（无盈利）；你填写的域名与密钥只保存在本机、不会上传；天气数据来自和风天气，仅供参考。
-            </p>
-          </div>
+          </StaggerTransition>
         </section>
 
         <!-- 怎么获取域名与密钥：弹层形式，不再顶掉整个引导面板 -->
@@ -124,6 +128,8 @@
 </template>
 
 <script setup>
+import StaggerGroup from '@/shared/motion/StaggerGroup'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LocationPicker from '@/features/weather/LocationPicker.vue'
 import ApiHelpPanel from './ApiHelpPanel.vue'
@@ -341,7 +347,7 @@ const handleLocationSelected = () => {
   flex-direction: column;
   gap: 1.25rem;
   padding: 2.125rem;
-  background: linear-gradient(155deg, rgba(14, 165, 233, 0.34), rgba(56, 189, 248, 0.1) 55%, transparent);
+  background: var(--hero-gradient);
   overflow: hidden;
 }
 
@@ -351,8 +357,8 @@ const handleLocationSelected = () => {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 90% at 18% -10%, rgba(56, 189, 248, 0.3), transparent 60%),
-    radial-gradient(95% 70% at 108% 106%, rgba(56, 189, 248, 0.16), transparent 62%);
+    var(--hero-glow),
+    radial-gradient(95% 70% at 108% 106%, var(--glass-active), transparent 62%);
 }
 
 .onb-head {
@@ -383,7 +389,7 @@ const handleLocationSelected = () => {
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  background: rgba(4, 18, 31, 0.26);
+  background: var(--surface-inset);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
 }
@@ -394,7 +400,7 @@ const handleLocationSelected = () => {
   height: 0.375rem;
   border-radius: 50%;
   background: var(--color-primary);
-  box-shadow: 0 0 0 0.1875rem rgba(56, 189, 248, 0.16);
+  box-shadow: 0 0 0 0.1875rem var(--glass-active);
 }
 
 .onb-title {
@@ -408,12 +414,12 @@ const handleLocationSelected = () => {
 
 /* 关键词用主色渐变，和天气卡的天空蓝呼应；不支持 background-clip 时退回纯色 */
 .onb-title-hl {
-  color: #7dd3fc;
+  color: var(--color-primary);
 }
 
 @supports ((-webkit-background-clip: text) or (background-clip: text)) {
   .onb-title-hl {
-    background: linear-gradient(115deg, #bae6fd, #7dd3fc 48%, #38bdf8);
+    background: var(--color-primary);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -470,14 +476,14 @@ const handleLocationSelected = () => {
   }
 
   &.primary {
-    color: #04121f;
-    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    color: var(--text-on-accent);
+    background: var(--color-primary);
     border-color: transparent;
     box-shadow: 0 1rem 2rem -1.125rem rgba(56, 189, 248, 0.85);
 
     &:hover:not(:disabled) {
-      color: #04121f;
-      background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+      color: var(--text-on-accent);
+      background: var(--color-primary);
       border-color: transparent;
       filter: brightness(1.07);
     }
@@ -499,7 +505,7 @@ const handleLocationSelected = () => {
 .onb-auto-cancel {
   padding: 0;
   font: inherit;
-  color: #8ed3f7;
+  color: var(--color-primary-soft);
   background: none;
   border: none;
   text-decoration: underline;
@@ -508,7 +514,7 @@ const handleLocationSelected = () => {
   transition: color 0.2s ease;
 
   &:hover {
-    color: #bae6fd;
+    color: var(--color-primary-soft);
   }
 }
 
@@ -547,7 +553,7 @@ const handleLocationSelected = () => {
   align-items: center;
   gap: 0.5625rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--glass-bg-soft);
   font-size: 0.72rem;
   color: var(--text-muted);
 }
@@ -562,14 +568,14 @@ const handleLocationSelected = () => {
     width: 1rem;
     height: 0.1875rem;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--glass-border);
 
     &.on {
-      background: linear-gradient(90deg, #7dd3fc, #38bdf8);
+      background: var(--color-primary);
     }
 
     &.on.done {
-      background: linear-gradient(90deg, #6fdcae, #8ee9c2);
+      background: var(--color-ok);
     }
   }
 }
@@ -584,8 +590,8 @@ const handleLocationSelected = () => {
   /* 和左栏同族、但更浅一档的玻璃：右上角透一缕主色，底部收暗，
      让右栏有明暗方向，不至于整块平铺发灰 */
   background:
-    radial-gradient(118% 80% at 100% 0%, rgba(56, 189, 248, 0.15), transparent 62%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.016));
+    var(--hero-glow),
+    linear-gradient(180deg, var(--glass-bg-soft), var(--glass-bg-subtle));
   overflow-y: auto;
 }
 
@@ -613,7 +619,7 @@ const handleLocationSelected = () => {
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: #8ed3f7;
+  color: var(--color-primary-soft);
 }
 
 .onb-right-kicker::before {
@@ -621,7 +627,7 @@ const handleLocationSelected = () => {
   display: block;
   width: 0.875rem;
   height: 0.0625rem;
-  background: linear-gradient(90deg, rgba(125, 211, 252, 0.2), #7dd3fc);
+  background: linear-gradient(90deg, rgba(125, 211, 252, 0.2), var(--color-primary));
 }
 
 .onb-right-sub {
@@ -657,7 +663,7 @@ const handleLocationSelected = () => {
   bottom: -1rem;
   width: 0.0625rem;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(125, 211, 252, 0.55), rgba(125, 211, 252, 0.14));
+  background: linear-gradient(180deg, var(--glass-border-strong), var(--glass-active));
 }
 
 .onb-step-no {
@@ -671,8 +677,8 @@ const handleLocationSelected = () => {
   height: 1.75rem;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #eaf7ff;
-  background: linear-gradient(160deg, rgba(56, 189, 248, 0.56), rgba(14, 165, 233, 0.28));
+  color: var(--text-on-accent);
+  background: var(--glass-active);
   border: 1px solid rgba(125, 211, 252, 0.56);
   border-radius: 50%;
   box-shadow:
@@ -691,13 +697,13 @@ const handleLocationSelected = () => {
   margin: 0.25rem 0 0;
   font-size: 0.84rem;
   line-height: 1.6;
-  color: rgba(235, 242, 251, 0.62);
+  color: var(--text-muted);
 
   code {
     padding: 0 0.25rem;
     font-size: 0.95em;
     color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--glass-bg-soft);
     border-radius: 0.25rem;
   }
 }
@@ -724,7 +730,7 @@ const handleLocationSelected = () => {
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--glass-bg-soft);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
 }
@@ -742,7 +748,7 @@ const handleLocationSelected = () => {
   flex-direction: column;
   gap: 0.4375rem;
   padding-top: 0.875rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--glass-bg-soft);
 }
 
 .onb-repo {
@@ -773,7 +779,7 @@ const handleLocationSelected = () => {
   font-size: 0.78rem;
   text-align: left;
   color: var(--text-secondary);
-  background: rgba(4, 18, 31, 0.38);
+  background: var(--surface-inset);
   border: 1px solid rgba(56, 189, 248, 0.32);
   border-radius: 0.5rem;
   overflow: hidden;
@@ -783,7 +789,7 @@ const handleLocationSelected = () => {
 
   &:hover {
     color: var(--text-primary);
-    border-color: rgba(56, 189, 248, 0.75);
+    border-color: var(--glass-border-strong);
   }
 }
 
@@ -792,7 +798,7 @@ const handleLocationSelected = () => {
   min-width: 3.25rem;
   font-size: 0.72rem;
   text-align: right;
-  color: #95d5ae;
+  color: var(--success-text);
 }
 
 .onb-readout-row {
@@ -829,7 +835,7 @@ const handleLocationSelected = () => {
   font-size: 0.78rem;
   line-height: 1.6;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--glass-bg-subtle);
   border: 1px solid var(--glass-border);
   border-left: 0.125rem solid rgba(125, 211, 252, 0.5);
   border-radius: var(--radius-sm);

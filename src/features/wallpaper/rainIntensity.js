@@ -73,9 +73,9 @@ export const resolveMinutelyIntensity = (minutely, now = Date.now()) => {
   // 没有点，或数据窗口已经整个过去：都不要再拿它驱动雨滴
   if (!analysis || analysis.expired) return null
   // 雪不交给雨滴背景：与原来 icon 4xx → 无雨的策略保持一致
-  if (analysis.type === 'snow') return 'none'
+  if (analysis.currentType === 'snow') return 'none'
   if (!analysis.raining) return 'none'
-  return analysis.level.key
+  return analysis.level.tone
 }
 
 export default resolveRainIntensity

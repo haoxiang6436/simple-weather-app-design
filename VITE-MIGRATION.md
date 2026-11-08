@@ -27,7 +27,7 @@
 | pinia + pinia-plugin-persistedstate、@vueuse、better-scroll、arco-design | 全是标准 ESM 包，Vite 原生支持，无需 polyfill 配置 |
 | SCSS 只用了 `:deep()`，没有 `::v-deep` / `/deep/` / `>>>` | 样式一行都不用改（`::v-deep` 在 Vue 3 里已废弃） |
 | 没有 `require.context`、没有自定义 webpack loader、没有 `devServer.proxy` | 没有 webpack 专有能力要"翻译" |
-| 没有动态 `import()`、没有 `new URL(..., import.meta.url)` 取资源 | 不会产生运行时分包 → 可以安全打成单 chunk |
+| 仅开发调试面板使用动态 `import()`，没有 `new URL(..., import.meta.url)` 取资源 | 调试面板与 Arco 需用 `import.meta.env.DEV` 隔离；生产仍可打成单 chunk |
 | Worker 全部用 `URL.createObjectURL(blob)` | file:// 下可用，迁移后行为不变 |
 | `.env` 目前**全是注释、没有任何键** | 环境变量这块几乎没有实际迁移工作量 |
 | 本机 Wallpaper Engine 的 CEF = **Chromium 146**（读 `libcef.dll` 版本得知） | 不存在"语法太新跑不了"的问题，Vite 默认 `build.target` 就够 |
@@ -107,7 +107,7 @@
 - 删除：`@vue/cli-service`、`@vue/cli-plugin-babel`、`@vue/cli-plugin-eslint`、`sass-loader`、`babel.config.js`
 - **保留** `@babel/eslint-parser` + `@babel/core`（ESLint 7 的解析器还要用，别一起删）
 - `browserslist` 字段迁移后失效（由 `build.target` 决定），可留可删
-- 建议顺手把 `@arco-design/web-vue` 从 devDependencies 挪到 dependencies（它本来就参与运行时代码）
+- `@arco-design/web-vue` 保留在 devDependencies：仅开发调试面板使用，迁移时保留开发分支的异步导入及面板内 CSS 导入，生产构建不包含 Arco。
 
 ### 5.3 `vite.config.js`（已验证可用的完整版本）
 

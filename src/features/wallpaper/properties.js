@@ -6,8 +6,13 @@ import { markWallpaperEngineEvent } from '@/shared/env'
 import {
   BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
+  COLOR_THEME_OPTIONS,
   DEFAULT_BACKGROUND_INDEX,
+  DEFAULT_COLOR_THEME,
+  DEFAULT_PANEL_OFFSET,
   DEFAULT_PANEL_SCALE,
+  PANEL_OFFSET_MAX,
+  PANEL_OFFSET_MIN,
   PANEL_SCALE_MAX,
   PANEL_SCALE_MIN,
   RAIN_CONFIG_OPTIONS,
@@ -46,6 +51,13 @@ if (!BACKGROUND_INDEX_OPTIONS.includes(String(BackgroundIndex.value))) {
 
 // 天气面板整体缩放（panelscale，1 = 设计原尺寸）
 export const PanelScale = ref(DEFAULT_PANEL_SCALE)
+export const PanelOffsetX = ref(DEFAULT_PANEL_OFFSET)
+export const PanelOffsetY = ref(DEFAULT_PANEL_OFFSET)
+
+// 面板配色：默认夜雨玻璃；保留一份本地值，避免引擎重载时主题闪回默认色。
+export const ColorTheme = useStorage(STORAGE_KEYS.WALLPAPER_COLOR_THEME, DEFAULT_COLOR_THEME, localStorage, {
+  flush: 'sync',
+})
 
 // 引擎上一次下发过的属性快照（不含域名/密钥 —— 那两项在 api/credentials.js 里单独缓存）。
 // 壁纸引擎只在页面加载时下发一次属性，页面重载（换背景会主动 location.reload、部署新版本后
@@ -62,6 +74,9 @@ const SNAPSHOT_PROPERTY_KEYS = [
   WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN,
   WALLPAPER_PROPERTIES.RAIN_CONFIG,
   WALLPAPER_PROPERTIES.PANEL_SCALE,
+  WALLPAPER_PROPERTIES.PANEL_OFFSET_X,
+  WALLPAPER_PROPERTIES.PANEL_OFFSET_Y,
+  WALLPAPER_PROPERTIES.COLOR_THEME,
 ]
 
 const rememberProperties = (properties) => {
@@ -106,6 +121,31 @@ export const applyPanelScale = (value) => {
 
 // 与 index.scss 里 --panel-scale 的默认值保持一致（先落一次，避免首帧闪烁）
 applyPanelScale(DEFAULT_PANEL_SCALE)
+
+// 使用视口单位，偏移距离不随面板缩放改变；只由 WeatherMain 的外壳消费。
+const applyPanelOffset = (value, axis) => {
+  if ((typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return
+  const num = Number(value)
+  if (!Number.isFinite(num)) return
+  const offset = Math.min(PANEL_OFFSET_MAX, Math.max(PANEL_OFFSET_MIN, num))
+  const target = axis === 'x' ? PanelOffsetX : PanelOffsetY
+  target.value = offset
+  document.documentElement.style.setProperty(`--weather-offset-${axis}`, `${offset}${axis === 'x' ? 'vw' : 'vh'}`)
+}
+
+/** 将主题写到根节点。样式只依赖 data-theme 的语义 token，不让组件分别判断主题。 */
+export const applyColorTheme = (value) => {
+  const theme = String(value)
+  if (!COLOR_THEME_OPTIONS.includes(theme)) {
+    console.warn(`[Wallpaper] 未知的面板主题 ${value}，已忽略（可用值：${COLOR_THEME_OPTIONS.join('/')}）`)
+    return
+  }
+  ColorTheme.value = theme
+  document.documentElement.dataset.theme = theme
+}
+
+// 先落一次，避免首帧按浏览器残留的 data-theme 渲染。
+applyColorTheme(ColorTheme.value)
 
 /**
  * 读取 Wallpaper Engine 下发的单个属性值
@@ -160,6 +200,15 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
   const panelScale = readPropertyValue(properties, WALLPAPER_PROPERTIES.PANEL_SCALE)
   if (panelScale !== undefined) {
     applyPanelScale(panelScale)
+  }
+  const panelOffsetX = readPropertyValue(properties, WALLPAPER_PROPERTIES.PANEL_OFFSET_X)
+  if (panelOffsetX !== undefined) applyPanelOffset(panelOffsetX, 'x')
+  const panelOffsetY = readPropertyValue(properties, WALLPAPER_PROPERTIES.PANEL_OFFSET_Y)
+  if (panelOffsetY !== undefined) applyPanelOffset(panelOffsetY, 'y')
+  // 面板配色（夜雨玻璃 / 晨雾玻璃）
+  const colorTheme = readPropertyValue(properties, WALLPAPER_PROPERTIES.COLOR_THEME)
+  if (colorTheme !== undefined) {
+    applyColorTheme(colorTheme)
   }
   // 用户自带的 和风天气 API 域名 / 密钥
   // 引擎只会下发「发生变化」的属性；没带上的字段由 credentials.js 保留原值，

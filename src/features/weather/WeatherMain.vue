@@ -19,8 +19,8 @@
             @selected="LocationPickerOpen = false" />
           <section v-else-if="!WeatherMainIsShow" class="weather-card panel-view">
       <!-- 左侧：当前天气（紧凑） -->
-      <header class="hero" :class="{ 'hero-warning': WeatherEarlyWarning.length }">
-        <div class="hero-top">
+      <StaggerGroup tag="header" class="hero" :class="{ 'hero-warning': WeatherEarlyWarning.length }">
+        <div key="top" class="hero-top">
           <button class="location" type="button" :title="locationTitle" @click="openSelectLocationDialog">
             <svg class="location-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16"
               height="16" aria-hidden="true">
@@ -47,12 +47,12 @@
           </div>
         </div>
 
-        <div class="hero-date">
+        <div key="date" class="hero-date">
           <h2 class="date-dayname">{{ dayDateCity.day }}</h2>
           <span class="date-day">{{ dayDateCity.date }}</span>
         </div>
 
-        <div class="hero-now">
+        <div key="now" class="hero-now">
           <i :class="`qi-${nowWeatherData.icon} weather-icon`"></i>
           <div class="now-temp">
             <span class="now-temp-num">{{ nowWeatherData.temp }}</span>
@@ -60,7 +60,7 @@
           </div>
         </div>
 
-        <div class="now-desc">
+        <div key="description" class="now-desc">
           <span class="now-desc-text">{{ nowWeatherData.text }}</span>
           <!-- 体感和今日温区合成一行：给下面常驻的分钟级降水胶囊腾出一行高度 -->
           <span class="now-sub">
@@ -73,25 +73,15 @@
         <!-- 分钟级降水 + 天气预警：两颗胶囊归成一组（组内只留 0.5rem）。
              以前它们是 .hero 的两个直接子元素，各自吃一份 1.625rem 的行距，
              看起来像两块互不相干的内容 —— 现在贴成一组，和上下内容的间距不变。 -->
-        <div class="hero-chips">
+        <div key="chips" class="hero-chips">
           <!-- 分钟级降水：常驻入口，点开看未来两小时的柱状图 -->
           <MinutelyRainChip />
 
-          <button v-if="WeatherEarlyWarning.length" class="early-chip" type="button"
-            :class="'sev-' + severityKey(currentWarning.level)" @click="openWarningDetails">
-            <Transition name="chip-fade" mode="out-in">
-              <span class="early-chip-main" :key="warningIndex">
-                <svg class="early-chip-icon" aria-hidden="true">
-                  <use :xlink:href="WeatherEarlyWarningLevel(currentWarning.level)"></use>
-                </svg>
-                <span class="early-chip-text">{{ currentWarning.typeName }}{{ currentWarning.level }}预警</span>
-              </span>
-            </Transition>
-            <span v-if="WeatherEarlyWarning.length > 1" class="early-count">×{{ WeatherEarlyWarning.length }}</span>
-          </button>
+          <WeatherWarningChip v-if="WeatherEarlyWarning.length" :warning="currentWarning"
+            :count="WeatherEarlyWarning.length" @open="openWarningDetails" />
         </div>
 
-        <div v-if="displayedIndices.length" class="indices">
+        <div v-if="displayedIndices.length" key="indices" class="indices">
           <div class="indices-title">生活指数</div>
           <!-- 选择器：4 列 2 行（7 条 → 4+3），图标 + 名称各一行；点哪条下面就讲哪条。
                末行恰好 3 个时拉伸填满整行（.stretch-last），右下角不留缺口 -->
@@ -120,21 +110,22 @@
             </Transition>
           </div>
         </div>
-      </header>
+      </StaggerGroup>
 
       <!-- 右侧：选中日详情 + 当日指标 + 4日预报 -->
-      <main class="details">
-        <div class="details-head">
+      <StaggerGroup tag="main" class="details">
+        <div key="heading" class="details-head">
           <div class="details-info">
             <span class="details-day">{{ activeDayLabel }}</span>
-            <div class="details-quote" role="button" tabindex="0" aria-label="点击换一句"
+            <button class="details-quote" type="button" aria-label="点击换一句"
+              :aria-busy="hitokotoLoading"
               :title="hitokoto ? (hitokoto + (hitokotoFrom ? ' · ' + hitokotoFrom : '') + '（点击换一句）') : (hitokotoFailed ? '加载失败，点击重试' : '加载一句话')"
-              @click="refreshHitokoto()" @keydown.enter="refreshHitokoto()" @keydown.space.prevent="refreshHitokoto()">
+              @click="refreshHitokoto()">
               <!-- 有文案就始终显示（刷新时淡化），没有文案才在骨架屏 / 失败提示之间切换 -->
               <span v-if="hitokoto" class="quote-text" :class="{ refreshing: hitokotoLoading }">{{ hitokoto }}</span>
               <span v-else-if="hitokotoFailed" class="quote-text quote-error">句子加载失败，点击重试</span>
               <span v-else class="quote-skeleton"></span>
-            </div>
+            </button>
           </div>
           <div class="details-temp">
             <span class="temp-num">{{ activeTempMax }}°</span>
@@ -143,7 +134,7 @@
           </div>
         </div>
 
-        <ul class="stat-grid">
+        <ul key="stats" class="stat-grid">
           <li class="stat">
             <span class="stat-icon" v-html="statIcon('precip')"></span>
             <span class="stat-label">降雨量</span>
@@ -177,22 +168,24 @@
           </li>
         </ul>
 
-        <div class="sun-row">
+        <div key="sun" class="sun-row">
           <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
           <span class="sun-sep"></span>
           <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
         </div>
 
-        <ul class="forecast-list">
-          <li v-for="item in FourDayWeatherData" :key="item.fxDate" role="button" tabindex="0"
-            :class="{ active: activeItem === item.fxDate }" @click="activeItem = item.fxDate"
-            @keydown.enter="activeItem = item.fxDate" @keydown.space.prevent="activeItem = item.fxDate">
-            <span class="forecast-day">{{ item.fxDate }}</span>
-            <i :class="`qi-${item.iconDay}`"></i>
-            <span class="forecast-temp"><b>{{ item.tempMax }}</b>/{{ item.tempMin }}°</span>
+        <ul key="forecast" class="forecast-list">
+          <li v-for="item in FourDayWeatherData" :key="item.fxDate">
+            <button class="forecast-item" type="button" :aria-pressed="activeItem === item.fxDate"
+              :aria-label="`${item.fxDate}，最高 ${item.tempMax} 度，最低 ${item.tempMin} 度`"
+              :class="{ active: activeItem === item.fxDate }" @click="activeItem = item.fxDate">
+              <span class="forecast-day">{{ item.fxDate }}</span>
+              <i :class="`qi-${item.iconDay}`" aria-hidden="true"></i>
+              <span class="forecast-temp"><b>{{ item.tempMax }}</b>/{{ item.tempMin }}°</span>
+            </button>
           </li>
         </ul>
-        </main>
+        </StaggerGroup>
           </section>
         </Transition>
       </div>
@@ -201,6 +194,7 @@
 </template>
 
 <script setup>
+import StaggerGroup from '@/shared/motion/StaggerGroup'
 import 'qweather-icons/font/qweather-icons.css'
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
 import { useStorage } from '@vueuse/core';
@@ -209,6 +203,7 @@ import { useWeatherStore } from '@/store/index';
 import WeatherStateIndicator from './WeatherStateIndicator.vue'
 import LocationPicker from './LocationPicker.vue'
 import MinutelyRainChip from './MinutelyRainChip.vue'
+import WeatherWarningChip from './WeatherWarningChip.vue'
 import OnboardingPanel from '@/features/onboarding/OnboardingPanel.vue'
 import SettingsPanel from '@/features/onboarding/SettingsPanel.vue'
 import { OnboardingOpen, SettingsOpen, WeatherReady, closeSettings, openSettings } from '@/features/onboarding/onboardingState'
@@ -266,7 +261,7 @@ const activeUv = computed(() => {
 const locationLabel = CityAddressLabel
 // 悬停给回完整层级 + 坐标：同名区县（北京朝阳 / 长春朝阳）还能对上号
 const locationTitle = computed(() => {
-  const point = dayDateCity.value.point
+  const point = weatherStore.CityAddressPoint
   if (!point) return dayDateCity.value.city
   const coords = `${point.lng}, ${point.lat}`
   const full = `${dayDateCity.value.city} ${point.road || ''}`.trim()
@@ -468,7 +463,7 @@ const currentWarning = computed(() => WeatherEarlyWarning.value[warningIndex.val
 const ROTATE_INTERVAL = 10000
 let rotateWorker = null
 const ensureRotateWorker = () => {
-  if (rotateWorker) return
+  if (rotateWorker || prefersReducedMotion()) return
   const blob = new Blob([`setInterval(function(){postMessage(1)},${ROTATE_INTERVAL})`], {
     type: 'application/javascript'
   })
@@ -490,22 +485,7 @@ const todayTempRange = computed(() => {
   return d ? `${d.tempMax}° / ${d.tempMin}°` : '—'
 })
 
-const WeatherEarlyWarningLevel = (event) => {
-  if (event === '蓝色') return '#icon-tianqiyujing-lan'
-  else if (event === '黄色') return '#icon-tianqiyujing-huang'
-  else if (event === '橙色') return '#icon-tianqiyujing-cheng'
-  else if (event === '红色') return '#icon-tianqi-yujing'
-  else return '#icon-tianqiyujing-lan'
-}
 
-// 预警等级 -> 强调色 class（与全局 .sev-* 色板对应）
-const severityKey = (level) => {
-  const l = level || ''
-  if (l.includes('红')) return 'red'
-  if (l.includes('橙')) return 'orange'
-  if (l.includes('黄')) return 'yellow'
-  return 'blue'
-}
 
 // 生活指数分类 -> 语气色（好/提醒/中性）
 const INDEX_WARN = [
@@ -589,12 +569,14 @@ watch(
    和预警一样用 Worker 计时 —— 壁纸引擎进全屏后页面会被隐藏，页面里的 setInterval 会被节流。 */
 const INDEX_ROTATE_INTERVAL = 1000 * 12
 let indexRotateWorker = null
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const stopIndexRotate = () => {
   indexRotateWorker?.terminate()
   indexRotateWorker = null
 }
 const startIndexRotate = () => {
   stopIndexRotate()
+  if (prefersReducedMotion()) return
   const blob = new Blob([`setInterval(function(){postMessage(1)},${INDEX_ROTATE_INTERVAL})`], {
     type: 'application/javascript'
   })
@@ -664,6 +646,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 </script>
 
 <style lang="scss" scoped>
+/* 独立 translate 与外壳进出场的 transform 并存，不移动满屏点击层和 Dialog。
+   百分比以外壳自身为基准，按实际宽高留出 1rem 边距，缩放 / 改分辨率时自动重算。 */
+.weather-shell {
+  translate:
+    clamp(min(0px, calc(50% - 50vw + 1rem)), var(--weather-offset-x, 0vw), max(0px, calc(50vw - 50% - 1rem)))
+    clamp(min(0px, calc(50% - 50vh + 1rem)), var(--weather-offset-y, 0vh), max(0px, calc(50vh - 50% - 1rem)));
+}
+
 /* 尺寸全部用 rem：1rem = 设计稿(1920×1080)的 16px，
    html 的 font-size 会随视口等比缩放（见 src/style/index.scss），
    因此卡片在任意分辨率 / 系统缩放下都保持同一观感。1px 描边保留 px。 */
@@ -680,12 +670,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  /* 与右栏同一套呼吸感：右栏 gap 1.625rem / padding 2.5rem，
+  /* 与右栏同一套呼吸感：右栏 gap 1.625rem / padding 2rem，
      左栏原来是 1.125rem / 2.125rem，明显更挤。卡片加高后把省出来的高度换成间距，
-     而不是全部堆在底部（否则左栏会变成「上面一坨、下面一大片空白」）。 */
+     而不是全部堆在底部（否则左栏会变成「上面一坨、下面一大片空白」）。
+     2rem 也是为了给 0.875rem 的分钟级胶囊腾宽度：左栏内容宽多约 12px，
+     最长的那句才不容易在胶囊里被省略号截掉。 */
   gap: 1.625rem;
-  padding: 2.5rem;
-  background: linear-gradient(155deg, rgba(14, 165, 233, 0.34), rgba(56, 189, 248, 0.10) 55%, transparent);
+  padding: 2rem;
+  background: var(--hero-gradient);
   overflow: hidden;
 }
 
@@ -693,7 +685,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 90% at 18% -10%, rgba(56, 189, 248, 0.30), transparent 60%);
+  background: var(--hero-glow);
   pointer-events: none;
 }
 
@@ -838,7 +830,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 .weather-icon {
   font-size: 5rem;
   line-height: 1;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .weather-icon::before {
@@ -912,68 +904,14 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   min-width: 0;
 }
 
-.early-chip {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5625rem;
-  width: fit-content;
-  min-height: 2.375rem;
-  padding: 0.5rem 0.875rem;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  background: var(--sev-bg);
-  border: 1px solid var(--sev-border);
-  border-radius: 999px;
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-
-.early-chip:hover {
-  filter: brightness(1.1);
-}
-
-.early-chip-icon {
-  width: 1em;
-  height: 1em;
-  flex: none;
-  fill: currentColor;
-  overflow: hidden;
-}
-
-.early-chip-main {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5625rem;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.early-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5em;
-  height: 1.5em;
-  padding: 0 0.35em;
-  font-size: 0.72em;
-  font-weight: 700;
-  line-height: 1;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-}
-
 /* ================= 右侧：详情 + 指数 + 预报 ================= */
 .details {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   gap: 1.625rem;
-  padding: 2.5rem;
-  background: rgba(255, 255, 255, 0.045);
+  padding: 2rem;
+  background: var(--glass-bg-subtle);
 }
 
 .details-head {
@@ -989,11 +927,21 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .details-quote {
+  appearance: none;
+  width: 100%;
   display: flex;
   align-items: center;
   min-height: 1.55em; /* 固定一行占位，请求期间也占住高度，避免下面卡片跳动 */
   margin: 0.5rem 0 0;
   padding-left: 0.625rem;
+  padding-top: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
   border-left: 0.1875rem solid rgba(56, 189, 248, 0.48);
   overflow: hidden;
   cursor: pointer;
@@ -1029,7 +977,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   width: clamp(5rem, 45%, 13.75rem);
   height: 0.95em;
   border-radius: 0.25rem;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+  background: linear-gradient(90deg, var(--glass-bg-subtle), var(--glass-bg-soft), var(--glass-bg-subtle));
   background-size: 200% 100%;
   animation: quote-sheen 1.2s ease infinite;
 }
@@ -1199,7 +1147,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .index-cell.active {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--glass-bg-soft);
   border-color: var(--glass-border-strong);
 }
 
@@ -1309,26 +1257,32 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .forecast-list li {
+  min-width: 0;
+}
+
+.forecast-item {
+  appearance: none;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.625rem;
   padding: 1.125rem 0.5rem;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--glass-bg-subtle);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.forecast-list li:hover {
+.forecast-item:hover {
   background: var(--glass-bg-soft);
 }
 
-.forecast-list li.active {
-  background: rgba(56, 189, 248, 0.16);
-  border-color: rgba(56, 189, 248, 0.5);
+.forecast-item.active {
+  background: var(--glass-active);
+  border-color: var(--color-primary);
   color: var(--text-primary);
   box-shadow: var(--shadow-panel);
 }
@@ -1338,12 +1292,12 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   font-weight: 600;
 }
 
-.forecast-list li i {
+.forecast-item i {
   font-size: 2.4rem;
   line-height: 1;
 }
 
-.forecast-list li i::before {
+.forecast-item i::before {
   font-size: 1em;
 }
 
@@ -1369,4 +1323,5 @@ watch(() => WeatherEarlyWarning.value.length, () => {
     gap: 1rem;
   }
 }
+
 </style>

@@ -6,18 +6,20 @@
       <div v-if="open" class="rpd-mask" @click.self="requestClose">
         <section ref="cardRef" class="rpd-card" role="dialog" aria-modal="true"
           aria-labelledby="rpd-title" aria-describedby="rpd-desc" tabindex="-1">
-          <header class="rpd-head">
-            <div class="rpd-head-text">
-              <h2 id="rpd-title" class="rpd-title">重选地区</h2>
-              <p id="rpd-desc" class="rpd-sub">选好地区后地图会直接定位过去，当前视野不会丢</p>
-            </div>
-            <button class="rpd-close" type="button" aria-label="关闭" :disabled="locating"
-              @click="requestClose">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
-          </header>
+          <StaggerTransition preset="panel">
+            <header class="rpd-head">
+              <div class="rpd-head-text">
+                <h2 id="rpd-title" class="rpd-title">重选地区</h2>
+                <p id="rpd-desc" class="rpd-sub">选好地区后地图会直接定位过去，当前视野不会丢</p>
+              </div>
+              <button class="rpd-close" type="button" aria-label="关闭" :disabled="locating"
+                @click="requestClose">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </header>
+          </StaggerTransition>
 
           <!-- 三列和卡片里的三列页完全一致（同一个 RegionCascade）。
                定位请求在途时锁住列：这期间再点一个区县，等请求回来会把刚选的路径覆盖掉 -->
@@ -27,17 +29,19 @@
 
           <p v-if="error" class="rpd-error">{{ error }}</p>
 
-          <footer class="rpd-foot">
-            <span class="rpd-path" :class="{ 'is-empty': !canLocate }">{{ draftText }}</span>
-            <div class="rpd-actions">
-              <button class="rpd-btn" type="button" :disabled="locating" @click="requestClose">
-                取消
-              </button>
-              <button class="rpd-btn is-primary" type="button" :disabled="!canGo" @click="handleConfirm">
-                {{ locating ? '正在定位…' : '定位到这里' }}
-              </button>
-            </div>
-          </footer>
+          <StaggerTransition preset="panel" :index="5">
+            <footer class="rpd-foot">
+              <span class="rpd-path" :class="{ 'is-empty': !canLocate }">{{ draftText }}</span>
+              <div class="rpd-actions">
+                <button class="rpd-btn" type="button" :disabled="locating" @click="requestClose">
+                  取消
+                </button>
+                <button class="rpd-btn is-primary" type="button" :disabled="!canGo" @click="handleConfirm">
+                  {{ locating ? '正在定位…' : '定位到这里' }}
+                </button>
+              </div>
+            </footer>
+          </StaggerTransition>
         </section>
       </div>
     </Transition>
@@ -47,6 +51,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import RegionCascade from './RegionCascade.vue'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
 import { canLocateRegion, needsCityFirst, pathLabels } from './regionTree'
 
 // eslint-disable-next-line no-undef
@@ -113,7 +118,7 @@ const handleConfirm = () => {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: rgba(4, 10, 20, 0.42);
+  background: var(--scrim);
   -webkit-backdrop-filter: blur(0.75rem);
   backdrop-filter: blur(0.75rem);
 }
@@ -132,7 +137,7 @@ const handleConfirm = () => {
   /* 比普通玻璃更实一点：卡片里是三列长列表，背后的地图必须压得住。
      磨砂交给遮罩那一层做，这里不再叠第二层 backdrop-filter ——
      整屏地图上叠两层实时模糊在壁纸里很吃 GPU，视觉上也看不出差别 */
-  background: rgba(15, 27, 48, 0.92);
+  background: var(--surface-modal);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -221,7 +226,7 @@ const handleConfirm = () => {
   margin: 0.875rem 0 0;
   font-size: 0.82rem;
   line-height: 1.6;
-  color: #ffbab5;
+  color: var(--danger-text);
 }
 
 .rpd-foot {
@@ -269,7 +274,7 @@ const handleConfirm = () => {
   }
 
   &:focus-visible {
-    outline: 2px solid #7dd3fc;
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
   }
 
@@ -279,8 +284,8 @@ const handleConfirm = () => {
   }
 
   &.is-primary {
-    color: #04121f;
-    background: linear-gradient(135deg, #7dd3fc, #38bdf8);
+    color: var(--text-on-accent);
+    background: var(--color-primary);
     border-color: transparent;
 
     &:hover:not(:disabled) {

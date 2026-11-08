@@ -3,16 +3,18 @@
     <RainEffect v-if="BackgroundIndex === '4'"></RainEffect>
     <RainOverlayEffect v-else></RainOverlayEffect>
   </div>
-  <WallpaperDebugPanel v-if="NODE_ENV === 'development'" />
+  <WallpaperDebugPanel v-if="WallpaperDebugPanel" />
 </template>
 
 <script setup>
 import RainEffect from './rain/RainEffect.vue';
 import RainOverlayEffect from './rain-overlay/RainOverlayEffect.vue';
-import WallpaperDebugPanel from '@/features/wallpaper/WallpaperDebugPanel.vue';
-import { watch } from 'vue';
+import { defineAsyncComponent, watch } from 'vue';
 import { BackgroundIndex } from '../properties';
-let NODE_ENV = process.env.NODE_ENV || 'development';
+// 必须在编译期常量判断内导入：生产构建不会解析调试面板及其 Arco JS / CSS。
+const WallpaperDebugPanel = process.env.NODE_ENV === 'development'
+  ? defineAsyncComponent(() => import('@/features/wallpaper/WallpaperDebugPanel.vue'))
+  : null;
 /**
  * 背景序号
  * 0-不显示背景
