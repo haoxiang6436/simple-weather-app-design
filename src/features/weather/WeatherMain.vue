@@ -199,15 +199,26 @@
         </StaggerGroup>
 
         <StaggerTransition preset="sunRow">
+          <!-- 日出日落那行右边空着，正好挂「7 天 / 24 小时」切换：
+               它必须零高度 —— 右侧这一列实测只剩 7px 余量，多一行就把 7 天条顶出去。 -->
           <div class="sun-row">
-            <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
-            <span class="sun-sep"></span>
-            <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
+            <div class="sun-main">
+              <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
+              <span class="sun-sep"></span>
+              <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
+            </div>
+            <div class="sun-right">
+              <!-- 署名的要求是「与数据同时可见」：只在 24 小时视图里出现，且不占额外高度 -->
+              <span v-if="ForecastView === 'hourly' && hourlyCredit" class="sun-credit">{{ hourlyCredit }}</span>
+              <ViewSegmentedControl :model-value="ForecastView" :options="FORECAST_VIEW_OPTIONS"
+                :controls="FORECAST_PANE_IDS" @update:model-value="onForecastViewChange" />
+            </div>
           </div>
         </StaggerTransition>
 
-        <ForecastStrip key="forecast" :days="forecastDays" :active-date="activeItem"
-          @select="activeItem = $event" />
+        <ForecastPanel key="forecast" :days="forecastDays" :active-date="activeItem"
+          :hours="hourlyHours" :status="HourlyStatus" :view="ForecastView"
+          @select="activeItem = $event" @retry="onHourlyRetry" />
       </main>
           </section>
         </Transition>
@@ -236,7 +247,8 @@ import { LocationPickerOpen, closeLocationPicker, openLocationPicker } from './l
 import MinutelyRainChip from './MinutelyRainChip.vue'
 import WeatherWarningChip from './WeatherWarningChip.vue'
 import AirQualityChip from './AirQualityChip.vue'
-import ForecastStrip from './ForecastStrip.vue'
+import ForecastPanel from './ForecastPanel.vue'
+import ViewSegmentedControl from './ViewSegmentedControl.vue'
 import StatDelta from './StatDelta.vue'
 import { uvLevel } from './uvScale'
 import { buildStatDeltas } from './statDeltas'
@@ -249,8 +261,8 @@ import { useWeatherRefresh } from './useWeatherRefresh';
 
 const WeatherMainIsShow = ref(false)
 const weatherStore = useWeatherStore()
-const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, CityAddressLabel } = storeToRefs(weatherStore)
-const { getLocationInformation, getWeatherIndices, ReviseState, openWarningDetails } = weatherStore
+const { dayDateCity, FourDayWeatherData, nowWeatherData, WeatherDataUpdatedAtATimeComputed, TheWeatherDataIsLoaded, WeatherEarlyWarning, WeatherIndices, CityAddressLabel, HourlyWeatherData, HourlyStatus, ForecastView } = storeToRefs(weatherStore)
+const { getLocationInformation, getWeatherIndices, getHourlyWeatherData, ReviseState, openWarningDetails } = weatherStore
 const activeItem = ref('今天')
 const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item => item.fxDate === activeItem.value))
 
@@ -274,6 +286,40 @@ const todayDaily = computed(() => FourDayWeatherData.value[0] || null)
  * 曲线按实际条数重新等分（列中心 = i / (n - 1)），5 天时每列自然变宽。
  */
 const forecastDays = computed(() => FourDayWeatherData.value.slice(0, ForecastDays.value))
+
+/* ---- 24 小时视图 ----
+   数据在 store 里按需加载（默认停在 7 天，切过去才发请求）；
+   这里只做「取出来」和「切视图时触发一次加载」。失败态由 HourlyStrip 自己画重试按钮。 */
+const hourlyHours = computed(() => HourlyWeatherData.value.hours || [])
+
+// 和风要求在展示数据的地方同时署名；接口给了 attributions 就用它，没给就退回固定文案
+const hourlyCredit = computed(() => {
+  const names = (HourlyWeatherData.value.attributions || []).map((item) => item.name).filter(Boolean)
+  return names.length ? `数据来源 ${names.join('、')}` : ''
+})
+
+/* 「7 天 / 24 小时」两个标签。
+   ⚠️ 天数不能写死：壁纸属性里用户可以选 5 / 6 / 7 天，写死「7 天」在设成 5 天时就是骗人。
+   标签跟着实际列数走（forecastDays 已经按属性截断过），切换属性时标签也跟着变。 */
+const FORECAST_VIEW_OPTIONS = computed(() => [
+  { value: 'daily', label: `${forecastDays.value.length || ForecastDays.value} 天` },
+  { value: 'hourly', label: '24 小时' },
+])
+const FORECAST_PANE_IDS = ['forecast-pane-daily', 'forecast-pane-hourly']
+
+const onForecastViewChange = (view) => {
+  ForecastView.value = view
+  if (view !== 'hourly') return
+  /* 切到 24 小时就等于离开「挑中的某一天」：把选中项复位到第一列（今天）。
+     不清的话，用户从「周六」切到 24 小时再切回来，看到的还是周六的高亮，
+     而 24 小时面板跟他看的是两回事，回来时应该是最中性的默认状态。 */
+  const first = forecastDays.value[0]
+  if (first) activeItem.value = first.fxDate
+  getHourlyWeatherData().catch(() => {})
+}
+
+// 重试：跳过缓存直接拉（true = important）
+const onHourlyRetry = () => getHourlyWeatherData(true).catch(() => {})
 
 // 选中的那天不在了才回落到第一列（别的情况一律不动选中项）。
 // 两种场景会走到这里：天数调小后选中的那天被截掉；跨过零点后旧的那一列被挤出 7 天窗口。
@@ -992,7 +1038,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 1.625rem;
+  /* 1.4375rem 而不是左栏的 1.625rem：右栏这一列本来就顶到卡片底（零余量），
+     日照行右边挂了 2rem 高的「7 天 / 24 小时」控件后整行高了 8px，
+     从 3 个间隙里各让 3px（共 9px）把它抵回来，还剩 1px 呼吸。
+     左栏不受影响，视觉上两栏对不齐也看不出来（不是同一组元素）。 */
+  gap: 1.4375rem;
   padding: 2rem;
   background: var(--glass-bg-subtle);
 }
@@ -1181,11 +1231,33 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 }
 
 .sun-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.sun-main {
   display: inline-flex;
   align-items: center;
   gap: 0.625rem;
-  font-size: 0.9rem;
+}
+
+/* 右侧：署名 + 视图切换。零高度地挂在同一行上（见模板里的说明） */
+.sun-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex: none;
+}
+
+.sun-credit {
+  font-size: 0.6875rem;
   color: var(--text-muted);
+  opacity: 0.85;
+  white-space: nowrap;
 }
 
 .sun-item b {

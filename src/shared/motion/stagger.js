@@ -23,15 +23,46 @@ export const STAGGER_PRESETS = Object.freeze({
   forecastDay: { duration: 460, base: 340, step: 44, maxDelay: 264, travel: '0.5rem' },
   // 温度趋势曲线：不淡入、不位移，进场靠 clip-path 从左往右把线「画」出来
   // （reveal 的声明在 ForecastStrip.vue，时长/延迟就用这里的 --stagger-* 变量）。
-  // 缓动刻意不用 --ease-enter：那条曲线一上来就冲刺 40%，看着像「刷」地一下出现；
-  // 这里要的是匀速偏减速，线条才能一路「画」过去。
-  // 进场延迟（340）略短于离场时长（360）：换数据时旧的曲线还在淡出，新的才开始画，
-  // 两条曲线会短暂同框，预报区不会先空一下。
-  // 340 = 预报七列开始落位的时间：曲线和第一列同时起笔，不会在空白的预报区里先画一遍。
-  trend: { duration: 640, base: 340, step: 0, maxDelay: 0, travel: '0px', opacity: 1, leave: 360, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
-  // 曲线的「选中日端点 / 导引线」：曲线快画完时（340 + 640 - 40）落下来，
-  // 和原来的相对时序一致 —— 不用等满一整条线，免得最后只剩两个点在动。
-  trendMarker: { duration: 300, base: 940, step: 0, maxDelay: 0, travel: '0px', leave: 160, easing: 'var(--ease-enter)' },
+  // 缓动不再是全局那支 cubic-bezier(0.4, 0, 0.2, 1)：那条两头都慢，画线会「先顿、中间冲、再刹」。
+  // 这里用 cubic-bezier(0.25, 0.25, 0.65, 1) —— 起步几乎就是匀速（t=0.1 时推进 11.4%，线性的 10%），
+  // 中段略快（峰值 1.35 倍），最后四分之一平滑减速到停（t=0.9 时只剩 0.36 倍速）。
+  // 用户的要求原话：「保留一点收尾减速」。
+  // 进场延迟（340）= 预报七列开始落位的时间：曲线和第一列同时起笔，不会在空白的预报区里先画一遍。
+  // ⚠️ leave 是 0：曲线靠 `:key` 重挂来重播，留离场时长会让旧的完整曲线盖在新曲线上面淡出
+  // （`.stagger-leave-active` 是 position:absolute; inset:0），见 §15.11。
+  // 代价是重画前那 340ms 温度带是空的 —— 但那时七列也在同一拍开始落位，读起来是「一起重算」。
+  trend: { duration: 640, base: 340, step: 0, maxDelay: 0, travel: '0px', opacity: 1, leave: 0, easing: 'cubic-bezier(0.25, 0.25, 0.65, 1)' },
+  // 24 小时条：一屏 8 列、按小时从左到右落位。24 项比 7 项多，所以间距压到 16ms、
+  // maxDelay 也收在 220：在视口里看得见的那 8 列（0~7）是 120→232ms 起，
+  // 后面 16 列虽然也在跑，但都在视口外，不该让它们把总时长拖长。
+  // base 和下面的 hourlyTrend 对齐：曲线与第一列同时起笔，而不是先在空白带子里画一遍。
+  hourlySlot: { duration: 420, base: 120, step: 16, maxDelay: 220, travel: '0.5rem' },
+  // 24 小时的曲线：同样靠 clip-path 从左往右「画」（声明在 HourlyStrip.vue）。
+  // ⚠️ 时长按「笔速」定，不按「感觉」定：7 日条画 672px 用 640ms ≈ 1.05px/ms，
+  // 24 小时这条横跨 3 屏（≈2010px），照同一支笔的走速要 1900ms；
+  // 再长就成等动画了，所以取 1440ms（≈1.4px/ms，比 7 日条快三成，但仍是「一笔一笔画过去」）——
+  // 720ms 那版是 2.8px/ms，用户的原话是「太快了，曲线长度很长的」。
+  // 终点（120 + 1440）晚于最后一列的入场（380 + 420），曲线收笔时数字早已落齐。
+  // ⚠️ leave 必须是 0：曲线靠 `:key` 重挂来重播，Vue 会同时给旧节点跑一遍离场，
+  // 而 `.stagger-leave-active` 是 `position:absolute; inset:0` —— 旧的完整曲线会正好盖在
+  // 新曲线（clip 100%，什么都还没画）上面淡出 260ms。于是观感变成
+  // 「先看到一条完整的线 → 0.2~0.3s 后淡掉 → 才开始 0→100% 地画」，用户报的就是这个
+  // （「线一直在那，随后零点几秒后消失，随后开始绘出动画」）。0ms 让旧线立刻消失。
+  // ⚠️ easing 和 7 日条的 trend 用同一条 cubic-bezier(0.25, 0.25, 0.65, 1)：
+  // 起步几乎匀速、末尾平滑减速。既不是全局缓动（两头都慢），也不是纯 linear
+  // （收笔会「啪」地停住）。用户的原话：「保留一点收尾减速」。
+  hourlyTrend: { duration: 1440, base: 120, step: 0, maxDelay: 0, travel: '0px', opacity: 1, leave: 0, easing: 'cubic-bezier(0.25, 0.25, 0.65, 1)' },
+  // 跨零点那条竖线：不位移、只淡入，等曲线画过半夜那一列之后再出现（否则一条孤零零的线
+  // 会比它两边的数据更早被看见）。半夜在第 9 列（0 起算），约占整条曲线的 39%，
+  // 1440ms 的曲线走到那儿约 605ms，加上起始延迟就是 700ms 左右。
+  hourlyDivider: { duration: 420, base: 700, step: 0, maxDelay: 0, travel: '0px', leave: 160 },
+  // 曲线的「选中日端点 / 导引线」：等整条曲线画完再落下来。
+  // 用户原话：「我觉得它应该等动画结束之后再出来」。7 日条的曲线是 base 340 + duration 640 = 980ms，
+  // 所以这里给 1000ms —— 留 20ms 的余量，读起来是「线收笔」和「点落下」先后两拍，
+  // 而不是两个东西同时到位。（原来是 940ms，曲线还没画完，端点和竖线就先挂上了。）
+  // ⚠️ leave 必须是 0：它和曲线一样靠 `:key` 重挂来重播，留离场时长会让旧的端点/导引线
+  // 在新曲线还什么都没画的时候先留在原位，等于又演一遍「诈一下」。
+  trendMarker: { duration: 300, base: 1000, step: 0, maxDelay: 0, travel: '0px', leave: 0, easing: 'var(--ease-enter)' },
   warning: { duration: 420, base: 0, step: 90, maxDelay: 360, travel: 'calc(var(--warning-unit) * 0.7)' },
   // 空气质量弹层正文（结论 / 刻度 / 污染物 / 建议 / 来源）不再走这里：
   // 那五块改用 anime.js 逐帧写内联 opacity / scale（见 AirQualityDialog.vue 的 playEntrance()）。

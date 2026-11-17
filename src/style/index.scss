@@ -320,6 +320,36 @@ html {
   box-sizing: border-box;
 }
 
+/* ---- 全局：拖动不选中文本 ----
+   壁纸里几乎全是「按住拖动」的手势（拖预报条、拖温度曲线、拖窗口），
+   一旦把文字选蓝，Windows / Edge 会弹出「搜索所选内容」「添加批注」浮条，
+   并且原生的选中拖拽还会带出半透明 ghost。所以整站默认禁选，
+   只给真正需要复制的位置（输入框、代码、带 data-selectable 的元素）开回来。
+   user-select 是可继承属性，写在 html 上即可覆盖全站，不必逐个组件加。 */
+html {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 图片 / 图标不参与原生拖拽（否则拖动会拖出 ghost 并触发 drop） */
+img,
+svg {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+[data-selectable],
+input,
+textarea,
+pre,
+code {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+
 html,
 body,
 #app {

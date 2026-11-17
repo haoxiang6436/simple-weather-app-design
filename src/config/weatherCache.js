@@ -20,11 +20,11 @@
  *    useWeatherStore.js 里的 CACHE_VERSION +1（它参与 isFresh 判定，改完所有接口
  *    缓存立刻整体作废），不需要发新版本才能清。
  *
- * 官方完整推荐表（原文抓取，供以后扩接口时查；本项目只用到其中 6 类）：
+ * 官方完整推荐表（原文抓取，供以后扩接口时查；本项目只用到其中 7 类）：
  *
  *   数据类型            推荐缓存时间        官方更新频率       本项目
  *   实时天气            10-30 分钟          5-10 分钟          realtime
- *   逐小时天气预报      30-60 分钟          60 分钟            ——（未使用）
+ *   逐小时天气预报      30-60 分钟          60 分钟            hourly
  *   逐天天气预报        1-6 小时            60 分钟            fourDays
  *   天气预警            5-20 分钟           3 分钟             warning
  *   天气指数            6-12 小时           60 分钟            indices
@@ -79,6 +79,19 @@ export const WEATHER_CACHE_SPECS = Object.freeze({
     updateFrequency: '60 分钟',
     envKey: 'VUE_APP_WEATHER_UPDATE_FOURDAYS',
     crossLocalDay: true,
+  }),
+
+  // 官方 30-60 分钟，更新频率 60 分钟。取 30 分钟（区间下限）：
+  // 逐小时预报只是把每日预报拆细，30 分钟内第一条「现在」还是同一个整点，
+  // 再多就是白发额度。这里不设 crossLocalDay —— 它本身就是一条跨零点的连续序列，
+  // 零点之后要的是「新的 24 小时」，而不是「清空重拉」，靠 TTL 自然滚动即可。
+  hourly: Object.freeze({
+    label: '逐小时预报',
+    ttl: 30 * MINUTE,
+    recommended: Object.freeze([30 * MINUTE, 60 * MINUTE]),
+    updateFrequency: '60 分钟',
+    envKey: 'VUE_APP_WEATHER_UPDATE_HOURLY',
+    crossLocalDay: false,
   }),
 
   // 官方 5-20 分钟，更新频率 3 分钟。预警是安全相关信息，在区间里取偏短的
@@ -140,7 +153,7 @@ export const WEATHER_CACHE_SPECS = Object.freeze({
  * @vue/cli-service 的 DefinePlugin 会把整个 process.env 定义成一个对象字面量
  * （见 resolveClientEnv.js 的 `{ 'process.env': env }`）。以前这里写
  * `env = process.env`，结果 .env 里所有 VUE_APP_* 都被原样打进 dist —— 和风
- * 密钥就是这样泄露的（2026-10-25 修复）。现在只按名字逐个访问下面 6 个变量，
+ * 密钥就是这样泄露的（2026-10-25 修复）。现在只按名字逐个访问下面 7 个变量，
  * 打包产物里只会出现这几个非敏感的缓存时长，其余变量一个都带不进来。
  *
  * 未在 .env 里定义的键，打包后仍会保留对 process 的访问；浏览器里没有
@@ -158,6 +171,7 @@ const readEnvValue = (getter) => {
 const env = {
   VUE_APP_WEATHER_UPDATE_REALTIME: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_REALTIME),
   VUE_APP_WEATHER_UPDATE_FOURDAYS: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_FOURDAYS),
+  VUE_APP_WEATHER_UPDATE_HOURLY: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_HOURLY),
   VUE_APP_WEATHER_UPDATE_WARNING: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_WARNING),
   VUE_APP_WEATHER_UPDATE_INDICES: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_INDICES),
   VUE_APP_WEATHER_UPDATE_MINUTELY: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_MINUTELY),

@@ -29,6 +29,7 @@ import { STATS_SERVICE } from './requestStats';
 const API_BY_PATH = [
   [/^\/weather\/v1\/current\//, 'current'],
   [/^\/weather\/v1\/daily\//, 'daily'],
+  [/^\/weather\/v1\/hourly\//, 'hourly'],
   [/^\/weatheralert\/v1\/current\//, 'alert'],
   [/^\/v7\/indices\//, 'indices'],
   [/^\/airquality\/v1\/current\//, 'air'],
@@ -215,6 +216,62 @@ const normalizeDaily = (raw, timeZone) => ({
 });
 
 /* ------------------------------------------------------------------ *
+ * 逐小时预报
+ * GET /weather/v1/hourly/{latitude}/{longitude}?hours=24&localTime=true
+ *
+ * 和 v1 其它接口一样：没有 code 字段、湿度/云量/降水概率都是 0~1 小数、
+ * 风速是 m/s、时间是 ISO。这里全部换成 UI 直接能用的形状：
+ *   - time / date 已经按查询地点的时区换算好（跨零点要靠 date 判断「明天」）
+ *   - ts 是毫秒时间戳，用来丢掉已经过去的整点（接口返回的第一项常常就是过去）
+ *   - precipProb 是百分比（0~100），不是 0~1
+ * ------------------------------------------------------------------ */
+
+/** 两位小数（降水量的量级是 0.01mm，用整数会全变成 0） */
+const twoDecimals = (value) => {
+  const number = num(value);
+  return number === null ? null : Math.round(number * 100) / 100;
+};
+
+/**
+ * 数据来源署名。
+ * v1 的 metadata.attributions 既可能是字符串数组（旧版），也可能是
+ * [{name, url}] 对象数组，两种都收；官方要求「署名必须与数据同时展示」。
+ */
+const normalizeAttributions = (list) => (Array.isArray(list) ? list : [])
+  .map((item) => (typeof item === 'string'
+    ? { name: '', url: item }
+    : { name: String(item?.name || ''), url: String(item?.url || '') }))
+  .filter((item) => item.name || item.url);
+
+/** /weather/v1/hourly 的响应 → UI 用的逐小时字段 */
+const normalizeHourly = (raw, timeZone) => ({
+  hours: (raw?.hours || []).map((hour) => {
+    const ts = Date.parse(hour.forecastTime);
+    return {
+      ts: Number.isFinite(ts) ? ts : null,
+      date: dateInZone(hour.forecastTime, timeZone),
+      time: clockInZone(hour.forecastTime, timeZone),
+      temp: round(hour.temperature?.value),
+      feelsLike: round(hour.feelsLike?.value),
+      icon: hour.condition?.code || '',
+      text: hour.condition?.text || '',
+      humidity: percent(hour.humidity),
+      windDir: windDir(hour.wind?.direction),
+      windScale: num(hour.wind?.scale),
+      windSpeed: speedToKmh(hour.wind?.speed),
+      // 0~1 小数 → 百分比：卡片上直接写「78%」，不再乘 100
+      precipProb: percent(hour.precipitation?.probability),
+      precip: twoDecimals(hour.precipitation?.amount?.value),
+      precipType: hour.precipitation?.type || '',
+      pressure: round(hour.pressure?.value),
+      cloud: percent(hour.cloudCover),
+      uvIndex: num(hour.uvIndex),
+    };
+  }),
+  attributions: normalizeAttributions(raw?.metadata?.attributions),
+});
+
+/* ------------------------------------------------------------------ *
  * 数据接口（全部按坐标查询）
  * ------------------------------------------------------------------ */
 /**
@@ -235,6 +292,18 @@ export const get7DayForecast = ({ lat, lon, tz }, days = 7) =>
     days: Math.min(Math.max(Number(days) || 7, 1), 10),
     localTime: 'true',
   }).then((raw) => normalizeDaily(raw, tz));
+
+/**
+ * 逐小时天气预报（1 km 分辨率，1-240 小时）
+ * @param {{lat:number, lon:number, tz?:string}} coord tz 用来把 ISO 时间换算成当地地方时
+ * @param {number} [hours] 默认 24
+ */
+export const getHourlyForecast = ({ lat, lon, tz }, hours = 24) =>
+  requestWeather(`/weather/v1/hourly/${round2(lat)}/${round2(lon)}`, {
+    hours: Math.min(Math.max(Number(hours) || 24, 1), 240),
+    // 不传的话接口默认给 UTC —— 卡片上的「15时」会整体偏移一个时区
+    localTime: 'true',
+  }).then((raw) => normalizeHourly(raw, tz));
 
 /**
  * 实时天气预警（新版接口，按经纬度）

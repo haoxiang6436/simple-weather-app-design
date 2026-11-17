@@ -69,6 +69,7 @@ export const STATS_SERVICE = 'qweather'
 export const REQUEST_API_LABELS = Object.freeze({
   current: '实时天气',
   daily: '每日预报',
+  hourly: '逐小时预报',
   alert: '天气预警',
   indices: '生活指数',
   air: '空气质量',
@@ -251,7 +252,7 @@ const bump = (bucket, field) => {
  *
  * @param {Object} event
  * @param {string} event.service   服务标识，必须是 'qweather'，否则整条丢弃（见 STATS_SERVICE）
- * @param {string} [event.api]     接口代号（current / daily / alert / indices / air / minutely / geo）
+ * @param {string} [event.api]     接口代号（current / daily / hourly / alert / indices / air / minutely / geo）
  * @param {string} [event.host]     发往哪个 API Host（用户填了多组域名时，额度其实分在各自账号上）
  * @param {'ok'|'soft'|'err'|'net'} [event.outcome] 结果分类，未知值按 err 处理（不虚增额度）
  * @param {number} [event.now]      时间戳，默认当前时间（测试时可注入）

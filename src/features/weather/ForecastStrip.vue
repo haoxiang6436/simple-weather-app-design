@@ -6,7 +6,7 @@
            （从左到右把线「画」出来），旧的那份在离场里淡掉。
            动效参数只在 shared/motion/stagger.js 里（trend / trendMarker 预设），这里不写 keyframes。 -->
       <StaggerTransition preset="trend">
-        <svg :key="plotKey" class="forecast-trend" viewBox="0 0 700 100" preserveAspectRatio="none">
+        <svg :key="`${plotKey}:${revealKey}`" class="forecast-trend" viewBox="0 0 700 100" preserveAspectRatio="none">
           <defs>
             <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="currentColor" stop-opacity="0.32" />
@@ -20,9 +20,12 @@
         </svg>
       </StaggerTransition>
       <!-- 选中日：一条贯穿温度带的细导引线 + 高低温两个端点。
-           和曲线同一个 plotKey：换数据时等曲线画完再落下来，点选另一天时只横移（不重放） -->
+           key 和曲线一样拼 plotKey + revealKey：曲线重画时它也跟着重来一次，
+           由 trendMarker 预设把入场压到「曲线收笔之后」——线还没画完就先挂一条竖线和两个点，
+           看起来像是这两个东西「没有动画、诈一下先出现」（用户报的就是这个）。
+           点选另一天时 key 不变，只横移，不重放。 -->
       <StaggerTransition preset="trendMarker">
-        <div v-if="activePoint" :key="plotKey" class="forecast-marker">
+        <div v-if="activePoint" :key="`${plotKey}:${revealKey}`" class="forecast-marker">
           <span class="forecast-marker-guide"></span>
           <span class="forecast-marker-dot" :style="{ top: `${activePoint.highPercent}%` }"></span>
           <span class="forecast-marker-dot is-low" :style="{ top: `${activePoint.lowPercent}%` }"></span>
@@ -40,15 +43,15 @@
          它们虽然不属于某一列，但进场要和选中列同步：同样走 forecastDay、
          用 activeIndex 对齐那一列的延迟，否则高亮会先亮在一片还没出现的文字上。 -->
     <StaggerTransition preset="forecastDay" :index="activeIndex">
-      <div v-if="activeIndex >= 0" class="forecast-thumb" aria-hidden="true"></div>
+      <div v-if="activeIndex >= 0" :key="revealKey" class="forecast-thumb" aria-hidden="true"></div>
     </StaggerTransition>
     <StaggerTransition preset="forecastDay" :index="activeIndex">
-      <div v-if="activeIndex >= 0" class="forecast-frame" aria-hidden="true"></div>
+      <div v-if="activeIndex >= 0" :key="revealKey" class="forecast-frame" aria-hidden="true"></div>
     </StaggerTransition>
 
     <!-- 七列各自进场：TransitionGroup 直接把 li 当作错峰项，ul 本身不做整块淡入，
          否则外层再淡一次，前几列会被「双重透明」压得比后几列更淡。 -->
-    <StaggerGroup tag="ul" class="forecast-list" preset="forecastDay"
+    <StaggerGroup :key="revealKey" tag="ul" class="forecast-list" preset="forecastDay"
       :style="{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }">
       <li v-for="item in days" :key="item.fxDate">
         <button class="forecast-item" type="button" :class="{ active: item.fxDate === activeDate }"
@@ -84,6 +87,8 @@ import { SPRING_PRESETS } from '@/shared/motion/stagger'
 const props = defineProps({
   days: { type: Array, default: () => [] },
   activeDate: { type: String, default: '' },
+  // 这一片当前是不是在前台（ForecastPanel 两片视图常驻 DOM，只切 visibility）
+  active: { type: Boolean, default: true },
 })
 // eslint-disable-next-line no-undef
 defineEmits(['select'])
@@ -196,6 +201,23 @@ const axisSpan = computed(() => Math.max(1, props.days.length - 1))
 const plotKey = computed(
   () => props.days.map((day) => `${day.fxDate}:${day.tempMax}:${day.tempMin}`).join('|')
 )
+
+/* ================= 进场重播开关 =================
+   这一片在 24 小时视图下是「挂着但看不见」的（ForecastPanel 用 visibility 藏着另一片），
+   而首屏那次进场动画发生在用户切过来之前 —— 于是会出现这个 bug：
+   从上一次停在「24 小时」的状态刷新页面，再切回 7 天，看到的是一片早就摆好的静态内容，
+   一点进场都没有；反过来（停在 7 天刷新、再切到 24 小时）却是正常的，因为那边有 revealKey。
+
+   所以这里也加一个：只在**第一次**切到前台时 +1，模板把它拼进 key，重挂一次重播进场。
+   来回切换不重播（演过一次就够）；挂载时如果本来就是前台，那次进场是看得见的，算已经演过。 */
+const revealKey = ref(0)
+const hasRevealed = ref(props.active)
+
+watch(() => props.active, (active) => {
+  if (!active || hasRevealed.value) return
+  hasRevealed.value = true
+  revealKey.value += 1
+})
 
 /* ================= 选中滑动块的横移：交给 anime.js 的 spring =================
    以前这里是 `transition: transform 0.3s cubic-bezier(...)`，值也由 --fc-active 直接给。
@@ -384,6 +406,10 @@ onBeforeUnmount(() => {
 .forecast-trend.stagger-leave-active {
   position: absolute;
   inset: 0;
+  /* 重播（revealKey 换 key）时旧曲线和新曲线只共存一帧：如果让它按 opacity 淡出，
+     那一帧里「已经画完的整条旧曲线」会先被看见，再消失、再从 0 画起——
+     用户看到的就是曲线闪了一下。直接当帧隐藏，视觉上等于原地重画。 */
+  visibility: hidden;
 }
 
 /* 离场只淡掉，不重播「画线」（trend 预设 opacity=1，这里单独补上淡出） */
@@ -391,10 +417,14 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
+/* 高低温两条边线跟 24 小时的曲线同一个颜色（--color-primary），
+   而不是 --text-secondary：深色（夜雨玻璃）主题下那是接近白的颜色，
+   会和蓝色的填充带、蓝色端点圆点打架，看着像「曲线漏了主题色」。
+   高温线更实、低温线更淡，靠不透明度而非色相区分上下沿。 */
 .forecast-high-line,
 .forecast-low-line {
   fill: none;
-  stroke: var(--text-secondary);
+  stroke: var(--color-primary);
   stroke-width: 1.25;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -402,11 +432,11 @@ onBeforeUnmount(() => {
 }
 
 .forecast-high-line {
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 .forecast-low-line {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .forecast-marker {
@@ -430,6 +460,13 @@ onBeforeUnmount(() => {
   width: 1px;
   background: linear-gradient(to bottom, transparent, var(--color-primary), transparent);
   opacity: 0.45;
+}
+
+/* 和曲线同一条规则：重播时旧端点只活一帧。
+   （trendMarker 的 leave 已经是 0，这里再兜一层，避免以后有人把 leave 调回去，
+   旧竖线/旧圆点又在新曲线还没画的时候挂在那儿。） */
+.forecast-marker.stagger-leave-active {
+  visibility: hidden;
 }
 
 .forecast-marker-dot {

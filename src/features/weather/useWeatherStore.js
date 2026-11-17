@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { get7DayForecast, getCurrentWeather, getWeatherWarnings, getWeatherIndices as getWeatherIndicesAPI, getMinutelyPrecipitation as getMinutelyPrecipitationAPI, getAirQuality as getAirQualityAPI, lookupCity } from '@/api/weather';
+import { get7DayForecast, getHourlyForecast, getCurrentWeather, getWeatherWarnings, getWeatherIndices as getWeatherIndicesAPI, getMinutelyPrecipitation as getMinutelyPrecipitationAPI, getAirQuality as getAirQualityAPI, lookupCity } from '@/api/weather';
 import { isNetworkError } from '@/api/errors';
 import Bus from '@/shared/Bus';
 import { BUS_EVENTS } from '@/features/wallpaper/constants';
@@ -22,6 +22,11 @@ const WEATHER_CACHE_STORAGE_KEY = 'WeatherApp-2026-9-1'
    预报条显示几条由壁纸属性 forecastdays 决定，只是对这份数据 slice 一下 ——
    所以缓存里必须一直是完整的 7 列，否则「切天数」就没有东西可切。 */
 const FORECAST_COLUMNS = 7
+
+/* 逐小时预报固定要 24 小时（一屏 8 列 × 3 屏）。
+   和风接口 hours 上限 240，这里只要一天的量；序列会自然跨过零点，
+   视图靠每一项的 date 判断「哪天」，所以不需要额外的跨天标记。 */
+const HOURLY_COLUMNS = 24
 
 export const useWeatherStore = defineStore('Weather', () => {
   // 展示的生活指数类型 ID（运动/洗车/穿衣/紫外线/旅游/舒适度/感冒）
@@ -240,6 +245,7 @@ export const useWeatherStore = defineStore('Weather', () => {
   // 天气数据更新时间
   const WeatherDataUpdatedAtATime = ref({
     FourDayWeather: 0,
+    HourlyWeather: 0,
     RealTimeWeather: 0,
     nowDate: 0,
     EarlyWarning: 0,
@@ -266,6 +272,16 @@ export const useWeatherStore = defineStore('Weather', () => {
     }
   })
   const FourDayWeatherData = ref(placeholderForecast())
+  /* ---- 逐小时预报 ----
+     按需加载：默认停在「7 天」，用户切到「24 小时」才发请求（接口按次计费，
+     没人看的视图不该花额度）。三份状态各管一件事：
+       HourlyWeatherData —— { hours: [], attributions: [] }，形状由 api 层归一化好
+       HourlyStatus      —— idle / loading / ready / error，视图据此画骨架 / 重试
+       ForecastView      —— 'daily' | 'hourly'，持久化，重载壁纸后停在原地
+     失败时保留旧数据（此时 status=error），视图仍然能画上一次的曲线。 */
+  const HourlyWeatherData = ref({ hours: [], attributions: [] })
+  const HourlyStatus = ref('idle')
+  const ForecastView = ref('daily')
   // 实时天气
   const nowWeatherData = ref({
     icon: '100',
@@ -364,6 +380,11 @@ export const useWeatherStore = defineStore('Weather', () => {
       getRealTimeWeather(important),
       getWeatherEarlyWarning(important),
     ])
+    // 逐小时预报：只有视图已经切到「24 小时」、或者本来就有数据时才跟着主周期刷新。
+    // 默认停在 7 天时完全不发请求（接口按次计费），等用户切过去再懒加载。
+    if (ForecastView.value === 'hourly' || HourlyStatus.value === 'ready') {
+      getHourlyWeatherData(important).catch(() => {})
+    }
     // 生活指数：手动定位时随主流程一起刷新（失败不影响主状态）；
     // 定时轮询不在这里发，改由 useWeatherRefresh 错峰单独触发，
     // 让每个定时周期的请求数保持为域名数的整数倍。
@@ -371,10 +392,11 @@ export const useWeatherStore = defineStore('Weather', () => {
       await getWeatherIndices(important || cacheVersionStale).catch(() => {})
     }
     // 分钟级降水：独立加载、不 await —— 境外坐标必然 400，
-    // 既不能进 allSettled（会判整张卡失败），也不该拖住主流程的加载耗时
-    getMinutelyPrecipitation().catch(() => {})
+    // 既不能进 allSettled（会判整张卡失败），也不该拖住主流程的加载耗时。
+    // 手动刷新（important）时同样强制重拉，否则点一下刷新，左边那颗胶囊还会按旧缓存说话
+    getMinutelyPrecipitation(important).catch(() => {})
     // 空气质量：同样独立、不 await —— 没权限 / 没覆盖时只影响温度旁那颗胶囊
-    getAirQuality().catch(() => {})
+    getAirQuality(important).catch(() => {})
     const failed = results.filter((result) => result.status === 'rejected')
     // 采纳当前凭据指纹与缓存版本：下一次请求按正常缓存时效走。
     // 必须放在数据请求之后 —— 放在前面的话 isFresh 会立刻通过，本轮的重新拉取就被跳过了
@@ -402,6 +424,52 @@ export const useWeatherStore = defineStore('Weather', () => {
     console.error('部分天气请求失败：', failed.map((result) => result.reason))
     ReviseState(hasNetworkError ? 400 : 300)
     throw failed[0].reason
+  }
+  /* ---- 手动刷新 ----
+     额度是用户自己申请的，「要不要现在多问一次」的权利就交回用户：点一下「N 分钟前更新」
+     就跳过全部缓存重拉一轮。走的仍是 getLocationInformation({ force: true }) ——
+     和「手动定位」同一条路，加载状态（100 → 200 / 300 / 400）、各接口时间戳、
+     部分失败、凭据失效重开引导页这些处理都是现成的，不另起一套。
+     我们这边只做两件事：
+       1) 防抖：冷却 30 秒 + 连点不排队。同一接口的在途请求本来就被 singleFlight 合并，
+          冷却挡的是「上一轮刚回来、再点一次又要七次调用」。
+       2) 不做每日限额：花的是用户自己的额度，界面只负责把「刚刚更新」如实显示出来。
+     一次全量刷新的代价（最多 7 次调用）：实时 / 7天 / 预警 / 24小时（仅已加载时）/
+     生活指数 + 分钟降水 + 空气质量。冷却只放内存、不进 localStorage：重载本身命中缓存、
+     不发请求，不值得为它落盘。 */
+  const MANUAL_REFRESH_COOLDOWN_MS = 30 * 1000
+  const ManualRefreshBusy = ref(false)
+  const ManualRefreshCooling = ref(false)
+  let ManualRefreshTimer = null
+  const refreshWeatherManually = async () => {
+    /* 离线优先：连请求都发不出去，就别走一遍必然失败的全量刷新，
+       更不要给用户「更新完成」的假反馈 —— 直接把整张卡标成 400（界面上是「已离线」）。
+       这一步必须排在冷却判定之前：否则离线时再点一次会撞上 30 秒冷却，
+       被当成「刚刚刷过了」而显示成功。 */
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      ReviseState(400)
+      return { ok: false, reason: 'offline' }
+    }
+    if (ManualRefreshBusy.value) return { ok: false, reason: 'busy' }
+    if (ManualRefreshCooling.value) return { ok: false, reason: 'cooling' }
+    ManualRefreshBusy.value = true
+    try {
+      await getLocationInformation({ force: true })
+      return { ok: true }
+    } catch (error) {
+      /* getLocationInformation 已经把失败原因和状态码写进 console 与加载状态，这里不重复打日志。
+         网络错误单独标出来：有的壁纸环境里 navigator.onLine 一直是 true，
+         断网只能从请求失败上看出来，此时界面要显示「已离线」而不是「接口出错了」。 */
+      return { ok: false, reason: isNetworkError(error) ? 'offline' : 'failed', error }
+    } finally {
+      ManualRefreshBusy.value = false
+      ManualRefreshCooling.value = true
+      clearTimeout(ManualRefreshTimer)
+      ManualRefreshTimer = setTimeout(() => {
+        ManualRefreshCooling.value = false
+        ManualRefreshTimer = null
+      }, MANUAL_REFRESH_COOLDOWN_MS)
+    }
   }
   /**
    * 选择位置：用静态数据里的 adcode 换取和风天气的位置对象，再拉取天气
@@ -620,8 +688,13 @@ export const useWeatherStore = defineStore('Weather', () => {
   }
   /* ---- 分钟级降水 ---- */
 
-  // 上次成功/失败的时间戳、坐标 key 和凭据指纹只放内存：分钟级降水不持久化 ——
-  // 重载页面时宁可重拉一次，也不想把两小时前的雨画在今天的卡片上。
+  /* 上次请求（成功或失败）的时间戳、坐标 key 和凭据指纹只放内存；数据本身持久化
+     （见文件末尾 persist 的 MinutelyPrecipitation，数据里自带 key 与 fetchedAt）。
+     原先数据也只放内存，理由是「重载时宁可重拉一次，也不想把两小时前的雨画在今天的
+     卡片上」—— 但 /v7/minutely/5m 每 5 分钟才出一版新数据，官方推荐的缓存时间正是
+     5-10 分钟，壁纸经常整页重载，5 分钟内的重载拿到的其实是同一份数据，白花额度。
+     现在改成重载后接过去继续用，但只认 TTL 之内的：睡一夜再打开，那份数据照样被丢弃
+     重拉（见下面 loadMinutelyPrecipitation 开头的 reusable 判定）。 */
   let MinutelyFetchedAt = 0
   let MinutelyKey = ''
   let MinutelyFingerprint = ''
@@ -640,6 +713,28 @@ export const useWeatherStore = defineStore('Weather', () => {
   const loadMinutelyPrecipitation = async (important) => {
     const key = currentKey()
     const fingerprint = UserApiFingerprint.value
+    /* 整页重载后的第一次调用（MinutelyKey 还是空）：pinia 里可能躺着一份上次持久化下来的
+       数据，它带着自己的坐标 key 和 fetchedAt。地点、凭据都对得上、而且还在 TTL 之内，
+       就直接接过来当缓存 —— 这就是「刷新页面不再白打一次请求」的那一步。
+       有一条对不上（换了城市 / 改了域名密钥 / 已经过期）就丢掉，退回原来的「重拉一次」，
+       绝不让上次的雨跟着重载留在卡片上。status 也要一起补成 ready：弹层按它区分
+       「加载中 / 已就绪」（loadMinutelyPrecipitation 之后的判定也要求 ready 才算有缓存）。 */
+    if (!MinutelyKey && MinutelyPrecipitation.value) {
+      const cached = MinutelyPrecipitation.value
+      const fetchedAt = Number(cached.fetchedAt) || 0
+      const reusable = cached.key === key &&
+        WeatherCacheFingerprint.value === fingerprint &&
+        isFresh('minutely', fetchedAt, false)
+      if (reusable) {
+        MinutelyKey = key
+        MinutelyFingerprint = fingerprint
+        MinutelyFetchedAt = fetchedAt
+        MinutelyStatus.value = 'ready'
+      } else {
+        MinutelyPrecipitation.value = null
+        MinutelyStatus.value = 'idle'
+      }
+    }
     // 换了城市、或者换了域名/密钥：旧数据和「失败重试计时」都作废 ——
     // 否则用户改好凭据后，胶囊还会顶着上一次的 401 显示十来分钟「不可用」
     if (key !== MinutelyKey || fingerprint !== MinutelyFingerprint) {
@@ -714,10 +809,12 @@ export const useWeatherStore = defineStore('Weather', () => {
     AirKey = key
     AirFingerprint = fingerprint
 
+    // 失败退避对强制刷新同样生效：「没有权限 / 该地无数据」这类固定失败不会因为
+    // 用户点了几次刷新就好起来，重撞只是白花额度（换城市 / 换凭据时上面已经把计时清掉了）
+    if (AirRetryAt && Date.now() < AirRetryAt) return
     if (!important) {
-      // 缓存有效期按官方推荐（30 分钟）走；失败的退避优先于它
+      // 缓存有效期按官方推荐（30 分钟）走
       if (AirQuality.value && isFresh('air', WeatherDataUpdatedAtATime.value.AirQuality, false)) return
-      if (AirRetryAt && Date.now() < AirRetryAt) return
     }
 
     const coord = weatherCoord.value || (await ensureWeatherCoord().catch(() => null))
@@ -824,6 +921,44 @@ export const useWeatherStore = defineStore('Weather', () => {
     console.log(`7日天气：请求 7 天，接口返回 ${list.length} 天`)
     WeatherDataUpdatedAtATime.value.FourDayWeather = Date.now()
   }
+  // 获取逐小时预报（24 小时视图）
+  const getHourlyWeatherData = (important) =>
+    singleFlight(`hourly:${currentKey()}`, () => loadHourlyWeatherData(important))
+  const loadHourlyWeatherData = async (important) => {
+    const TimeInterval = Date.now() - WeatherDataUpdatedAtATime.value.HourlyWeather
+    const cachedHours = Array.isArray(HourlyWeatherData.value.hours) ? HourlyWeatherData.value.hours.length : 0
+    /* 和 7 日一样，「没过期」还不够，条目数也得够：只有 6 小时的数据撑不起 24 列轨道，
+       会露出后面一大片空白。不足即视为不可用。 */
+    const cacheComplete = cachedHours >= HOURLY_COLUMNS
+    if (cacheComplete && isFresh('hourly', WeatherDataUpdatedAtATime.value.HourlyWeather, important)) {
+      console.log(`逐小时预报未过期：${(TimeInterval / 1000 / 60).toFixed(0)} min前更新`);
+      HourlyStatus.value = 'ready'
+      return
+    }
+    /* 这里不调 ReviseState(100)：那是整张卡的加载态，
+       而切到 24 小时只是一次局部补数据，不该让左边那一半也重画一遍。 */
+    HourlyStatus.value = 'loading'
+    console.log('逐小时预报过期、重新获取');
+    try {
+      const coord = await ensureWeatherCoord()
+      // 多要几项再裁到 24：接口按整点返回，第一项经常已经过去（最多丢掉 1 小时）
+      const { hours, attributions } = await getHourlyForecast(coord, HOURLY_COLUMNS + 6)
+      const cutoff = Date.now() - 30 * 60 * 1000
+      const list = (hours || [])
+        // 已经过去的整点不画：曲线要「从现在开始」，而不是从上一个整点开始
+        .filter((hour) => hour.ts === null || hour.ts >= cutoff)
+        .slice(0, HOURLY_COLUMNS)
+      HourlyWeatherData.value = { hours: list, attributions: attributions || [] }
+      HourlyStatus.value = 'ready'
+      WeatherDataUpdatedAtATime.value.HourlyWeather = Date.now()
+      console.log(`逐小时预报：请求 ${HOURLY_COLUMNS + 6} 小时，保留 ${list.length} 小时`)
+    } catch (error) {
+      // 旧数据留着继续画（视图给一个重试按钮），只有真的一条都没有时才显示错误态
+      HourlyStatus.value = 'error'
+      console.log('逐小时预报获取失败', error)
+      throw error
+    }
+  }
   // 获取实时天气
   const getRealTimeWeather = (important) =>
     singleFlight(`now:${currentKey()}`, () => loadRealTimeWeather(important))
@@ -891,11 +1026,16 @@ export const useWeatherStore = defineStore('Weather', () => {
   return {
     // 获取位置/天气
     getLocationInformation,
+    // 手动刷新（跳出缓存重拉一轮）+ 它的在途 / 冷却状态（只放内存）
+    refreshWeatherManually,
+    ManualRefreshBusy,
+    ManualRefreshCooling,
     chooseLocation,
     choosePoint,
     // 高德密钥变更后只刷新地址文案，不重发天气请求
     applyPointAddress,
     getFourDayWeatherData,
+    getHourlyWeatherData,
     getRealTimeWeather,
     getWeatherEarlyWarning,
     getWeatherIndices,
@@ -919,6 +1059,11 @@ export const useWeatherStore = defineStore('Weather', () => {
     CityAddressFullLabel,
     // 近四天天气
     FourDayWeatherData,
+    // 逐小时预报（24 小时视图，按需加载）
+    HourlyWeatherData,
+    HourlyStatus,
+    // 预报条当前视图：daily / hourly（持久化，重载后停在原地）
+    ForecastView,
     // 实时天气
     nowWeatherData,
     WeatherDataUpdatedAtATime,
@@ -945,6 +1090,9 @@ export const useWeatherStore = defineStore('Weather', () => {
     // 这样以后清空 / 废弃天气缓存永远不会把用户选的位置一起冲掉。
     paths: [
       'FourDayWeatherData',
+      // 24 小时数据也存一份：重载壁纸后切过去不会先闪一下骨架（TTL 由 HourlyWeather 时间戳判定）
+      'HourlyWeatherData',
+      'ForecastView',
       'nowWeatherData',
       'WeatherEarlyWarning',
       'WeatherIndices',
@@ -952,7 +1100,12 @@ export const useWeatherStore = defineStore('Weather', () => {
       'WeatherCacheFingerprint',
       'TheWeatherDataIsLoaded',
       // 空气质量 30 分钟才刷新一次，持久化一份能让重载后立刻显示（TTL 由时间戳判定）
-      'AirQuality'
+      'AirQuality',
+      /* 分钟级降水也存一份：它 5 分钟才更新一次，壁纸整页重载若赶上 TTL 之内，
+         就没必要再花一次额度问同一份数据（loadMinutelyPrecipitation 开头按
+         key + 凭据 + fetchedAt 三项决定要不要接着用，过期的照样丢弃）。
+         数据里带着 key 和 fetchedAt，所以重载后能自己判断「这份还属不属于当前位置」。 */
+      'MinutelyPrecipitation'
     ]
   },
 })
