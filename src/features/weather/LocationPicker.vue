@@ -49,8 +49,15 @@
                        <button> 里面套 <button> 是非法结构，键盘和读屏都会乱 -->
                   <div v-for="item in history" :key="locationHistoryKey(item)" class="lp-chip-history"
                     :class="{ 'is-current': isHistoryCurrent(item) }">
+                    <!-- 单击 = 选中（进地图 / 把上次的点摆好）；双击 = 直接应用，
+                         不必再去右下角点一次「就用这里」。
+                         这一颗在 locating 时也要保持可点：只有区县的记录第一下点击会去查
+                         区县中心（locating），button 一旦 disabled 就不会再派发第二次 click
+                         和 dblclick，双击就永远收不到 -->
                     <button class="lp-chip-main" type="button" :aria-pressed="isHistoryCurrent(item)"
-                      :disabled="submitting || locating" @click="applyHistory(item)">{{ item.label }}</button>
+                      :title="`双击直接应用「${item.label}」`"
+                      :disabled="submitting" @click="handleHistoryClick(item, $event)"
+                      @dblclick="applyHistoryNow(item)">{{ item.label }}</button>
                     <button class="lp-chip-remove" type="button"
                       :aria-label="`删除最近地址：${item.label}`" :title="`删除「${item.label}」`"
                       :disabled="submitting || locating" @click="removeHistoryItem(item)">
@@ -831,6 +838,12 @@ const confirm = async (point) => {
         // 高德 / 和风都没查到时留空，主界面会用 CityDetail 兜底。
         district: pickedDistrict.value || '',
         districtSource: pickedDistrict.value ? pickedDistrictSource.value : '',
+        // 省与街道也一起落库：设置页要按「省-市-区-街道-路」写完整地址，
+        // 这两个字段只在这里（以及 applyPointAddress 重查时）能拿到。
+        // 从「最近」或已保存的点回来时地图还没查完，这里的 mapGeo 可能是空的，
+        // 那就沿用那条记录里已经存下的省 / 街道（否则每确认一次就丢一段）
+        province: mapGeo.value?.province || String(exact.province || ''),
+        township: mapGeo.value?.township || String(exact.township || ''),
       }
       const chosenCity = await weatherStore.choosePoint(savedPoint)
       // choosePoint 内部已经按坐标查过一次和风，返回的 name 才是 pin 真正所在的区县。
@@ -1057,10 +1070,11 @@ const applyIds = async (ids) => {
 }
 
 /**
- * 「最近」记录：先进地图，把上次的点摆好当起点，用户可以微调再确认。
- * 之前的实现是直接 confirm()，等于点一下就定了，没有改的余地。
+ * 选中一条「最近」记录：先进地图，把上次的点摆好当起点，用户可以微调再确认。
+ * 之前的实现是直接 confirm()，等于点一下就定了，没有改的余地；
+ * 现在单击只负责选中，想直接落地用双击（见 applyHistoryNow）。
  */
-const applyHistory = async (item) => {
+const selectHistory = async (item) => {
   if (submitting.value || locating.value) return
   const nodes = (item?.path || []).map(findNode).filter(Boolean)
   if (!nodes.length) return
@@ -1082,6 +1096,50 @@ const applyHistory = async (item) => {
     // 拿不到中心点、记录里也没有坐标（网络问题 / 老记录）→ 退回直接确认
     await confirm(point)
   }
+}
+
+/**
+ * 「最近」的单击：选中这条记录（进地图 / 把 pin 移到它的坐标上）。
+ *
+ * 键盘 Enter / 空格触发的 click 没有 detail（= 0），也就没有「第二下」可等，
+ * 所以在已经选中的那条上再按一次 Enter 与双击等价 —— 直接应用。
+ */
+const handleHistoryClick = (item, event) => {
+  if (event?.detail === 0 && isHistoryCurrent(item)) {
+    applyHistoryNow(item)
+    return
+  }
+  // 正在查区县中心（多半是第一下点击发起的）：这一下就当双击的第二下，别再选中一次。
+  // 真的只是想再选它？等定位结束再说，页脚这时也写着「正在定位…」
+  if (locating.value) return
+  selectHistory(item)
+}
+
+/**
+ * 「最近」的双击：直接应用这条记录，不必再跑到右下角点一次「就用这里」。
+ *
+ * 不走「先选中（进地图、查区县中心）再确认」那条路：区县中心只是地图上的落点，
+ * 确认只认记录里的路径 / 坐标。这样双击不会被第一下点击的定位请求卡住，
+ * 也不会在中途把状态换成别的地址。
+ */
+const applyHistoryNow = async (item) => {
+  if (submitting.value) return
+  const nodes = (item?.path || []).map(findNode).filter(Boolean)
+  if (!nodes.length) return
+  const point = item?.point &&
+    Number.isFinite(item.point.lng) &&
+    Number.isFinite(item.point.lat)
+    ? { lng: item.point.lng, lat: item.point.lat }
+    : null
+
+  // 选中状态先落到这条记录上：确认失败留在页面上时，高亮 / 页脚显示的也是它
+  selectedPath.value = nodes
+  pickedPoint.value = point
+  pickedRoad.value = point?.road || ''
+  pickedDistrict.value = point?.district || ''
+  pickedDistrictSource.value = point?.districtSource || ''
+  mapGeo.value = geoFromSaved(point)
+  await confirm(point)
 }
 
 /**
@@ -1207,10 +1265,15 @@ const removeHistoryItem = (item) => {
   }
 
   &.is-current {
-    color: var(--text-on-accent);
-    background: var(--color-primary);
-    border-color: transparent;
-    font-weight: 600;
+    color: var(--control-accent-text);
+    background: var(--control-accent-bg);
+    border-color: var(--control-accent-border);
+
+    &:hover:not(:disabled) {
+      color: var(--control-accent-text);
+      background: var(--control-accent-hover-bg);
+      border-color: var(--control-accent-hover-border);
+    }
   }
 
   &:disabled {
@@ -1237,22 +1300,26 @@ const removeHistoryItem = (item) => {
   }
 
   &.is-current {
-    color: var(--text-on-accent);
-    background: var(--color-primary);
-    border-color: transparent;
+    color: var(--control-accent-text);
+    background: var(--control-accent-bg);
+    border-color: var(--control-accent-border);
 
     .lp-chip-main {
-      color: var(--text-on-accent);
-      font-weight: 600;
+      color: var(--control-accent-text);
+
+      &:hover:not(:disabled) {
+        color: var(--control-accent-text);
+        background: var(--control-accent-hover-bg);
+      }
     }
 
     .lp-chip-remove {
-      color: var(--text-muted);
-      border-left-color: var(--glass-border);
+      color: var(--control-accent-text);
+      border-left-color: var(--control-accent-border);
 
       &:hover:not(:disabled) {
-        color: var(--text-on-accent);
-        background: var(--glass-bg-subtle);
+        color: var(--control-accent-text);
+        background: var(--control-accent-hover-bg);
       }
     }
   }
@@ -1264,7 +1331,7 @@ const removeHistoryItem = (item) => {
   color: inherit;
   background: transparent;
   border: 0;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, background 0.2s ease;
 
   &:hover:not(:disabled) {
     color: var(--text-primary);
@@ -1494,14 +1561,16 @@ const removeHistoryItem = (item) => {
   padding: 0.5625rem 1.25rem;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-on-accent);
-  background: var(--color-primary);
-  border: none;
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border: 1px solid var(--control-accent-border);
   border-radius: 999px;
-  transition: filter 0.2s ease, opacity 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 
   &:hover:not(:disabled) {
-    filter: brightness(1.08);
+    color: var(--control-accent-text);
+    background: var(--control-accent-hover-bg);
+    border-color: var(--control-accent-hover-border);
   }
 
   &:disabled {
@@ -1604,9 +1673,10 @@ const removeHistoryItem = (item) => {
   opacity: 0;
 }
 
+/* 只位移不缩放：缩放会在收尾重栅格时让文字和边框跳一下（理由见 WeatherDialog.vue）。 */
 .lp-confirm-enter-from .lp-confirm-dialog,
 .lp-confirm-leave-to .lp-confirm-dialog {
-  transform: translateY(0.5rem) scale(0.97);
+  transform: translateY(0.5rem);
   opacity: 0;
 }
 

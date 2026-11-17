@@ -3,7 +3,7 @@
     :aria-label="warning.typeName + warning.level + '预警'" :inert="!active || undefined"
     :aria-hidden="!active || undefined">
     <div class="warning-card-content" :tabindex="active ? 0 : -1" role="region"
-      :aria-label="warning.typeName + '预警正文与防御指南'">
+      :aria-label="warning.typeName + '预警正文与防御指南'" @click="focusContent">
       <header class="warning-detail-header">
         <div class="warning-title-row">
           <span class="warning-icon-surface">
@@ -57,6 +57,12 @@ const severityKey = (level) => {
   if (value.includes('橙')) return 'orange'
   if (value.includes('黄')) return 'yellow'
   return 'blue'
+}
+
+// Swiper 会在 pointerdown 时 preventDefault（内容区不在它的 focusableElements 白名单里），
+// 浏览器原生的「点可聚焦元素即聚焦」因此失效；点击当前这张卡时手动把焦点补上。
+const focusContent = (event) => {
+  event.currentTarget.focus({ preventScroll: true })
 }
 
 const parseTime = (date) => {
@@ -119,7 +125,13 @@ const instructionLines = (instruction) => String(instruction || '')
   background: var(--warning-bg);
   border: 1px solid var(--warning-border);
   border-radius: calc(var(--warning-unit) * 1.6);
-  overflow: visible;
+  /* 卡片最高到外层弹层给的上限（--warning-max-h，见 EarlyWarningDetails：一屏减上下留白）。
+     不封顶时，长正文会把卡片长到屏幕之外，整层遮罩跟着滚（面板缩放 150% 时最明显）。
+     overflow 收成 hidden 有两个作用：把卡片的圆角裁干净（正文在内部滚动，滚到边上的字
+     不能画到圆角外面），同时保证卡片高度真的停在 --warning-avail-h 上。 */
+  --warning-avail-h: var(--warning-max-h);
+  max-height: var(--warning-avail-h);
+  overflow: hidden;
   box-shadow: 0 calc(var(--warning-unit) * 0.8) calc(var(--warning-unit) * 2.4) rgba(4, 17, 30, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(calc(var(--warning-unit) * 1.1)) saturate(1.3);
   -webkit-backdrop-filter: blur(calc(var(--warning-unit) * 1.1)) saturate(1.3);
@@ -194,8 +206,17 @@ const instructionLines = (instruction) => String(instruction || '')
   gap: calc(var(--warning-unit) * 0.8);
   padding: calc(var(--warning-unit) * 1.4) calc(var(--warning-unit) * 1.5);
   border-radius: inherit;
-  overflow: visible;
   user-select: none;
+  /* 正文在这里滚，卡片本体和它的圆角不动。
+     上限比卡片少 2px：卡片上下各 1px 边框，不扣掉的话卡片会高出 --warning-avail-h 一眼，
+     遮罩层就又多出一条 2px 的滚动条。内容没超长时这里不留滚动条，版式和以前完全一样。
+     滚动条走细样式，深色滚轨压在浅色预警卡上太扎眼。 */
+  max-height: calc(var(--warning-avail-h) - 2px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--warning-accent) 42%, transparent) transparent;
 }
 
 .warning-slide { flex: 1 1 auto; }

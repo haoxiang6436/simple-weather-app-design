@@ -130,9 +130,6 @@ const cacheSet = (key, value) => {
   cache.set(key, value)
 }
 
-/** 清空缓存（调试 / 换 key 后用） */
-export const clearReverseGeocodeCache = () => cache.clear()
-
 const buildUrl = (lng, lat) => {
   const params = new URLSearchParams({
     output: 'json',

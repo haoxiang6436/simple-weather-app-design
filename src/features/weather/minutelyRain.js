@@ -8,7 +8,7 @@
  * 注意接口返回的 precip 是字符串（"0.00"），也不要假设数组一定有 24 个点。
  */
 
-import { getRateLevelSteps, rateLevel } from './precipitationLevels'
+import { rateLevel } from './precipitationLevels'
 export { getRateLevelSteps, rateLevel } from './precipitationLevels'
 
 // 每个点代表它之后 5 分钟的累计降水量
@@ -21,12 +21,6 @@ const TREND_LOOKAHEAD = 3
 
 // 保留非零的微量降水，低于标准最低阈值时仍能提示零星雨雪。
 const WET_MM = 0
-
-/** 降雨的参考强度下界；雪图通过 getRateLevelSteps('snow') 取独立阈值。 */
-export const LEVEL_STEPS = getRateLevelSteps('rain').map((level) => ({
-  ...level,
-  mm: (level.min * STEP_MINUTES) / 60,
-}))
 
 /** 每 5 分钟降水量（mm）→ 小时雨强（mm/h） */
 export const precipToRate = (precip) => (Number(precip) || 0) * (60 / STEP_MINUTES)

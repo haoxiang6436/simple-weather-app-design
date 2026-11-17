@@ -7,10 +7,8 @@
  */
 import BetterScroll from '@better-scroll/core'
 import MouseWheel from '@better-scroll/mouse-wheel'
-import Slide from '@better-scroll/slide'
 
 let mouseWheelApplied = false
-let slideApplied = false
 
 export const useMouseWheelPlugin = () => {
   if (mouseWheelApplied) return
@@ -18,11 +16,5 @@ export const useMouseWheelPlugin = () => {
   BetterScroll.use(MouseWheel)
 }
 
-export const useSlidePlugin = () => {
-  if (slideApplied) return
-  slideApplied = true
-  // Slide exposes goToPage/getCurrentPage on the BetterScroll instance.
-  BetterScroll.use(Slide)
-}
 
 export default BetterScroll

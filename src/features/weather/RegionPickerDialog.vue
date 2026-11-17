@@ -1,6 +1,4 @@
 <template>
-  <!-- 重选地区卡片。Teleport 到 body：地图全屏时 .lp-frame 是 position: fixed 的整屏层，
-       卡片留在里面会被它的排版和裁切带着走；挂到 body 才能盖在整屏地图上做一块独立的悬浮玻璃 -->
   <Teleport to="body">
     <Transition name="region-pop">
       <div v-if="open" class="rpd-mask" @click.self="requestClose">
@@ -49,6 +47,10 @@
 </template>
 
 <script setup>
+/* 重选地区卡片。Teleport 到 body：地图全屏时 .lp-frame 是 position: fixed 的整屏层，
+   卡片留在里面会被它的排版和裁切带着走；挂到 body 才能盖在整屏地图上做一块独立的悬浮玻璃。
+   （说明放在 script 里而不是 <template> 顶层，避免根节点变成「注释 + Teleport」Fragment
+     —— 见 transitions.scss 的 ⚠️） */
 import { computed, nextTick, ref, watch } from 'vue'
 import RegionCascade from './RegionCascade.vue'
 import StaggerTransition from '@/shared/motion/StaggerTransition'
@@ -284,12 +286,14 @@ const handleConfirm = () => {
   }
 
   &.is-primary {
-    color: var(--text-on-accent);
-    background: var(--color-primary);
-    border-color: transparent;
+    color: var(--control-accent-text);
+    background: var(--control-accent-bg);
+    border-color: var(--control-accent-border);
 
     &:hover:not(:disabled) {
-      filter: brightness(1.08);
+      color: var(--control-accent-text);
+      background: var(--control-accent-hover-bg);
+      border-color: var(--control-accent-hover-border);
     }
   }
 }
@@ -310,9 +314,10 @@ const handleConfirm = () => {
   opacity: 0;
 }
 
+/* 只位移不缩放：缩放会在收尾重栅格时让文字和边框跳一下（理由见 WeatherDialog.vue）。 */
 .region-pop-enter-from .rpd-card,
 .region-pop-leave-to .rpd-card {
-  transform: translateY(0.75rem) scale(0.98);
+  transform: translateY(0.75rem);
   opacity: 0;
 }
 

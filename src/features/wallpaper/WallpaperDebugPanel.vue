@@ -86,20 +86,68 @@
             </Select>
           </div>
 
-          <!-- 背景切换（全局属性，对应 project.json 的 backgroundindex） -->
+          <!-- 预报条显示天数（对应 project.json 的 forecastdays） -->
           <div class="row">
-            <span class="label">背景</span>
-            <Select v-model="state.backgroundindex" size="small" class="control" @change="applyAll">
-              <Option value="0">无</Option>
-              <Option value="4">实时渲染雨滴</Option>
-              <Option value="5">整页雨珠叠加</Option>
+            <span class="label">预报天数</span>
+            <Select v-model="state.forecastdays" size="small" class="control" @change="applyAll">
+              <Option v-for="days in FORECAST_DAYS_OPTIONS" :key="days" :value="days">{{ days }} 天</Option>
             </Select>
           </div>
 
-          <!-- 当前背景的专属配置（按 project.json 中 backgroundindex 的 condition 划分） -->
+          <!-- 背景来源（对应 project.json 的 backgroundindex） -->
+          <div class="row">
+            <span class="label">背景</span>
+            <Select v-model="state.backgroundindex" size="small" class="control" @change="applyAll">
+              <Option value="4">湖心桥</Option>
+              <Option value="6">雾夜长街</Option>
+              <Option value="0">跟随面板配色</Option>
+              <Option value="solid">自定义纯色</Option>
+              <Option value="custom">自定义背景</Option>
+            </Select>
+          </div>
+
+          <!-- 自定义纯色的颜色（对应 project.json 的 backgroundcolor） -->
+          <div v-if="isCustomSolid" class="row">
+            <span class="label">背景颜色</span>
+            <input v-model="backgroundColorHex" class="color-input" type="color" />
+          </div>
+
+          <!-- 用户自选背景图（开发环境用 data URL 模拟引擎的 file 属性）。
+               与壁纸属性面板的显示条件保持一致：只有背景切到「自定义背景」时才出现 -->
+          <template v-if="isCustomBackground">
+            <div class="section-title">自定义背景</div>
+            <div class="row">
+              <span class="label">图片</span>
+              <span class="custom-background-name" :title="CustomBackgroundFileName">
+                {{ CustomBackgroundFileName || '未选择' }}
+              </span>
+            </div>
+            <Space :size="8">
+              <label class="file-button">
+                选择图片
+                <input type="file" accept="image/*" @change="handleCustomBackgroundFile" />
+              </label>
+              <Button size="mini" :disabled="!CustomBackgroundRaw" @click="clearCustomBackground">清除</Button>
+            </Space>
+            <div class="api-status">仅浏览器调试用；壁纸引擎里请用属性面板的「自定义背景图」。</div>
+          </template>
+
+          <!-- 实时渲染雨滴：任意图片背景都能开，纯色背景隐藏 -->
+          <template v-if="!isSolidBackground">
+            <div class="section-title">实时雨滴</div>
+            <div class="row">
+              <span class="label">实时渲染雨滴</span>
+              <Switch v-model="state.rainenabled" size="small" @change="applyAll" />
+            </div>
+            <div class="api-status">
+              在当前背景图上渲染雨滴；自定义背景还没选图时先显示占位，选好图后自动生效。
+            </div>
+          </template>
+
+          <!-- 当前背景的专属配置（按 project.json 中 rainenabled 的 condition 划分） -->
           <template v-if="currentFields.length">
             <Divider style="margin: 2px 0" />
-            <div class="section-title">{{ currentSchema.label }}专属配置</div>
+            <div class="section-title">实时雨滴专属配置</div>
 
             <template v-for="field in currentFields" :key="field.key">
               <!-- 该背景独占的壁纸属性 -->
@@ -151,7 +199,7 @@
             </template>
 
             <Button v-if="hasRuntimeFields" size="mini" long @click="resetBgConfig">
-              恢复该背景默认参数
+              恢复雨滴默认参数
             </Button>
           </template>
         </Space>
@@ -182,22 +230,29 @@ import {
   BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
   COLOR_THEME_OPTIONS,
+  DEFAULT_BACKGROUND_COLOR,
   DEFAULT_BACKGROUND_INDEX,
   DEFAULT_COLOR_THEME,
+  DEFAULT_FORECAST_DAYS,
   DEFAULT_PANEL_OFFSET,
   DEFAULT_PANEL_SCALE,
+  DEFAULT_RAIN_ENABLED,
+  FORECAST_DAYS_OPTIONS,
   PANEL_OFFSET_MAX,
   PANEL_OFFSET_MIN,
   PANEL_SCALE_MAX,
   PANEL_SCALE_MIN,
   STORAGE_KEYS,
   WALLPAPER_PROPERTIES,
+  isSolidBackgroundIndex,
 } from './constants'
 import {
+  BackgroundColor,
   BackgroundIndex,
   ColorTheme,
   PanelOffsetX,
   PanelOffsetY,
+  RainEnabled,
   applyWallpaperProperties,
 } from './properties'
 import {
@@ -206,6 +261,16 @@ import {
   resetBackgroundConfig,
   setBackgroundConfig,
 } from './backgroundConfig'
+import {
+  CustomBackgroundFileName,
+  CustomBackgroundRaw,
+  setCustomBackground,
+} from './customBackground'
+import {
+  hexToWallpaperColor,
+  normalizeWallpaperColor,
+  wallpaperColorToHex,
+} from './backgrounds/backgroundColors'
 import {
   AmapKeyRaw,
   UserApiHostRaw,
@@ -223,7 +288,8 @@ import {
   openSettings,
 } from '@/features/onboarding/onboardingState'
 
-const collapsed = ref(false)
+// 收起状态落盘：刷新 / 重新加载后保持收起，不用每次重新点一遍
+const collapsed = useStorage(STORAGE_KEYS.WALLPAPER_DEBUG_PANEL_COLLAPSED, false, localStorage)
 const rainConfigStorage = useStorage(STORAGE_KEYS.WALLPAPER_USER_RAIN_CONFIG, 'auto', localStorage)
 
 // 用户自带的 API 域名/密钥：与引导面板共用同一份状态（见 api/credentials.js）
@@ -285,12 +351,15 @@ const state = useStorage(
   STORAGE_KEYS.WALLPAPER_DEBUG_PROPERTIES,
   {
     backgroundindex: BackgroundIndex.value,
+    backgroundcolor: BackgroundColor.value,
+    rainenabled: RainEnabled.value,
     showweathermain: false,
     rainconfig: rainConfigStorage.value,
     panelscale: DEFAULT_PANEL_SCALE,
     paneloffsetx: PanelOffsetX.value,
     paneloffsety: PanelOffsetY.value,
     colortheme: ColorTheme.value,
+    forecastdays: DEFAULT_FORECAST_DAYS,
   },
   localStorage
 )
@@ -302,6 +371,13 @@ if (state.value.backgroundindex !== undefined) {
 // 兼容旧数据：1/2/3 背景已移除，残留的序号回退到默认背景
 if (!BACKGROUND_INDEX_OPTIONS.includes(state.value.backgroundindex)) {
   state.value.backgroundindex = DEFAULT_BACKGROUND_INDEX
+}
+// 兼容旧数据：早期版本没有纯色颜色 / 雨滴开关字段
+state.value.backgroundcolor = normalizeWallpaperColor(state.value.backgroundcolor, DEFAULT_BACKGROUND_COLOR)
+if (state.value.rainenabled === undefined || state.value.rainenabled === null) {
+  state.value.rainenabled = DEFAULT_RAIN_ENABLED
+} else {
+  state.value.rainenabled = !!state.value.rainenabled
 }
 // 兼容旧数据：早期版本没有面板缩放字段
 if (state.value.panelscale === undefined) {
@@ -321,17 +397,114 @@ offsetAxes.forEach(({ key }) => {
 if (!COLOR_THEME_OPTIONS.includes(state.value.colortheme)) {
   state.value.colortheme = DEFAULT_COLOR_THEME
 }
+// 兼容旧数据：早期版本没有预报天数字段，非法值也回退到默认 7 天
+if (!FORECAST_DAYS_OPTIONS.includes(Number(state.value.forecastdays))) {
+  state.value.forecastdays = DEFAULT_FORECAST_DAYS
+}
+
+// 与 project.json 的显示条件一致：选图入口只在「自定义背景」下出现；
+// 两种纯色背景都不显示雨滴开关和雨滴专属配置
+const isCustomBackground = computed(() => state.value.backgroundindex === 'custom')
+const isSolidBackground = computed(() => isSolidBackgroundIndex(state.value.backgroundindex))
+const isCustomSolid = computed(() => state.value.backgroundindex === 'solid')
+const showRainConfig = computed(() => !!state.value.rainenabled && !isSolidBackground.value)
+
+// 纯色颜色：引擎里是 "r g b"，调试面板用原生取色器（#rrggbb）编辑
+const backgroundColorHex = computed({
+  get: () => wallpaperColorToHex(state.value.backgroundcolor),
+  set: (hex) => {
+    const normalized = hexToWallpaperColor(hex)
+    if (!normalized) return
+    state.value.backgroundcolor = normalized
+    applyAll()
+  },
+})
 
 // 转换为 Wallpaper Engine applyUserProperties 的入参结构
 const toWallpaperProperties = (p) => ({
   [WALLPAPER_PROPERTIES.BACKGROUND_INDEX]: { value: String(p.backgroundindex) },
+  [WALLPAPER_PROPERTIES.BACKGROUND_COLOR]: { value: p.backgroundcolor },
+  [WALLPAPER_PROPERTIES.RAIN_ENABLED]: { value: p.rainenabled },
   [WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN]: { value: p.showweathermain },
   [WALLPAPER_PROPERTIES.RAIN_CONFIG]: { value: p.rainconfig },
   [WALLPAPER_PROPERTIES.PANEL_SCALE]: { value: p.panelscale },
   [WALLPAPER_PROPERTIES.PANEL_OFFSET_X]: { value: p.paneloffsetx },
   [WALLPAPER_PROPERTIES.PANEL_OFFSET_Y]: { value: p.paneloffsety },
   [WALLPAPER_PROPERTIES.COLOR_THEME]: { value: p.colortheme },
+  [WALLPAPER_PROPERTIES.FORECAST_DAYS]: { value: String(p.forecastdays) },
+  // 自定义背景单独走 customBackground.js 的持久化；调试时允许 blob: URL 只在当前会话有效
+  [WALLPAPER_PROPERTIES.CUSTOM_BACKGROUND]: { value: CustomBackgroundRaw.value },
 })
+
+// 只下发自定义背景属性，避免选一张图就把其它面板状态重新广播一遍
+const applyCustomBackgroundProperties = () => {
+  applyWallpaperProperties({
+    [WALLPAPER_PROPERTIES.CUSTOM_BACKGROUND]: { value: CustomBackgroundRaw.value },
+  })
+}
+
+// 开发环境无法拿到 file:// 路径，用 data URL 模拟引擎下发的图片。
+// 先压到最长边 1920 + WebP：通常只有几百 KB，可以跨刷新保留，
+// 重新打开调试面板后也能直接看到上次选的图。
+const MAX_DEBUG_BACKGROUND_EDGE = 1920
+const createDebugBackground = (file) => new Promise((resolve, reject) => {
+  const objectUrl = URL.createObjectURL(file)
+  const image = new Image()
+  image.onload = () => {
+    URL.revokeObjectURL(objectUrl)
+    try {
+      const width = image.naturalWidth || image.width
+      const height = image.naturalHeight || image.height
+      if (!width || !height) {
+        reject(new Error('图片尺寸无效'))
+        return
+      }
+      const scale = Math.min(1, MAX_DEBUG_BACKGROUND_EDGE / Math.max(width, height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(width * scale))
+      canvas.height = Math.max(1, Math.round(height * scale))
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('无法创建 2D canvas 上下文'))
+        return
+      }
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/webp', 0.82))
+    } catch (error) {
+      reject(error)
+    }
+  }
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl)
+    reject(new Error('图片解码失败'))
+  }
+  image.src = objectUrl
+})
+
+const handleCustomBackgroundFile = async (event) => {
+  const file = event.target.files && event.target.files[0]
+  // 清空 value，允许连续选择同一个文件
+  event.target.value = ''
+  if (!file) return
+  if (!file.type || !file.type.startsWith('image/')) {
+    console.warn('[Wallpaper] 调试面板只接受图片文件')
+    return
+  }
+  try {
+    const dataUrl = await createDebugBackground(file)
+    setCustomBackground(dataUrl)
+    applyCustomBackgroundProperties()
+  } catch (error) {
+    console.warn('[Wallpaper] 调试面板读取图片失败', error)
+  }
+}
+
+const clearCustomBackground = () => {
+  setCustomBackground('')
+  applyCustomBackgroundProperties()
+}
 
 const applyAll = () => {
   applyWallpaperProperties(toWallpaperProperties(state.value))
@@ -346,8 +519,12 @@ const resetPanelPosition = () => {
   applyOffsets()
 }
 
-// ---------- 当前背景的专属配置 ----------
-const currentSchema = computed(() => backgroundConfigSchema[state.value.backgroundindex])
+// ---------- 实时雨滴的专属配置 ----------
+// 雨滴参数固定存在 '4' 下，与背景是纯色 / 默认图 / 自定义图无关
+const RAIN_CONFIG_INDEX = '4'
+const currentSchema = computed(() => (
+  showRainConfig.value ? backgroundConfigSchema[RAIN_CONFIG_INDEX] : null
+))
 const currentFields = computed(() => currentSchema.value?.fields || [])
 const hasRuntimeFields = computed(() => currentFields.value.some((field) => !field.property))
 
@@ -359,22 +536,24 @@ const loadBgConfig = (index) => {
 }
 
 const applyBgConfig = () => {
-  const index = state.value.backgroundindex
+  const index = RAIN_CONFIG_INDEX
   setBackgroundConfig(index, JSON.parse(JSON.stringify(bgConfig)))
   Bus.emit(BUS_EVENTS.BACKGROUND_CONFIG_CHANGE, { index, config: { ...bgConfig } })
 }
 
 const resetBgConfig = () => {
-  resetBackgroundConfig(state.value.backgroundindex)
-  loadBgConfig(state.value.backgroundindex)
+  resetBackgroundConfig(RAIN_CONFIG_INDEX)
+  loadBgConfig(RAIN_CONFIG_INDEX)
   applyBgConfig()
 }
 
 const formatValue = (val) => (Array.isArray(val) ? `${val[0]} ~ ${val[1]}` : val)
 
-watch(() => state.value.backgroundindex, (index) => loadBgConfig(index), { immediate: true })
+watch(showRainConfig, (visible) => {
+  if (visible) loadBgConfig(RAIN_CONFIG_INDEX)
+}, { immediate: true })
 
-// 切换背景会触发 location.reload()，页面重载后恢复并重新应用调试属性
+// 背景切换不再刷新页面，挂载后把当前调试状态下发一次即可
 onMounted(() => {
   setTimeout(() => {
     applyAll()
@@ -425,6 +604,52 @@ onMounted(() => {
   .section-title {
     font-size: 13px;
     font-weight: 600;
+  }
+
+  .color-input {
+    width: 48px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .custom-background-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: rgb(var(--primary-6));
+    background: transparent;
+    border: 1px solid rgb(var(--primary-6));
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      color: #fff;
+      background: rgb(var(--primary-6));
+    }
+
+    input {
+      display: none;
+    }
   }
 
   .api-status {

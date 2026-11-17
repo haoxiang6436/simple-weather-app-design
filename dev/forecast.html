@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>七日预报 · 排版预览</title>
+  <style>
+    /* 预览壳：只还原七日预报在右栏里的真实宽度、内边距和底色，
+       不加载整张天气卡，方便单独截图检查基线与间距。 */
+    html,
+    body {
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    /* 预览固定 1rem = 16px：设计基准值。正式页面按视口等比缩放，
+       这里固定住才能在不同窗口尺寸下得到同一张可对比的截图。 */
+    html {
+      font-size: 16px !important;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      background: radial-gradient(120% 100% at 20% 0%, #1b4a72 0%, #0a1c30 55%, #06111d 100%);
+    }
+
+    :root[data-theme='mist'] body {
+      background: radial-gradient(120% 100% at 20% 0%, #dfeaf1 0%, #b8cddd 60%, #9fb9cc 100%);
+    }
+
+    /* 与真实右栏同宽：卡片 71.25rem 按 0.88fr : 1.6fr 分栏后，右栏约 46rem，
+       减掉两侧各 2rem 内边距，内容的可用宽度正好是 42rem。 */
+    .preview-details {
+      width: 46rem;
+      padding: 2rem;
+      border-radius: 1.75rem;
+      background: var(--glass-bg-subtle, rgba(237, 247, 252, 0.04));
+      border: 1px solid var(--glass-border, rgba(237, 247, 252, 0.16));
+      backdrop-filter: blur(18px);
+    }
+
+    .preview-eyebrow {
+      margin-bottom: 1.625rem;
+      font-size: 0.9rem;
+      color: var(--text-muted, rgba(232, 242, 248, 0.52));
+    }
+
+    .preview-eyebrow b {
+      font-weight: 600;
+      color: var(--text-secondary, rgba(232, 242, 248, 0.76));
+    }
+
+    .preview-sep {
+      display: inline-block;
+      width: 0.25rem;
+      height: 0.25rem;
+      margin: 0 0.625rem;
+      border-radius: 50%;
+      background: var(--text-muted, rgba(232, 242, 248, 0.52));
+      vertical-align: middle;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/dev/forecastPreview.js"></script>
+</body>
+
+</html>

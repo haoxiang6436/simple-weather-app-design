@@ -1,9 +1,8 @@
 /**
  * 「天气数据 → 雨量档位」的共用映射
  *
- * 供两个雨滴背景共用：
- *   - rain/RainEffect.vue（backgroundindex = 4，自带背景图的全屏后处理）
- *   - rain-overlay/RainOverlayEffect.vue（backgroundindex = 5，整页雨珠叠加）
+ * 供实时雨滴背景使用：
+ *   - rain/RainEffect.vue（rainenabled = true，在当前背景图上做全屏后处理）
  *
  * 自动档的数据源优先级：
  *   1. 分钟级降水里「现在」所在的那一个 5 分钟段 —— 和胶囊 / 弹层用同一套分析

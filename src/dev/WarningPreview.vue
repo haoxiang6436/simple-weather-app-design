@@ -1,7 +1,7 @@
 <template>
   <main class="WarningPreview">
     <h1>预警时间预览</h1>
-    <p>使用假数据查看按钮末尾的相对发布时间。点击入口查看详情弹窗。</p>
+    <p>使用假数据查看按钮末尾的相对发布时间。点击入口查看详情弹窗；弹窗里露在旁边的卡片可直接点击（或 Tab 过去按回车）聚焦，不必按住鼠标拖动。</p>
     <nav aria-label="预警场景">
       <button v-for="scenario in scenarios" :key="scenario.key" type="button"
         :aria-pressed="selected === scenario.key" @click="selectScenario(scenario)">{{ scenario.label }}</button>

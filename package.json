@@ -1,21 +1,27 @@
 {
   "name": "simple-weather-app-design",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "preview:rain": "vue-cli-service serve src/dev/minutelyRainPreview.js --host 127.0.0.1 --port 8081",
-    "build": "vue-cli-service build && node scripts/deploy-wallpaper-engine.js",
-    "build:dist": "vue-cli-service build",
+    "serve": "vite",
+    "preview:rain": "vite --open /dev/minutely-rain.html --host 127.0.0.1 --port 8081",
+    "preview:warning": "vite --open /dev/warning.html --host 127.0.0.1 --port 8082",
+    "preview:forecast": "vite --open /dev/forecast.html --host 127.0.0.1 --port 8083",
+    "preview:air": "vite --open /dev/air-quality.html --host 127.0.0.1 --port 8084",
+    "preview:settings": "vite --open /dev/settings-dialog.html --host 127.0.0.1 --port 8085",
+    "preview:stagger": "vite --open /dev/stagger-lab.html --host 127.0.0.1 --port 8086",
+    "build": "vite build && node scripts/deploy-wallpaper-engine.js",
+    "build:dist": "vite build",
     "deploy:we": "node scripts/deploy-wallpaper-engine.js",
-    "lint": "vue-cli-service lint"
+    "lint": "eslint --ext .js,.vue src && node scripts/check-vue-roots.mjs",
+    "check:roots": "node scripts/check-vue-roots.mjs"
   },
   "dependencies": {
     "@better-scroll/core": "^2.5.1",
     "@better-scroll/mouse-wheel": "^2.5.1",
-    "@better-scroll/slide": "^2.5.1",
     "@formkit/auto-animate": "^0.8.2",
     "@vueuse/core": "^13.1.0",
+    "animejs": "^4.5.0",
     "axios": "^1.6.7",
     "mitt": "^3.0.1",
     "pinia": "^2.1.7",
@@ -28,13 +34,12 @@
     "@arco-design/web-vue": "^2.55.3",
     "@babel/core": "^7.12.16",
     "@babel/eslint-parser": "^7.12.16",
-    "@vue/cli-plugin-babel": "~5.0.0",
-    "@vue/cli-plugin-eslint": "~5.0.0",
-    "@vue/cli-service": "~5.0.0",
+    "@vitejs/plugin-vue": "^5.0.0",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
     "sass": "^1.70.0",
-    "sass-loader": "^14.0.0"
+    "terser": "^5.51.2",
+    "vite": "^5.4.0"
   },
   "eslintConfig": {
     "root": true,
@@ -46,7 +51,8 @@
       "eslint:recommended"
     ],
     "parserOptions": {
-      "parser": "@babel/eslint-parser"
+      "parser": "@babel/eslint-parser",
+      "requireConfigFile": false
     },
     "rules": {}
   },

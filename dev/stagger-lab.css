@@ -1,0 +1,423 @@
+/* anime.js stagger() 手感样机的样式（只供开发时对照，不进 dist）。
+   颜色 / 圆角 / 缓动都取 index.scss 里的 token，看起来和真弹层是一路的。
+   这里刻意保留两块「玻璃面板」：带 backdrop-filter 的半透明底 + 纯文字，
+   因为正式界面里会「抖一下」的那几块文字，正是压在这种面板上的。 */
+
+.lab {
+  min-height: 100vh;
+  padding: 2rem 2.5rem 3rem;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+/* ---------- 头部 ---------- */
+
+.lab-head h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lab-head p {
+  margin: 0;
+  max-width: 62rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.lab-head code,
+.lab-readout code {
+  padding: 0.05em 0.35em;
+  border-radius: 0.3rem;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.92em;
+}
+
+/* ---------- 控件 ---------- */
+
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+  margin: 1.5rem 0 1.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field > label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field input[type='range'] {
+  width: 8.5rem;
+  accent-color: #7fc8ff;
+}
+
+.field select,
+.field input[type='number'] {
+  min-width: 7.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.5rem;
+  background: rgba(8, 24, 40, 0.72);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.field output {
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.field--check > label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+.actions button {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.actions button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.actions button.is-primary {
+  border-color: rgba(127, 200, 255, 0.5);
+  background: rgba(127, 200, 255, 0.22);
+}
+
+/* ---------- 两块舞台 ---------- */
+
+.lab-stages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stage-cap {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.stage-cap b {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  max-width: 36rem;
+  /* 真弹层是 1.618:1 的定高面板；样机这边让高度跟着内容走，
+     五块都要看得见（高度不够时的裁切会让人误以为是动画没做完） */
+  min-height: 24rem;
+  padding: 1.25rem 1.5rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-lg);
+  background: rgba(14, 34, 54, 0.46);
+  /* 真弹层是这块玻璃：半透明 + 背景模糊，文字直接压在上面 */
+  backdrop-filter: blur(1.5rem) saturate(1.2);
+  -webkit-backdrop-filter: blur(1.5rem) saturate(1.2);
+  box-shadow: 0 1.5rem 3rem rgba(0, 10, 20, 0.35);
+  transition:
+    opacity 0.36s ease,
+    transform 0.48s var(--ease-enter),
+    filter 0.26s ease;
+}
+
+/* 面板自己的进场：和 WeatherDialog.vue 里那三条一致（时长也一致） */
+.panel.is-enter {
+  opacity: 0;
+  transform: translateY(-28px) scale(0.97);
+  filter: blur(3px);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 正文五块（照 AQI 弹层的排列来）。进场由 stagger-lab.js 直接写内联样式驱动：
+   CSS 一侧写 transition + opacity，anime 一侧由 animate() 写 opacity。 */
+
+.block {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.score .value {
+  color: var(--text-primary);
+  font-size: 2.6rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.score .unit {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+}
+
+.score .grade {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid rgba(255, 190, 90, 0.5);
+  border-radius: 999px;
+  color: #ffcf87;
+  font-size: 0.7rem;
+}
+
+.effect {
+  margin: 0.4rem 0 0;
+}
+
+.meter {
+  display: flex;
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.meter span {
+  flex-grow: 1;
+}
+
+.meter span:nth-child(1) { background: #4fbf7a; }
+.meter span:nth-child(2) { background: #d8c44a; }
+.meter span:nth-child(3) { background: #e0973c; }
+.meter span:nth-child(4) { background: #d96a4a; }
+.meter span:nth-child(5) { background: #b8546f; }
+.meter span:nth-child(6) { background: #8a4f6d; }
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.row-title {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.row-note {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.pollutants {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pollutants li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.66rem;
+}
+
+.pollutants .p-name {
+  color: var(--text-primary);
+}
+
+.pollutants .p-value {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.advice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.advice-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.advice-label {
+  flex: none;
+  width: 4.2rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.advice-text {
+  color: var(--text-secondary);
+}
+
+.source {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.source a {
+  color: inherit;
+}
+
+/* ---------- 读数 ---------- */
+
+.lab-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.lab-readout section {
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lab-readout h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.lab-readout pre {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.74rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.delay-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delay-chips li {
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  background: rgba(127, 200, 255, 0.16);
+  color: var(--text-primary);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.api-notes {
+  grid-column: 1 / -1;
+}
+
+.api-notes dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 1rem;
+  margin: 0;
+  font-size: 0.74rem;
+}
+
+.api-notes dt {
+  color: #9ad4ff;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.api-notes dd {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1100px) {
+  .lab-stages,
+  .lab-readout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

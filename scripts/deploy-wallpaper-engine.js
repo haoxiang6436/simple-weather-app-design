@@ -26,7 +26,7 @@ const defaultWeDir = 'D:/Steam/steamapps/common/wallpaper_engine/projects/myproj
 const weDir = path.resolve(process.env.WE_PROJECT_DIR || defaultWeDir)
 
 // 构建产物：每次同步前先清掉，避免旧的 hash 文件越堆越多
-const BUILD_ENTRIES = ['index.html', 'seed.html', 'favicon.ico', 'css', 'js', 'img', 'fonts']
+const BUILD_ENTRIES = ['index.html', 'favicon.ico', 'css', 'js', 'img', 'fonts', 'assets', 'version.json']
 
 // Wallpaper Engine 自己维护的文件：同步时跳过，保留工程目录里的版本
 const WE_KEEP_ENTRIES = ['project.json', 'preview.jpg', 'preview.gif']
@@ -90,9 +90,54 @@ function fail (message) {
   process.exit(1)
 }
 
+// 迁移到 Vite 后，产物必须兼容 file://：不能有 type="module" 或 crossorigin。
+// 否则 Wallpaper Engine 加载时会出现白屏或样式被静默丢弃。
+function assertFileUrlSafe () {
+  const indexPath = path.join(distDir, 'index.html')
+  if (!fs.existsSync(indexPath)) return
+  const html = fs.readFileSync(indexPath, 'utf8')
+  if (/type="module"/.test(html)) {
+    fail('dist/index.html 包含 type="module"，file:// 下不执行，请检查构建配置。')
+  }
+  if (/crossorigin/.test(html)) {
+    fail('dist/index.html 包含 crossorigin，file:// 下样式会丢失，请检查构建配置。')
+  }
+}
+
 if (!fs.existsSync(distDir)) {
   fail(`没有找到构建产物目录 ${distDir}，请先执行构建。`)
 }
+
+assertFileUrlSafe()
+
+// 版本核对：dist/version.json 由 vite.config.js 的 emit-build-info 插件生成，
+// 记录 version / builtOn / commit。它同时会被同步进壁纸工程，写上「这个目录是哪一版」。
+// 这里再对一遍 package.json —— 改了版本号却忘了重新构建时，发布出去的仍是旧产物。
+function readBuildInfo () {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(distDir, 'version.json'), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function reportBuildVersion () {
+  const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'))
+  const buildInfo = readBuildInfo()
+  if (!buildInfo) {
+    console.warn('[deploy] dist 里没有 version.json（旧版构建产物），本次部署留不下版本标记，建议重新构建。')
+    return
+  }
+  console.log(`[deploy] 构建版本 v${buildInfo.version}（${buildInfo.builtOn}，${buildInfo.commit || '无 git 信息'}）`)
+  if (buildInfo.version !== pkg.version) {
+    console.warn(
+      `[deploy] ⚠ package.json 是 v${pkg.version}，dist 里却是 v${buildInfo.version}：` +
+        '版本号改过但没有重新构建，这次发布出去的仍是旧代码。'
+    )
+  }
+}
+
+reportBuildVersion()
 
 if (!fs.existsSync(weDir)) {
   fail(

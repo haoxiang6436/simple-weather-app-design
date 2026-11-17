@@ -28,3 +28,9 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# 本地调试截图（开发期对比图 / 取证截图，不入库）
+/dev/*.png
+
+# MemSearch 本地记忆目录
+/.memsearch/

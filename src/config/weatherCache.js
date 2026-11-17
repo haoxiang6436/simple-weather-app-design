@@ -20,7 +20,7 @@
  *    useWeatherStore.js 里的 CACHE_VERSION +1（它参与 isFresh 判定，改完所有接口
  *    缓存立刻整体作废），不需要发新版本才能清。
  *
- * 官方完整推荐表（原文抓取，供以后扩接口时查；本项目只用到其中 5 类）：
+ * 官方完整推荐表（原文抓取，供以后扩接口时查；本项目只用到其中 6 类）：
  *
  *   数据类型            推荐缓存时间        官方更新频率       本项目
  *   实时天气            10-30 分钟          5-10 分钟          realtime
@@ -29,7 +29,7 @@
  *   天气预警            5-20 分钟           3 分钟             warning
  *   天气指数            6-12 小时           60 分钟            indices
  *   分钟降水            5-10 分钟           5 分钟             minutely
- *   实时空气质量        30-60 分钟          30-60 分钟         ——（未使用）
+ *   实时空气质量        30-60 分钟          30-60 分钟         air
  *   空气质量逐天预报    8-12 小时           1-6 小时           ——（未使用）
  *   潮汐                8-12 小时           8 小时             ——（未使用）
  *   台风                活跃 20 / 非活跃 60 分钟  10-60 分钟   ——（未使用）
@@ -42,8 +42,6 @@
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
-
-export const QWEATHER_CACHE_DOC_URL = 'https://dev.qweather.com/docs/best-practices/cache/'
 
 /**
  * 每类数据的缓存配置。新增接口时在这里加一项即可，store 里只认 kind 字符串。
@@ -117,6 +115,19 @@ export const WEATHER_CACHE_SPECS = Object.freeze({
     envKey: 'VUE_APP_WEATHER_UPDATE_MINUTELY',
     crossLocalDay: false,
   }),
+
+  // 官方 30-60 分钟，更新频率 30-60 分钟。取区间下限 30 分钟：
+  // 最坏间隔 60 分钟，正好是官方「缓存与原数据最多相差 2 倍」的上限。
+  // 空气质量按小时缓慢变化，不需要跟着一分钟一次的轮询刷新 —— 30 分钟内所有轮询
+  // 都命中缓存，一次请求就够；跨零点不用失效（AQI 没有「当天 / 昨天」的概念）。
+  air: Object.freeze({
+    label: '实时空气质量',
+    ttl: 30 * MINUTE,
+    recommended: Object.freeze([30 * MINUTE, 60 * MINUTE]),
+    updateFrequency: '30-60 分钟',
+    envKey: 'VUE_APP_WEATHER_UPDATE_AIR',
+    crossLocalDay: false,
+  }),
 })
 
 /* ------------------------------------------------------------------ *
@@ -129,7 +140,7 @@ export const WEATHER_CACHE_SPECS = Object.freeze({
  * @vue/cli-service 的 DefinePlugin 会把整个 process.env 定义成一个对象字面量
  * （见 resolveClientEnv.js 的 `{ 'process.env': env }`）。以前这里写
  * `env = process.env`，结果 .env 里所有 VUE_APP_* 都被原样打进 dist —— 和风
- * 密钥就是这样泄露的（2026-10-25 修复）。现在只按名字逐个访问下面 5 个变量，
+ * 密钥就是这样泄露的（2026-10-25 修复）。现在只按名字逐个访问下面 6 个变量，
  * 打包产物里只会出现这几个非敏感的缓存时长，其余变量一个都带不进来。
  *
  * 未在 .env 里定义的键，打包后仍会保留对 process 的访问；浏览器里没有
@@ -150,6 +161,7 @@ const env = {
   VUE_APP_WEATHER_UPDATE_WARNING: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_WARNING),
   VUE_APP_WEATHER_UPDATE_INDICES: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_INDICES),
   VUE_APP_WEATHER_UPDATE_MINUTELY: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_MINUTELY),
+  VUE_APP_WEATHER_UPDATE_AIR: readEnvValue(() => process.env.VUE_APP_WEATHER_UPDATE_AIR),
 }
 
 const formatMs = (ms) => {

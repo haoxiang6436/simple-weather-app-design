@@ -12,7 +12,9 @@
       <button type="button" :aria-pressed="mist" @click="toggleTheme">{{ mist ? '切换夜雨' : '切换晨雾' }}</button>
       <button v-if="!weatherStore.MinutelyDetailsDialog" type="button" @click="weatherStore.MinutelyDetailsDialog = true">打开图表</button>
     </nav>
-    <MinutelyRainDialog v-if="weatherStore.MinutelyDetailsDialog" />
+    <!-- key 用场景名：换场景时重新挂载，正文那套 anime.js 错峰进场会重播一遍，方便反复看节奏；
+         正式界面里弹层是 v-if 挂载的，打开一次就播一次。 -->
+    <MinutelyRainDialog v-if="weatherStore.MinutelyDetailsDialog" :key="selected" />
     <div class="RainPreviewChip"><span>主界面入口</span><MinutelyRainChip /></div>
     <p class="RainPreviewNote">原始降雨采用提供的 24 条数据；其余场景按相同结构生成，时间平移到当前。</p>
   </div>

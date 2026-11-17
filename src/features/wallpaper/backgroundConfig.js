@@ -6,9 +6,10 @@
  * 在运行时读取同一份持久化配置。
  *
  * 字段划分与 public/project.json 保持一致：
- *   - showweathermain 是“实时雨滴”独占的壁纸属性（condition: backgroundindex==="4"）
- *   - rainconfig 是“实时雨滴”与“整页雨珠叠加”共用的壁纸属性（condition 见 public/project.json）
- *   - 其余为各背景的运行时效果参数（雨滴大小、数量等）
+ *   - showweathermain 是“实时雨滴”独占的壁纸属性（condition: rainenabled.value && 非纯色）
+ *   - rainconfig 的 condition 为 rainenabled.value && 图片背景（与 project.json 一致），
+ *     关闭实时雨滴或纯色背景时属性面板不显示「雨滴强度」
+ *   - 其余为雨滴的运行时效果参数（雨滴大小、数量等）
  * 壁纸属性字段通过 property 标记，渲染时绑定全局壁纸属性状态并走
  * applyWallpaperProperties；运行时参数存储在本地并按背景独立生效。
  *
@@ -22,7 +23,7 @@ import { STORAGE_KEYS, WALLPAPER_PROPERTIES } from './constants'
 // 全部背景配置（持久化到 localStorage，替换时整体写入）
 const backgroundConfigs = useStorage(STORAGE_KEYS.WALLPAPER_BACKGROUND_CONFIGS, {}, localStorage)
 
-// 各背景的可配置字段定义（1-小鸟 / 2-星空 / 3-动态粒子 已移除）
+// 各背景的可配置字段定义（1-小鸟 / 2-星空 / 3-动态粒子 / 5-整页雨珠叠加 已移除）
 export const backgroundConfigSchema = {
   '4': {
     label: '实时雨滴',
@@ -35,7 +36,7 @@ export const backgroundConfigSchema = {
       },
       {
         key: WALLPAPER_PROPERTIES.RAIN_CONFIG,
-        label: '雨滴配置',
+        label: '雨滴强度',
         type: 'select',
         property: WALLPAPER_PROPERTIES.RAIN_CONFIG,
         options: [
@@ -47,38 +48,9 @@ export const backgroundConfigSchema = {
           { label: '雨停', value: 'none' },
         ],
       },
-      { key: 'dropletSize', label: '雨滴大小', type: 'range', min: 2, max: 80, step: 1, default: [10, 30] },
+      { key: 'dropletSize', label: '雨滴大小', type: 'range', min: 2, max: 80, step: 1, default: [6, 20] },
       { key: 'dropletsPerSeconds', label: '雨滴数量/秒', type: 'slider', min: 0, max: 2000, step: 50, default: 500 },
-      { key: 'spawnLimit', label: '雨滴同时上限', type: 'slider', min: 100, max: 2000, step: 100, default: 500 },
-    ],
-  },
-  '5': {
-    label: '整页雨珠',
-    fields: [
-      {
-        key: WALLPAPER_PROPERTIES.RAIN_CONFIG,
-        label: '雨滴配置',
-        type: 'select',
-        property: WALLPAPER_PROPERTIES.RAIN_CONFIG,
-        options: [
-          { label: '自动', value: 'auto' },
-          { label: '暴雨', value: 'storm' },
-          { label: '大雨', value: 'heavy' },
-          { label: '中雨', value: 'moderate' },
-          { label: '小雨', value: 'light' },
-          { label: '雨停', value: 'none' },
-        ],
-      },
-      // 凝结水珠层（就是看着像“水渍”的那一层）：只会越积越多（仅被下落雨滴擦除，
-      // 不会自己变淡）。默认开启成小颗粒低密度（与 RainOverlayConfig.js 的四档预设一致），
-      // 只有在下落雨滴不断擦除时才会稳定；调高后注意它会持续变糊。
-      { key: 'dropletSize', label: '凝结水珠大小', type: 'range', min: 2, max: 40, step: 1, default: [2, 20] },
-      { key: 'dropletsPerSeconds', label: '凝结水珠数量/秒', type: 'slider', min: 0, max: 500, step: 10, default: 150 },
-      // 雨滴上限默认取「中雨」预设的值；只有显式调过才会覆盖各档预设，见 RainOverlayEffect.vue
-      { key: 'spawnLimit', label: '雨滴同时上限', type: 'slider', min: 40, max: 600, step: 20, default: 150 },
-      // 折射源是整页 DOM 的低分辨率快照（html2canvas），这两个参数决定快照成本
-      { key: 'snapshotScale', label: '快照分辨率', type: 'slider', min: 0.1, max: 1, step: 0.05, default: 0.25 },
-      { key: 'snapshotInterval', label: '快照间隔(ms)', type: 'slider', min: 100, max: 1000, step: 50, default: 400 },
+      { key: 'spawnLimit', label: '雨滴同时上限', type: 'slider', min: 100, max: 2000, step: 100, default: 450 },
     ],
   },
 }
@@ -102,6 +74,41 @@ export const getBackgroundConfig = (index) => {
     result[field.key] = value !== undefined
       ? value
       : JSON.parse(JSON.stringify(field.default))
+  })
+  return result
+}
+
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+
+// 旧版本调试面板曾把这三个字段的默认值整份写进 localStorage；
+// 它们和「没改过」等价，识别出来才能让预设重新接管。
+const LEGACY_RUNTIME_DEFAULTS = {
+  dropletSize: [10, 30],
+  dropletsPerSeconds: 500,
+  spawnLimit: 500,
+}
+
+/**
+ * 只读取「用户真正改过」的运行时参数，不补默认值。
+ *
+ * getBackgroundConfig() 会把每个字段补齐成默认值，适合给调试面板的滑块用；
+ * 但如果直接拿它叠加到雨滴预设上，默认值会把每档预设的雨滴大小 / 数量全部
+ * 盖成中雨那一套，大雨暴雨就只能靠放大的滑动水珠来区分，画面也就变成了油膜。
+ * 所以渲染时用这个函数：没动过的参数一律跟着预设走。
+ */
+export const getBackgroundConfigOverrides = (index) => {
+  const schema = backgroundConfigSchema[index]
+  if (!schema) return {}
+  const stored = getBackgroundConfigs()[index] || {}
+  const result = {}
+  schema.fields.forEach((field) => {
+    if (field.property) return
+    const value = stored[field.key]
+    if (value === undefined) return
+    if (sameValue(value, field.default)) return
+    const legacy = LEGACY_RUNTIME_DEFAULTS[field.key]
+    if (legacy !== undefined && sameValue(value, legacy)) return
+    result[field.key] = value
   })
   return result
 }

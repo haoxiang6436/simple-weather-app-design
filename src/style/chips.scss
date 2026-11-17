@@ -30,13 +30,13 @@
   transition: background-color 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
 }
 
-/* 深色玻璃上 hover 是提亮，不是压暗 */
+/* 深色玻璃上 hover 是提亮，不是压暗；晨雾的浅底反过来 —— 见文件末尾的覆写。 */
 .status-chip:hover {
-  filter: var(--chip-hover, brightness(1.10));
+  filter: brightness(1.10);
 }
 
 .status-chip:active {
-  filter: var(--chip-active, brightness(1.16));
+  filter: brightness(1.16);
 }
 
 /* 焦点环用胶囊自己的文字色（语气亮色）；同时守住胶囊自己的圆角
@@ -49,4 +49,42 @@
 /* 图标颜色单独取 --chip-icon，让图标比文字亮一档，和参考图一致 */
 .status-chip :where(svg) {
   color: var(--chip-icon);
+}
+
+/* 晨雾下别再给胶囊叠 backdrop-filter。
+   胶囊本身嵌在 .weather-shell 里，而外壳自己就带 backdrop-filter（面板毛玻璃）——
+   内层元素的 backdrop-filter 在 Chromium 里拿到的「背景根」不是卡片表面，
+   blur + saturate 会把 14% 的雾蓝底整体抬亮，31% 的蓝边再叠上去就洗成一圈白描边；
+   夜雨/风暴图谱下面板够暗，同样的抬升看不出来，所以只有晨雾会露馅。
+   胶囊只有 2.375rem 高，这层模糊本来也看不出来：晨雾下直接去掉，
+   底色和描边就回到 --rain-chip-bg / --rain-chip-border 定义的样子（略深于卡片的一层蓝玻璃）。 */
+:root[data-theme='mist'] .status-chip {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* 晨雾下只有预警胶囊要换一种 hover。
+   它是近乎实心的浅琥珀：brightness(1.10) 会把 #EFE2C6 乘成 #FFF9DA（R 通道直接顶到 255），
+   黄味全丢、HSL 饱和度反而被削顶撑成 100%，看着就是在发光；filter 还会把文字一起提亮。
+   分钟级降水胶囊不能跟着改：它仍是 14% 的蓝玻璃 + 深字浅底，提亮正好是它的语气，
+   而压深会把 4.4:1 一路压到 4.0 以下 —— 两种材质，两种反馈。
+   预警胶囊改成「叠一层极淡的墨色」：只压深背景、文字不参与运算，对比度不降反升，
+   也正好是卡片自己「hover = 叠一层暗玻璃」的语言。
+   内阴影画在背景之上、内容之下，999px 的 spread 只是让它铺满圆角内框。 */
+:root[data-theme='mist'] .status-chip.early-chip {
+  box-shadow: inset 0 0 0 999px rgba(23, 50, 75, 0);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+:root[data-theme='mist'] .status-chip.early-chip:hover,
+:root[data-theme='mist'] .status-chip.early-chip:active {
+  filter: none;
+}
+
+:root[data-theme='mist'] .status-chip.early-chip:hover {
+  box-shadow: inset 0 0 0 999px rgba(23, 50, 75, 0.08);
+}
+
+:root[data-theme='mist'] .status-chip.early-chip:active {
+  box-shadow: inset 0 0 0 999px rgba(23, 50, 75, 0.14);
 }

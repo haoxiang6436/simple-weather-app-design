@@ -1,204 +1,257 @@
 {
-	"contentrating" : "Everyone",
-	"description" : "<h4>QWeather🌦️和风天气[测试]</h4>🚧 测试版：功能与界面可能继续调整，欢迎在创意工坊反馈问题与建议。<br/><br/>📅 更新日期：2026-10-25<br/><br/>❗ 使用前需自备和风天气开发者账号，在「壁纸属性」填入 API 域名与 Web API Key；本壁纸不提供公共密钥，不填无法显示天气。<br/><br/>🗺️ 高德密钥为选填：填写「Web服务」Key 可显示最近道路名，留空不影响使用。<br/><br/>✌️ 本次更新：地址纠偏、背景精简、可选高德路名、全新引导与地址选择页、多组密钥轮询。<br/><br/>🎉 天气数据来源：和风天气 QWeather",
-	"file" : "index.html",
-	"general" : 
-	{
-		"properties" : 
-		{
-			"schemecolor" : 
-			{
-				"index" : 0,
-				"order" : 1,
-				"text" : "ui_browse_properties_scheme_color",
-				"type" : "color",
-				"value" : "0.027450980392156862 0.09803921568627451 0.1843137254901961"
+	"contentrating": "Everyone",
+	"description": "🎉最近一次的更新：2026-11-08\n\n——面板配色：新增「夜雨玻璃」「晨雾玻璃」「风暴图谱」三套主题，在壁纸属性中随时切换\n——位置调整：新增主界面 X / Y 轴偏移，搭配整体缩放自由摆放，到屏幕边缘自动停止\n——分钟级降水：支持雨雪分别显示，胶囊播报当前强度、预计起止与变化趋势，降雪量以水当量呈现\n——降水图表：优化未来两小时柱状图，等级参考线等距排列，悬停查看时段强度，微量降水也能清楚展示\n——预警详情：改为左右拖动切换，点击胶囊直接打开对应预警，正文与防御指南支持拖拽滚动\n——预警状态：支持新增、更新与取消消息，优化旧消息替换和重复预警处理，发布时间自动更新\n——界面动效：统一天气、引导、设置、地址页与弹层的切换和错峰渐入效果，适配系统减少动态效果设置\n——地址修复：优化切换位置、修改高德密钥时的地址刷新，避免旧请求覆盖新地点\n——上一版新增：地图选点、设置与连接检测、五类数据独立缓存、选填高德密钥\n——已有功能：生活指数、预报详情、每日一言、自带天气密钥、雨滴背景",
+	"file": "index.html",
+	"general": {
+		"properties": {
+			"groupapi": {
+				"index": 0,
+				"order": 100,
+				"text": "🔑数据源 | API",
+				"type": "group"
 			},
-			"qweatherhost" : 
-			{
-				"index" : 1,
-				"order" : 2,
-				"text" : "<h4>[🔑域名]<br/><small>和风天气 API 域名，多个用英文逗号分隔</small></h4>",
-				"type" : "textinput",
-				"value" : ""
+			"qweatherhost": {
+				"index": 1,
+				"order": 101,
+				"type": "textinput",
+				"value": "",
+				"text": "<b>🔑 域名</b><br/><small>多个域名用英文逗号分隔</small>"
 			},
-			"qweatherkey" : 
-			{
-				"index" : 2,
-				"order" : 3,
-				"text" : "<h4>[🔑密钥]<br/><small>与上方域名按顺序一一配对</small></h4>",
-				"type" : "textinput",
-				"value" : ""
+			"qweatherkey": {
+				"index": 2,
+				"order": 102,
+				"type": "textinput",
+				"value": "",
+				"text": "<b>🔑 密钥</b><br/><small>与上方域名按顺序配对</small>"
 			},
-			"amapkey" : 
-			{
-				"index" : 3,
-				"order" : 4,
-				"text" : "<h4>[🗺️高德密钥（选填）]<br/><small>需「Web服务」Key；填了显示路名，留空不影响使用</small></h4>",
-				"type" : "textinput",
-				"value" : ""
+			"amapkey": {
+				"index": 3,
+				"order": 103,
+				"type": "textinput",
+				"value": "",
+				"text": "<b>🗺️ 高德密钥</b><br/><small>选填，用于显示道路名</small>"
 			},
-			"panelscale" : 
-			{
-				"fraction" : true,
-				"index" : 4,
-				"max" : 1.5,
-				"min" : 0.5,
-				"order" : 5,
-				"precision" : 2,
-				"step" : 0.05,
-				"text" : "<h4>[🔍天气面板缩放]<br/><small>100% 为原尺寸，默认 75%</small></h4>",
-				"type" : "slider",
-				"value" : 0.75
+			"groupappearance": {
+				"index": 4,
+				"order": 104,
+				"text": "🎨背景与配色 | Appearance",
+				"type": "group"
 			},
-			"paneloffsetx" :
-			{
-				"index" : 12,
-				"order" : 5.1,
-				"min" : -50,
-				"max" : 50,
-				"step" : 1,
-				"text" : "<h4>[主界面 X 轴偏移]<br/><small>屏幕宽度百分比；负值向左，正值向右，0 居中，到屏幕边缘停止</small></h4>",
-				"type" : "slider",
-				"value" : 0
-			},
-			"paneloffsety" :
-			{
-				"index" : 13,
-				"order" : 5.2,
-				"min" : -50,
-				"max" : 50,
-				"step" : 1,
-				"text" : "<h4>[主界面 Y 轴偏移]<br/><small>屏幕高度百分比；负值向上，正值向下，0 居中，到屏幕边缘停止</small></h4>",
-				"type" : "slider",
-				"value" : 0
-			},
-			"colortheme" :
-			{
-				"index" : 5,
-				"order" : 6,
-				"text" : "<h4>[🎨面板配色]</h4>",
-				"type" : "combo",
-				"value" : "night",
-				"options" :
-				[
+			"colortheme": {
+				"index": 5,
+				"order": 105,
+				"options": [
 					{
-						"label" : "夜雨玻璃",
-						"value" : "night"
+						"label": "夜雨玻璃",
+						"value": "night"
 					},
 					{
-						"label" : "晨雾玻璃",
-						"value" : "mist"
+						"label": "晨雾玻璃",
+						"value": "mist"
 					},
 					{
-						"label" : "风暴图谱",
-						"value" : "atlas"
-					}
-				]
-			},
-			"backgroundindex" :
-			{
-				"index" : 6,
-				"options" : 
-				[
-					{
-						"label" : "[实时渲染雨滴]",
-						"value" : "4"
-					},
-					{
-						"label" : "[整页雨珠叠加][测试]",
-						"value" : "5"
-					},
-					{
-						"label" : "[无]",
-						"value" : "0"
+						"label": "风暴图谱",
+						"value": "atlas"
 					}
 				],
-				"order" : 7,
-				"text" : "<h4>[🖼️动态背景]</h4>",
-				"type" : "combo",
-				"value" : "4"
+				"type": "combo",
+				"value": "night",
+				"text": "<b>🎨 面板配色</b>"
 			},
-			"showweathermain" : 
-			{
-				"condition" : "backgroundindex.value === \"4\"",
-				"index" : 7,
-				"order" : 8,
-				"text" : "<h4>[🌧️沉浸式雨滴]<br/><small>隐藏天气面板</small></h4>",
-				"type" : "bool",
-				"value" : false
-			},
-			"rainconfig" : 
-			{
-				"condition" : "backgroundindex.value === \"4\" || backgroundindex.value === \"5\"",
-				"index" : 8,
-				"order" : 9,
-				"text" : "<h4>[🌧️雨滴强度]<br/><small>自动跟随天气，或手动选择</small></h4>",
-				"type" : "combo",
-				"value" : "auto",
-				"options" : 
-				[
+			"backgroundindex": {
+				"index": 6,
+				"order": 106,
+				"options": [
 					{
-						"label" : "[自动]",
-						"value" : "auto"
+						"label": "湖心桥",
+						"value": "4"
 					},
 					{
-						"label" : "[暴雨]",
-						"value" : "storm"
+						"label": "雾夜长街",
+						"value": "6"
 					},
 					{
-						"label" : "[大雨]",
-						"value" : "heavy"
+						"label": "跟随面板配色",
+						"value": "0"
 					},
 					{
-						"label" : "[中雨]",
-						"value" : "moderate"
+						"label": "自定义纯色",
+						"value": "solid"
 					},
 					{
-						"label" : "[小雨]",
-						"value" : "light"
-					},
-					{
-						"label" : "[雨停]",
-						"value" : "none"
+						"label": "自定义背景",
+						"value": "custom"
 					}
-				]
+				],
+				"type": "combo",
+				"value": "4",
+				"text": "<b>🖼️ 背景</b>"
 			},
-			"text3" : 
-			{
-				"condition" : "backgroundindex.value === \"5\"",
-				"index" : 9,
-				"order" : 10,
-				"text" : "<h4>[💧整页雨珠叠加]<br/><small>雨珠覆盖整页，面板仍可点击</small></h4>",
-				"type" : "text",
-				"value" : "0 0 0"
+			"backgroundcolor": {
+				"index": 7,
+				"order": 107,
+				"type": "color",
+				"value": "0.07058823529411765 0.18823529411764706 0.30196078431372547",
+				"condition": "backgroundindex.value === \"solid\"",
+				"text": "<b>🎨 背景颜色</b><br/><small>选「自定义纯色」时生效</small>"
 			},
-			"text" : 
-			{
-				"index" : 10,
-				"order" : 11,
-				"text" : "<h4 align='center'>😥Notice<br/><small>Only works in Chinese Mainland.</small></h4>",
-				"type" : "text",
-				"value" : "0 0 0"
+			"custombackground": {
+				"index": 8,
+				"order": 108,
+				"type": "file",
+				"fileType": "image",
+				"value": "",
+				"condition": "backgroundindex.value === \"custom\"",
+				"text": "<b>🖼️ 背景图</b>"
 			},
-			"text2" : 
-			{
-				"index" : 11,
-				"order" : 12,
-				"text" : "<h4 align='center'>😀ThankYou<br/><small>🎉更新 2026-10-25 · 🚧 Beta<br/><br/>📄 开源：github.com/haoxiang6436/simple-weather-app-design<br/><br/>Powered by <a href='https://cn.vuejs.org/'><b>Vue</b></a> · 天气数据：<a href='https://www.qweather.com/'><b>和风天气</b></a></small></h4>",
-				"type" : "text",
-				"value" : "0 0 0"
+			"rainenabled": {
+				"index": 9,
+				"order": 109,
+				"type": "bool",
+				"value": true,
+				"condition": "backgroundindex.value !== \"0\" && backgroundindex.value !== \"solid\"",
+				"text": "<b>🌧️ 实时渲染雨滴</b>"
+			},
+			"rainconfig": {
+				"index": 10,
+				"order": 110,
+				"options": [
+					{
+						"label": "自动",
+						"value": "auto"
+					},
+					{
+						"label": "暴雨",
+						"value": "storm"
+					},
+					{
+						"label": "大雨",
+						"value": "heavy"
+					},
+					{
+						"label": "中雨",
+						"value": "moderate"
+					},
+					{
+						"label": "小雨",
+						"value": "light"
+					},
+					{
+						"label": "雨停",
+						"value": "none"
+					}
+				],
+				"type": "combo",
+				"value": "auto",
+				"condition": "rainenabled.value && backgroundindex.value !== \"0\" && backgroundindex.value !== \"solid\"",
+				"text": "<b>🌧️ 雨滴强度</b>"
+			},
+			"showweathermain": {
+				"index": 11,
+				"order": 111,
+				"type": "bool",
+				"value": false,
+				"condition": "rainenabled.value && backgroundindex.value !== \"0\" && backgroundindex.value !== \"solid\"",
+				"text": "<b>🌧️ 沉浸式雨滴</b><br/><small>隐藏天气面板</small>"
+			},
+			"grouplayout": {
+				"index": 12,
+				"order": 112,
+				"text": "🪟界面与布局 | Layout",
+				"type": "group"
+			},
+			"panelscale": {
+				"index": 13,
+				"order": 113,
+				"fraction": true,
+				"max": 1.5,
+				"min": 0.5,
+				"precision": 2,
+				"step": 0.05,
+				"type": "slider",
+				"value": 0.9,
+				"text": "<b>🔍 缩放</b>"
+			},
+			"paneloffsetx": {
+				"index": 14,
+				"order": 114,
+				"max": 50,
+				"min": -50,
+				"step": 1,
+				"type": "slider",
+				"value": 0,
+				"text": "<b>X 偏移</b>"
+			},
+			"paneloffsety": {
+				"index": 15,
+				"order": 115,
+				"max": 50,
+				"min": -50,
+				"step": 1,
+				"type": "slider",
+				"value": 0,
+				"text": "<b>Y 偏移</b>"
+			},
+			"forecastdays": {
+				"index": 16,
+				"order": 116,
+				"options": [
+					{
+						"label": "5 天",
+						"value": "5"
+					},
+					{
+						"label": "6 天",
+						"value": "6"
+					},
+					{
+						"label": "7 天",
+						"value": "7"
+					}
+				],
+				"type": "combo",
+				"value": "5",
+				"text": "<b>📆 预报天数</b><br/><small>底部显示 5~7 天</small>"
+			},
+			"groupabout": {
+				"index": 17,
+				"order": 117,
+				"text": "ℹ️关于 | About",
+				"type": "group"
+			},
+			"text": {
+				"index": 18,
+				"order": 118,
+				"type": "text",
+				"value": "0 0 0",
+				"text": "<b>😥 仅限中国大陆使用</b><br/><small>Only works in Chinese Mainland.</small>"
+			},
+			"text2": {
+				"index": 19,
+				"order": 119,
+				"type": "text",
+				"value": "0 0 0",
+				"text": "<b>😀 Thank you</b><br/><small>github.com/haoxiang6436/simple-weather-app-design</small><br/><small>Powered by Vue · 天气数据：和风天气</small>"
+			},
+			"schemecolor": {
+				"index": 0,
+				"order": 1,
+				"text": "ui_browse_properties_scheme_color",
+				"type": "color",
+				"value": "0.027450980392156862 0.09803921568627451 0.1843137254901961"
 			}
 		}
 	},
-	"preview" : "preview.gif",
-	"ratingsex" : "none",
-	"ratingviolence" : "none",
-	"tags" : [ "Relaxing" ],
-	"title" : "QWeather🌦️和风天气[测试]",
-	"type" : "web",
-	"version" : 25,
-	"visibility" : "public",
-	"workshopid" : "3149014795",
-	"workshopurl" : "steam://url/CommunityFilePage/3149014795"
+	"preview": "preview.jpg",
+	"ratingsex": "none",
+	"ratingviolence": "none",
+	"tags": [
+		"Technology"
+	],
+	"title": "QWeather🌦️和风天气",
+	"type": "web",
+	"version": 31,
+	"visibility": "public",
+	"workshopid": "3149014795",
+	"workshopurl": "steam://url/CommunityFilePage/3149014795"
 }

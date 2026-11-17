@@ -274,7 +274,8 @@ watch(
   &.active {
     background: var(--glass-active);
     color: var(--text-primary);
-    font-weight: 600;
+    /* 选中项不加粗：列表是滚轮拖动选中的，字重一变整行文字就要换字形重新栅格化，
+       滚动过程中每一格都触发一次，读起来就是卡顿。选中态靠底色 + 文字色标记。 */
   }
 }
 

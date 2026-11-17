@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>指标差值角标 · 终稿（C 方案）</title>
+  <link rel="stylesheet" href="../src/style/font.css" />
+  <style>
+    :root {
+      --font-sans: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      --glass-bg-soft: rgba(237, 247, 252, 0.075);
+      --glass-border: rgba(237, 247, 252, 0.16);
+      --glass-border-strong: rgba(237, 247, 252, 0.28);
+      --surface-modal: rgba(12, 31, 52, 0.94);
+      --text-primary: #e8f2f8;
+      --text-secondary: rgba(232, 242, 248, 0.76);
+      --text-muted: rgba(232, 242, 248, 0.52);
+      --radius-md: 1.125rem;
+      /* 只给温度和湿度：升=暖、降=冷 */
+      --delta-up: #e9b77c;
+      --delta-down: #a9dcf2;
+      /* 全局缓动：与 src/style/index.scss 一致 */
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-leave: cubic-bezier(0.4, 0, 1, 1);
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      margin: 0;
+      padding: 24px 32px 40px;
+      font-family: var(--font-sans);
+      background: radial-gradient(120% 100% at 20% 0%, #17364b, #0b1720 70%);
+      color: var(--text-primary);
+    }
+
+    .sheet { width: 800px; }
+
+    .block { margin-bottom: 26px; }
+    .block-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .block-tag {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
+      color: #0b2233; background: #9fd8ee; border: 1px solid #9fd8ee;
+      padding: 2px 7px; border-radius: 5px;
+    }
+    .block-tag.ghost { color: #86c9e6; background: rgba(101, 199, 242, 0.1); border-color: rgba(101, 199, 242, 0.34); }
+    .block-title { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+    .block-note { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 28px; list-style: none; margin: 0; padding: 0;
+    }
+
+    .stat {
+      position: relative;
+      display: flex; flex-direction: column; gap: 0.375rem;
+      padding: 1rem;
+      background: var(--glass-bg-soft);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+    }
+
+    .stat-icon { display: block; width: 1.55rem; height: 1.55rem; color: var(--text-muted); }
+    .stat-label { font-size: 0.84rem; color: var(--text-muted); }
+
+    /* 数值行：C 方案，两端对齐 */
+    .stat-foot {
+      position: relative;
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .stat-value {
+      font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em;
+      color: var(--text-primary); line-height: 1.1;
+      font-variant-numeric: tabular-nums; white-space: nowrap; flex: none;
+    }
+    .stat-value small { font-size: 0.52em; font-weight: 500; color: var(--text-muted); letter-spacing: normal; }
+    .stat-wind { font-size: 1.72rem; }   /* 风向卡最长文本，降一档给角标让位 */
+
+    /* ---- 差值角标 ---- */
+    .delta {
+      display: inline-flex; align-items: center; gap: 0.12em;
+      font-size: 0.75rem; font-weight: 600; letter-spacing: 0.01em;
+      line-height: 1; font-variant-numeric: tabular-nums;
+      white-space: nowrap; flex: none;
+    }
+    .delta svg { width: 0.95em; height: 0.95em; display: block; }
+    .delta .num { color: var(--text-secondary); }
+    /* 单位：比数字小一档、暗一档，紧贴数字（和数值行里的 <small> 同一套层级） */
+    .delta .unit { margin-left: 0.04em; font-size: 0.86em; font-weight: 500; color: var(--text-muted); }
+
+    /* 弱化色：降雨 / 风 / 紫外线 / 云量 —— 没有冷暖可言 */
+    .delta.mono svg { color: var(--text-muted); }
+    /* 持平没有数字陪衬，单独一个 = 要看得见 */
+    .delta.flat svg { color: var(--text-secondary); }
+
+    /* 冷暖色：只有平均温度、湿度 */
+    .delta.up svg { color: var(--delta-up); }
+    .delta.down svg { color: var(--delta-down); }
+
+    /* ---- tooltip ---- */
+    .tip {
+      position: absolute;
+      right: 0;
+      /* 0.2rem：再高就切穿标签行，透上来的半截字会变成一道残影 */
+      bottom: calc(100% + 0.2rem);
+      z-index: 5;
+      display: flex; flex-direction: column; gap: 0.15rem;
+      width: max-content;
+      max-width: 15rem;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.72rem; line-height: 1.45;
+      /* 当前采用的材质：和卡片玻璃只差一档 */
+      color: #eef7fc;
+      background: rgba(13, 34, 56, 0.55);
+      border: 1px solid rgba(237, 247, 252, 0.2);
+      border-radius: 0.75rem;
+      box-shadow: 0 0.5rem 1.4rem -0.5rem rgba(0, 0, 0, 0.45);
+      -webkit-backdrop-filter: blur(1.75rem) saturate(150%);
+      backdrop-filter: blur(1.75rem) saturate(150%);
+      /* 消失：先宽限 0.12s（边缘抖动 / 扫过不停留都不算真离开），再用 0.12s 走完 */
+      opacity: 0;
+      translate: 0 0.25rem;
+      scale: 0.97;
+      transform-origin: 100% 100%;   /* 从角标那个锚点长出来，不是一个飘着的方块 */
+      transition:
+        opacity 0.12s var(--ease-leave) 0.12s,
+        translate 0.12s var(--ease-leave) 0.12s,
+        scale 0.12s var(--ease-leave) 0.12s;
+      pointer-events: none;
+      text-align: left;
+    }
+
+    /* ---- 材质对比：同一个浮层，四种底色 ----
+       0.55 是现在采用的那一档：卡片玻璃是 0.48，浮层只比它厚一点；三套主题都开着 blur。
+       再往厚走（0.72 / 0.94）就不再是同一套材质了 —— 亮壁纸下浮层会比卡面暗三四倍，
+       看起来像在卡上挖了个洞，这是这套对比最想说明的一件事。 */
+    .tip.m-solid {
+      background: rgba(12, 31, 52, 0.94);
+      box-shadow: 0 0.75rem 2rem -0.75rem rgba(0, 0, 0, 0.7);
+    }
+    .tip.m-glass-72 {
+      background: rgba(13, 34, 56, 0.72);
+      border-color: rgba(237, 247, 252, 0.22);
+      box-shadow: 0 0.75rem 2rem -0.75rem rgba(0, 0, 0, 0.7);
+    }
+    .tip.m-glass-60 {
+      background: rgba(13, 34, 56, 0.6);
+      border-color: rgba(237, 247, 252, 0.18);
+      box-shadow: 0 0.75rem 2rem -0.75rem rgba(0, 0, 0, 0.7);
+    }
+    /* 模糊只作用在文字层，不挂在带 backdrop-filter 的那层上 */
+    .tip-body {
+      display: flex; flex-direction: column; gap: 0.15rem;
+      filter: blur(2px);
+      transition: filter 0.12s var(--ease-leave) 0.12s;
+    }
+    .tip-sub { font-size: 0.68rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+    /* 出现：0.16s 的悬停意图延迟就是一次防抖 —— 0.16s 内移开，opacity 从未离开 0，
+       什么都不会渲染；再移回来则重新计时。打开态由整张卡驱动，纯 CSS，没有 JS 状态 */
+    .stat:hover .tip,
+    .stat:focus-within .tip,
+    .is-hover .tip {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+      transition:
+        opacity 0.2s var(--ease-enter) 0.16s,
+        translate 0.2s var(--ease-enter) 0.16s,
+        scale 0.2s var(--ease-enter) 0.16s;
+    }
+    .stat:hover .tip-body,
+    .stat:focus-within .tip-body,
+    .is-hover .tip-body {
+      filter: blur(0);
+      transition: filter 0.2s var(--ease-enter) 0.16s;
+    }
+    .is-hover { border-color: var(--glass-border-strong); }
+
+    .mini-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.7; margin: 10px 0 0; }
+    .mini-note b { color: var(--text-secondary); font-weight: 600; }
+    .row { display: flex; gap: 40px; align-items: flex-start; }
+    .row > div { width: 250px; }
+    .mini-head {
+      display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px;
+      font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
+    }
+    .caption { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .mat-note { font-size: 11px; line-height: 1.55; color: var(--text-muted); }
+    .mat-note b { color: var(--text-secondary); font-weight: 600; }
+  </style>
+</head>
+
+<body>
+  <div class="sheet">
+    <div id="root"></div>
+  </div>
+
+  <script>
+    const ICONS = {
+      precip: '<path d="M17.4 10.4a4.2 4.2 0 0 0-8.2-1.3 3.6 3.6 0 0 0 .3 7.1h7.1a3.2 3.2 0 0 0 .8-5.8z"/><path d="M9 18.5l-1 1.9M13 18.5l-1 1.9M17 18.5l-1 1.9"/>',
+      humidity: '<path d="M12 3.5C8.8 7.6 7.3 10.1 7.3 12.6a4.7 4.7 0 0 0 9.4 0c0-2.5-1.5-5-4.7-9.1z"/><path d="M9 13a3 3 0 0 0 2.5 2.7"/>',
+      wind: '<path d="M3.5 8.5h11a2.4 2.4 0 1 0-2.4-2.4M3.5 12.5h15.5M3.5 16.5h9"/>',
+      uv: '<circle cx="12" cy="12" r="3.8"/><path d="M12 2.8v1.8M12 19.4v1.8M2.8 12h1.8M19.4 12h1.8M5.5 5.5l1.3 1.3M17.2 17.2l1.3 1.3M18.5 5.5l-1.3 1.3M6.8 17.2l-1.3 1.3"/>',
+      temp: '<path d="M12 4.4a1.9 1.9 0 0 1 1.9 1.9v7.2a3.6 3.6 0 1 1-3.8 0V6.3A1.9 1.9 0 0 1 12 4.4z"/><path d="M10.1 9h3.8M10.1 11.9h3.8"/>',
+      cloud: '<path d="M17.3 9.2a4.2 4.2 0 0 0-8.1-1.3 3.6 3.6 0 0 0 .3 7.1h7a3.2 3.2 0 0 0 .8-5.8z"/>',
+    }
+    const iconSvg = (path) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" width="100%" height="100%">${path}</svg>`
+
+    const GLYPH = {
+      up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19.5V5M6 11l6-6 6 6"/></svg>',
+      down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5V19M6 13l6 6 6-6"/></svg>',
+      flat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9.6h10M7 14.4h10"/></svg>',
+    }
+
+    // 选中日 = 周六，差值 = 周六 − 今天
+    const CARDS = [
+      {
+        key: 'precip', label: '降雨量', value: '6.43', unit: ' mm', dir: 'up', text: '3.4', badgeUnit: 'mm', tone: 'mono',
+        tip: '比今天多 3.4 mm', sub: '今天 3.02 mm → 周六 6.43 mm',
+      },
+      {
+        key: 'humidity', label: '湿度', value: '92', unit: ' %', dir: 'down', text: '5', badgeUnit: '%', tone: 'tint',
+        tip: '比今天低 5 个点', sub: '今天 97% → 周六 92%',
+      },
+      {
+        key: 'wind', label: '风向风力', value: '西北风 0级', unit: '', dir: 'down', text: '2', badgeUnit: '级', tone: 'mono',
+        tip: '比今天小 2 级', sub: '今天 南风 2级 → 周六 西北风 0级',
+      },
+      {
+        key: 'uv', label: '紫外线', value: '最弱', unit: '', dir: 'down', text: '', tone: 'mono',
+        tip: '比今天弱一档', sub: '今天 弱 → 周六 最弱',
+      },
+      {
+        key: 'temp', label: '平均温度', value: '20', unit: ' °C', dir: 'up', text: '2', badgeUnit: '°C', tone: 'tint',
+        tip: '比今天高 2°C', sub: '今天 18°C → 周六 20°C',
+      },
+      {
+        key: 'cloud', label: '云量', value: '93', unit: ' %', dir: 'flat', tone: 'mono',
+        tip: '和今天一样', sub: '今天 93% → 周六 93%',
+      },
+    ]
+
+    const valueHtml = (c) => `<span class="stat-value${c.key === 'wind' ? ' stat-wind' : ''}">${c.value}${c.unit ? `<small>${c.unit}</small>` : ''}</span>`
+
+    const deltaHtml = (c) => {
+      const cls = ['delta', c.dir, c.tone === 'mono' ? 'mono' : ''].filter(Boolean).join(' ')
+      const unit = c.badgeUnit ? `<span class="unit">${c.badgeUnit}</span>` : ''
+      const num = c.dir === 'flat' || !c.text ? '' : `<span class="num">${c.text}${unit}</span>`
+      return `<span class="${cls}">${GLYPH[c.dir]}${num}</span>`
+    }
+
+    const tipHtml = (c) => `<span class="tip"><span class="tip-body"><span class="tip-main">${c.tip}</span><span class="tip-sub">${c.sub}</span></span></span>`
+
+    const card = (c, { hover = false } = {}) => `<li class="stat${hover ? ' is-hover' : ''}">
+        <span class="stat-icon">${iconSvg(ICONS[c.key])}</span>
+        <span class="stat-label">${c.label}</span>
+        <span class="stat-foot">${valueHtml(c)}${deltaHtml(c)}${tipHtml(c)}</span>
+      </li>`
+
+    // 材质对比：三张湿度卡都固定成 hover 态，只换浮层底色
+    const matCard = (cls, label, note) => `<li class="stat is-hover">
+        <span class="stat-icon">${iconSvg(ICONS.humidity)}</span>
+        <span class="stat-label">湿度</span>
+        <span class="stat-foot">${valueHtml(CARDS[1])}${deltaHtml(CARDS[1])}
+          <span class="tip ${cls}"><span class="tip-body"><span class="tip-main">${CARDS[1].tip}</span><span class="tip-sub">${CARDS[1].sub}</span></span></span>
+        </span>
+        <span class="mat-note"><b>${label}</b> · ${note}</span>
+      </li>`
+
+    document.getElementById('root').innerHTML = [
+      `<section class="block">
+        <div class="block-head">
+          <span class="block-tag">终稿</span>
+          <span class="block-title">角标固定在数值行右端，三态只换图标</span>
+          <span class="block-note">温度 / 湿度用冷暖色，其余四个保持中性灰；紫外线是文字指标，只给方向不给数字；数字后面带单位，单位小一档、暗一档</span>
+        </div>
+        <ul class="stat-grid">${CARDS.map((c) => card(c)).join('')}</ul>
+      </section>`,
+
+      `<section class="block">
+        <div class="block-head">
+          <span class="block-tag ghost">hover</span>
+          <span class="block-title">整张卡都是热区，停 0.16s 出一枚玻璃提示</span>
+          <span class="block-note">第一行说「比今天差多少」，第二行给两端原值，省掉在两张卡之间来回看</span>
+        </div>
+        <div class="row">
+          <div>
+            <ul class="stat-grid" style="display:block;margin:0;padding:0">${card(CARDS[4], { hover: true })}</ul>
+            <p class="mini-note">冷暖色的箭头 + 一句口语：<b>比今天高 2°C</b></p>
+          </div>
+          <div>
+            <ul class="stat-grid" style="display:block;margin:0;padding:0">${card(CARDS[5], { hover: true })}</ul>
+            <p class="mini-note">持平不再出现文字，只留一个 <b>＝</b> 形图标；提示里照样把话说完整。</p>
+          </div>
+        </div>
+      </section>`,
+
+      `<section class="block">
+        <div class="block-head">
+          <span class="block-tag ghost">今天</span>
+          <span class="block-title">选中「今天」时整层不渲染</span>
+          <span class="block-note">选中未来某天时出角标；表头不再补「较今日」—— 日期本身就是那句话</span>
+        </div>
+        <div class="row">
+          <div>
+            <div class="mini-head">今天</div>
+            <ul class="stat-grid" style="display:block;margin:0;padding:0">
+              <li class="stat">
+                <span class="stat-icon">${iconSvg(ICONS.humidity)}</span>
+                <span class="stat-label">湿度</span>
+                <span class="stat-foot">${valueHtml(CARDS[1])}</span>
+              </li>
+            </ul>
+            <p class="mini-note">六张卡全部没有角标，也不会出现六个「和今天一样」。</p>
+          </div>
+          <div>
+            <div class="mini-head">周六</div>
+            <ul class="stat-grid" style="display:block;margin:0;padding:0">
+              <li class="stat">
+                <span class="stat-icon">${iconSvg(ICONS.humidity)}</span>
+                <span class="stat-label">湿度</span>
+                <span class="stat-foot">${valueHtml(CARDS[1])}${deltaHtml(CARDS[1])}</span>
+              </li>
+            </ul>
+            <p class="mini-note">箭头、数字、单位一起说差多少（<b>↓ 5%</b>）；提示第一行把基准和差值收成一句（<b>比今天低 5 个点</b>），第二行补两端原值。</p>
+          </div>
+        </div>
+      </section>`,
+      `<section class="block">
+        <div class="block-head">
+          <span class="block-tag ghost">材质</span>
+          <span class="block-title">浮层该有多「玻璃」</span>
+          <span class="block-note">浮层压在图标和标签上：框内的字会被糊开，框外露出的那一截不会 —— 所以它必须整块盖住标签</span>
+        </div>
+        <ul class="stat-grid" style="gap:24px;grid-template-columns:repeat(2,1fr)">
+          ${matCard('m-solid', '实心 94%', '不透光，一块浮起来的深色板')}
+          ${matCard('m-glass-72', '玻璃 72%（已换掉）', '亮壁纸下比卡面暗近 4 倍，像卡上挖了个洞')}
+          ${matCard('m-glass-60', '玻璃 60%', '更透，标签直接透上来，只剩一层影子')}
+          ${matCard('m-glass-55', '玻璃 55%（现用）', '只比卡片玻璃厚一档，靠模糊、细边、软影分层')}
+        </ul>
+      </section>`,
+    ].join('')
+  </script>
+</body>
+
+</html>

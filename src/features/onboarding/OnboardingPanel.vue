@@ -1,9 +1,4 @@
 <template>
-  <!-- 第 1 步 ↔ 第 2 步：换的是外壳里的内容，外壳不动（动效定义见 style/weather-panel.scss） -->
-  <!-- 根节点必须是一个普通元素，不能直接是 <Transition>：
-       外层（WeatherMain 的 .weather-shell）用 mode="out-in" 做「引导页 ↔ 天气卡」的切换时，
-       会顺着组件树去找真实元素；如果这里直接返回 Transition，一旦内层正处于切换中，
-       外层就取不到元素、只渲染一个注释占位，结果天气卡永远出不来、外壳变成一张空卡。 -->
   <div class="panel-view onb-stage">
     <Transition name="panel-swap">
       <!-- 检测通过 + 用户点了「下一步」→ 同一个面板内的第 2 步：选择位置 -->
@@ -22,7 +17,7 @@
               <h1 v-if="reviewCopy" class="onb-title">你已经配置好了，<br />这里是<span class="onb-title-hl">完整流程</span></h1>
               <h1 v-else class="onb-title">还差一步，<br />才能<span class="onb-title-hl">显示天气</span></h1>
               <p v-if="reviewCopy" class="onb-lead">
-                你的域名与密钥已经可用，这一步不用再填。看完点下面的<b>「返回设置」</b>即可。
+                你的域名与密钥已经可用，这一步不用再填。看完点下面的<b>「返回主界面」</b>即可。
               </p>
               <p v-else class="onb-lead">
                 请在右侧「壁纸属性」面板填入 <b>你自己的域名与密钥</b>，壁纸会自动读取并检测。
@@ -128,6 +123,18 @@
 </template>
 
 <script setup>
+/* 第 1 步 ↔ 第 2 步：换的是外壳里的内容，外壳不动（动效定义见 style/weather-panel.scss）
+
+   根节点必须是一个普通元素，不能直接是 <Transition>：
+   外层（WeatherMain 的 .weather-shell）用 mode="out-in" 做「引导页 ↔ 天气卡」的切换时，
+   会顺着组件树去找真实元素；如果这里直接返回 Transition，一旦内层正处于切换中，
+   外层就取不到元素、只渲染一个注释占位，结果天气卡永远出不来、外壳变成一张空卡。
+
+   ⚠️ 这两条说明必须留在 script 里，不要挪回 <template> 顶层（理由见 AirQualityDialog.vue）：
+      模板顶层的注释在开发构建里会被保留成真实的注释节点，组件根节点就成了「注释 + div」
+      两截 Fragment —— 外面 WeatherMain 的 <Transition name="panel-swap"> 拿不到单根元素，
+      进场照样能动（hooks 挂在组件 vnode 上），离场却被 Vue 直接 removeFragment，
+      引导页是「啪」一下消失的。生产构建会剥掉注释，所以这个坑只在 npm run dev 里发作。 */
 import StaggerGroup from '@/shared/motion/StaggerGroup'
 import StaggerTransition from '@/shared/motion/StaggerTransition'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -196,8 +203,10 @@ const primaryAction = computed(() => {
     return { label: '下一步 · 选择所在位置', run: goToLocationStep }
   }
   if (canClose.value) {
-    // 从设置页进来的回顾态：关掉后回到设置页，按钮文案跟着说清楚
-    return { label: review.value ? '返回设置' : '返回天气', run: closeOnboarding }
+    // 从设置页进来的回顾态：关掉引导页落在天气卡上（设置页在跳转时已经关了，
+    // 见 SettingsDialog 的 reviewOnboarding），所以这里不能写「返回设置」——
+    // 那个按钮点下去到不了设置页。写「返回主界面」才和实际动作对上。
+    return { label: review.value ? '返回主界面' : '返回天气', run: closeOnboarding }
   }
   if (canContinueWithoutCheck.value) return { label: '网络异常，仍然继续', run: continueWithoutCheck }
   return null
@@ -476,16 +485,14 @@ const handleLocationSelected = () => {
   }
 
   &.primary {
-    color: var(--text-on-accent);
-    background: var(--color-primary);
-    border-color: transparent;
-    box-shadow: 0 1rem 2rem -1.125rem rgba(56, 189, 248, 0.85);
+    color: var(--control-accent-text);
+    background: var(--control-accent-bg);
+    border-color: var(--control-accent-border);
 
     &:hover:not(:disabled) {
-      color: var(--text-on-accent);
-      background: var(--color-primary);
-      border-color: transparent;
-      filter: brightness(1.07);
+      color: var(--control-accent-text);
+      background: var(--control-accent-hover-bg);
+      border-color: var(--control-accent-hover-border);
     }
   }
 }
@@ -677,13 +684,10 @@ const handleLocationSelected = () => {
   height: 1.75rem;
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--text-on-accent);
-  background: var(--glass-active);
-  border: 1px solid rgba(125, 211, 252, 0.56);
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border: 1px solid var(--control-accent-border);
   border-radius: 50%;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 0.5rem 1rem -0.5rem rgba(56, 189, 248, 0.9);
 }
 
 .onb-step-title {

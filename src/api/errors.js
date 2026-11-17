@@ -396,8 +396,3 @@ export const getWeatherErrorTip = (code, type = '', title = '') =>
 export const getWeatherErrorLines = (code, type = '', title = '') =>
   getWeatherErrorInfo({ code, type, title }).lines;
 
-/**
- * 兼容旧调用：只传业务码时返回第一行短提示。
- * 新代码建议直接用 getWeatherErrorInfo / getWeatherErrorTip / getWeatherErrorLines。
- */
-export const getBusinessErrorMessage = (code) => getWeatherErrorMessage(code);

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>天气卡预览（离线假数据）</title>
+  <!-- 固定 1920×1080 下的实际 rem（16px × 0.9），截图能和真机对上 -->
+  <style>
+    html {
+      font-size: 14.4px;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(120% 100% at 20% 0%, #16344a, #0b1720 70%);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/dev/cardPreview.js"></script>
+</body>
+
+</html>

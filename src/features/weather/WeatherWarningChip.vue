@@ -35,7 +35,9 @@ const severityKey = (level = '') => {
 .early-chip-icon { width: var(--chip-icon-size); height: var(--chip-icon-size); flex: none; font-size: var(--chip-icon-size); line-height: 1; }
 .early-chip-main { display: inline-flex; align-items: center; gap: var(--chip-gap); flex-wrap: wrap; min-width: 0; }
 .early-chip-text { overflow-wrap: anywhere; }
-.early-chip-time { flex: none; font-size: 0.8em; font-weight: 400; line-height: 1.4; white-space: nowrap; opacity: 0.8; }
+/* 0.8 会把时间压到 3.1:1（晨雾下正文本来就只有 4.29:1）：层级交给字号和字重，
+   透明度只让一档。 */
+.early-chip-time { flex: none; font-size: 0.8em; font-weight: 400; line-height: 1.4; white-space: nowrap; opacity: 0.85; }
 .early-count { display: inline-flex; flex: none; align-items: center; justify-content: center; min-width: 1.5em; height: 1.5em; padding: 0 0.35em; font-size: 0.72em; font-weight: 700; line-height: 1; color: var(--chip-text); background: var(--glass-bg-soft); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 999px; }
 .early-chip.is-cancelled { --chip-bg: var(--glass-bg-soft); --chip-border: 1px solid var(--text-muted); --chip-text: var(--text-secondary); --chip-icon: var(--text-secondary); }
 </style>

@@ -155,9 +155,6 @@ const cacheSet = (key, value) => {
   cache.set(key, value)
 }
 
-/** 清空缓存（调试 / 换 key 后用；地理数据本身与凭据无关，正常不需要清） */
-export const clearPlaceLookupCache = () => cache.clear()
-
 /**
  * 响应 → 统一结构。
  * 保留 raw（原始 city 对象）给 store 的 choosePoint 复用：它需要 id / tz / lat / lon

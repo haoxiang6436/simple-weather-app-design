@@ -1,7 +1,5 @@
 <template>
-  <!-- 整层也是「点击卡片外」的落点：设置页关闭、地址页确认已选点（见 shared/useLayerOutsideClick）。
-       卡片内的点击目标是卡里的元素，不会冒泡成「点在外面」 -->
-  <div ref="layerRef" class="weather weather-layer">
+  <div class="weather weather-layer">
     <!-- 卡片外壳常驻，切换的是壳里的内容（动效定义见 style/weather-panel.scss） -->
     <Transition name="panel-in" appear>
      <div v-if="shellVisible" class="weather-shell" :class="{ 'weather-shell-card': panelView === 'weather' }">
@@ -12,11 +10,10 @@
         <Transition name="panel-swap">
           <!-- 新用户引导：没填可用的域名/密钥、或还没选位置时，用引导面板占住天气卡的位置 -->
           <OnboardingPanel v-if="panelView === 'onboarding'" />
-          <!-- 设置 / 状态页：已经能看天气之后，齿轮打开的是这里，不再回到首次引导 -->
-          <SettingsPanel v-else-if="panelView === 'settings'" />
+          <!-- 设置 / 状态页不在这里：它是一层盖住整张卡的弹窗，挂在 App.vue 上（见 SettingsDialog） -->
           <!-- 地址选择页：日常换城市走这里（与天气卡同尺寸、同层级） -->
-          <LocationPicker v-else-if="panelView === 'location'" dismissable @close="LocationPickerOpen = false"
-            @selected="LocationPickerOpen = false" />
+          <LocationPicker v-else-if="panelView === 'location'" dismissable @close="closeLocationPicker"
+            @selected="closeLocationPicker" />
           <section v-else-if="!WeatherMainIsShow" class="weather-card panel-view">
       <!-- 左侧：当前天气（紧凑） -->
       <StaggerGroup tag="header" class="hero" :class="{ 'hero-warning': WeatherEarlyWarning.length }">
@@ -58,6 +55,8 @@
             <span class="now-temp-num">{{ nowWeatherData.temp }}</span>
             <span class="now-temp-unit">°C</span>
           </div>
+          <!-- 实时空气质量：贴在当前温度右侧、落在温度基线上；没数据时组件自己什么都不渲染 -->
+          <AirQualityChip class="hero-aqi" />
         </div>
 
         <div key="description" class="now-desc">
@@ -112,80 +111,104 @@
         </div>
       </StaggerGroup>
 
-      <!-- 右侧：选中日详情 + 当日指标 + 4日预报 -->
-      <StaggerGroup tag="main" class="details">
-        <div key="heading" class="details-head">
-          <div class="details-info">
-            <span class="details-day">{{ activeDayLabel }}</span>
-            <button class="details-quote" type="button" aria-label="点击换一句"
-              :aria-busy="hitokotoLoading"
-              :title="hitokoto ? (hitokoto + (hitokotoFrom ? ' · ' + hitokotoFrom : '') + '（点击换一句）') : (hitokotoFailed ? '加载失败，点击重试' : '加载一句话')"
-              @click="refreshHitokoto()">
-              <!-- 有文案就始终显示（刷新时淡化），没有文案才在骨架屏 / 失败提示之间切换 -->
-              <span v-if="hitokoto" class="quote-text" :class="{ refreshing: hitokotoLoading }">{{ hitokoto }}</span>
-              <span v-else-if="hitokotoFailed" class="quote-text quote-error">句子加载失败，点击重试</span>
-              <span v-else class="quote-skeleton"></span>
-            </button>
+      <!-- 右侧：选中日详情 + 当日指标 + 7日预报。
+           这里不再把整块详情当成一个错峰项：标题、六张指标卡、日出日落行、七日预报
+           各走各的进场（指标卡在 StaggerGroup 里逐张浮起，预报列在 ForecastStrip 里逐列落位）。 -->
+      <main class="details">
+        <StaggerTransition preset="content" :index="0">
+          <div class="details-head">
+            <div class="details-info">
+              <!-- 日期只说一次：左边是预报条选中的那一列（今天 / 明天 / 周二…），
+                   这里就是它的全名。不再补「较今日」那种基准小字 ——
+                   它挨着日期放会被读成「这一天相对今天」，和日期本身就是同一句话；
+                   基准由每枚角标的悬停提示和读屏文案各自说全。 -->
+              <span class="details-day">{{ activeDayLabel }}</span>
+              <button class="details-quote" type="button" aria-label="点击换一句"
+                :aria-busy="hitokotoLoading"
+                :title="hitokoto ? (hitokoto + (hitokotoFrom ? ' · ' + hitokotoFrom : '') + '（点击换一句）') : (hitokotoFailed ? '加载失败，点击重试' : '加载一句话')"
+                @click="refreshHitokoto()">
+                <!-- 有文案就始终显示（刷新时淡化），没有文案才在骨架屏 / 失败提示之间切换 -->
+                <span v-if="hitokoto" class="quote-text" :class="{ refreshing: hitokotoLoading }">{{ hitokoto }}</span>
+                <span v-else-if="hitokotoFailed" class="quote-text quote-error">句子加载失败，点击重试</span>
+                <span v-else class="quote-skeleton"></span>
+              </button>
+            </div>
+            <div class="details-temp">
+              <span class="temp-num"><AnimatedNumber :value="activeTempMax" :delay="80" />{{ degree(activeTempMax) }}</span>
+              <span class="temp-sep">/</span>
+              <span class="temp-num"><AnimatedNumber :value="activeTempMin" :delay="120" />{{ degree(activeTempMin) }}</span>
+            </div>
           </div>
-          <div class="details-temp">
-            <span class="temp-num">{{ activeTempMax }}°</span>
-            <span class="temp-sep">/</span>
-            <span class="temp-num">{{ activeTempMin }}°</span>
-          </div>
-        </div>
+        </StaggerTransition>
 
-        <ul key="stats" class="stat-grid">
-          <li class="stat">
+        <!-- 六张指标卡：数值行两端对齐（数字靠左、角标贴右端）。
+             角标全部由 statDeltas.js 算好（选中日 − 今天），这里只负责摆：
+             选中「今天」或某一项没有可比数据时，那一项就不出角标。 -->
+        <StaggerGroup tag="ul" class="stat-grid" preset="stat">
+          <li key="precip" class="stat">
             <span class="stat-icon" v-html="statIcon('precip')"></span>
             <span class="stat-label">降雨量</span>
-            <span class="stat-value">{{ activeDaily?.precip ?? '—' }}<small> mm</small></span>
+            <!-- 固定两位小数（0 → 0.00），缺数据仍是「—」；见 AnimatedNumber 组件 -->
+            <span class="stat-foot">
+              <span class="stat-value"><AnimatedNumber :value="activeDaily?.precip" :decimals="2" :delay="100" /><small> mm</small></span>
+              <StatDelta v-if="statDeltas.precip" v-bind="statDeltas.precip" />
+            </span>
           </li>
-          <li class="stat">
+          <li key="humidity" class="stat">
             <span class="stat-icon" v-html="statIcon('humidity')"></span>
             <span class="stat-label">湿度</span>
-            <span class="stat-value">{{ activeDaily?.humidity ?? '—' }}<small> %</small></span>
+            <span class="stat-foot">
+              <span class="stat-value"><AnimatedNumber :value="activeDaily?.humidity" :delay="160" /><small> %</small></span>
+              <StatDelta v-if="statDeltas.humidity" v-bind="statDeltas.humidity" />
+            </span>
           </li>
-          <li class="stat">
+          <li key="wind" class="stat">
             <span class="stat-icon" v-html="statIcon('wind')"></span>
             <span class="stat-label">风向风力</span>
-            <span class="stat-value stat-wind">{{ activeDaily?.windDirDay || '—' }} {{ activeDaily?.windScaleDay ?? '—' }}级</span>
+            <!-- 风向文字不动，只有风级滚；区间风级（3-4）原样显示 -->
+            <span class="stat-foot">
+              <span class="stat-value stat-wind">{{ activeWind.dir }} <AnimatedNumber v-if="activeWind.scale !== null" :value="activeWind.scale" :delay="220" />{{ activeWind.scale === null ? activeWind.text : '' }}级</span>
+              <StatDelta v-if="statDeltas.wind" v-bind="statDeltas.wind" />
+            </span>
           </li>
-          <li class="stat">
+          <li key="uv" class="stat">
             <span class="stat-icon" v-html="statIcon('uv')"></span>
             <span class="stat-label">紫外线</span>
-            <!-- 与其它指标同字号同色：只显示强度等级，例如「弱」 -->
-            <span class="stat-value stat-uv" :title="activeUv.title">{{ activeUv.text }}</span>
+            <!-- 与其它指标同字号同色：只显示强度等级，例如「弱」（文字等级不参与数值滚动） -->
+            <span class="stat-foot">
+              <span class="stat-value stat-uv" :title="activeUv.title">{{ activeUv.text }}</span>
+              <StatDelta v-if="statDeltas.uv" v-bind="statDeltas.uv" />
+            </span>
           </li>
-          <li class="stat">
+          <li key="temp" class="stat">
             <span class="stat-icon" v-html="statIcon('temp')"></span>
             <span class="stat-label">平均温度</span>
-            <span class="stat-value">{{ activeDaily?.tempAvg ?? '—' }}<small> °C</small></span>
+            <span class="stat-foot">
+              <span class="stat-value"><AnimatedNumber :value="activeDaily?.tempAvg" :delay="280" /><small> °C</small></span>
+              <StatDelta v-if="statDeltas.temp" v-bind="statDeltas.temp" />
+            </span>
           </li>
-          <li class="stat">
+          <li key="cloud" class="stat">
             <span class="stat-icon" v-html="statIcon('cloud')"></span>
             <span class="stat-label">云量</span>
-            <span class="stat-value">{{ activeDaily?.cloud ?? '—' }}<small> %</small></span>
+            <span class="stat-foot">
+              <span class="stat-value"><AnimatedNumber :value="activeDaily?.cloud" :delay="340" /><small> %</small></span>
+              <StatDelta v-if="statDeltas.cloud" v-bind="statDeltas.cloud" />
+            </span>
           </li>
-        </ul>
-
-        <div key="sun" class="sun-row">
-          <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
-          <span class="sun-sep"></span>
-          <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
-        </div>
-
-        <ul key="forecast" class="forecast-list">
-          <li v-for="item in FourDayWeatherData" :key="item.fxDate">
-            <button class="forecast-item" type="button" :aria-pressed="activeItem === item.fxDate"
-              :aria-label="`${item.fxDate}，最高 ${item.tempMax} 度，最低 ${item.tempMin} 度`"
-              :class="{ active: activeItem === item.fxDate }" @click="activeItem = item.fxDate">
-              <span class="forecast-day">{{ item.fxDate }}</span>
-              <i :class="`qi-${item.iconDay}`" aria-hidden="true"></i>
-              <span class="forecast-temp"><b>{{ item.tempMax }}</b>/{{ item.tempMin }}°</span>
-            </button>
-          </li>
-        </ul>
         </StaggerGroup>
+
+        <StaggerTransition preset="sunRow">
+          <div class="sun-row">
+            <span class="sun-item">日出 <b>{{ activeDaily?.sunrise ?? '—' }}</b></span>
+            <span class="sun-sep"></span>
+            <span class="sun-item">日落 <b>{{ activeDaily?.sunset ?? '—' }}</b></span>
+          </div>
+        </StaggerTransition>
+
+        <ForecastStrip key="forecast" :days="forecastDays" :active-date="activeItem"
+          @select="activeItem = $event" />
+      </main>
           </section>
         </Transition>
       </div>
@@ -194,7 +217,13 @@
 </template>
 
 <script setup>
+/* 天气卡本体，以及与它同尺寸、同层级的两个面板：引导页、地址选择页（三者的切换见 panelView）。
+   设置 / 状态页不在这张表里：它是盖在整张卡上的一层弹窗，挂在 App.vue 上
+   （features/onboarding/SettingsDialog.vue），打开时天气卡留在背后，关掉就回到原样。
+   （说明放在 script 里而不是 <template> 顶层，避免根节点变成 Fragment —— 见 transitions.scss 的 ⚠️） */
 import StaggerGroup from '@/shared/motion/StaggerGroup'
+import StaggerTransition from '@/shared/motion/StaggerTransition'
+import AnimatedNumber from '@/shared/motion/AnimatedNumber.vue'
 import 'qweather-icons/font/qweather-icons.css'
 import { onMounted, ref, computed, onUnmounted, watch } from 'vue';
 import { useStorage } from '@vueuse/core';
@@ -202,13 +231,18 @@ import { storeToRefs } from 'pinia';
 import { useWeatherStore } from '@/store/index';
 import WeatherStateIndicator from './WeatherStateIndicator.vue'
 import LocationPicker from './LocationPicker.vue'
+// 地址页的开关提到了模块级：设置页的「位置地图」卡也要能打开它（见 locationPanelState.js）
+import { LocationPickerOpen, closeLocationPicker, openLocationPicker } from './locationPanelState'
 import MinutelyRainChip from './MinutelyRainChip.vue'
 import WeatherWarningChip from './WeatherWarningChip.vue'
+import AirQualityChip from './AirQualityChip.vue'
+import ForecastStrip from './ForecastStrip.vue'
+import StatDelta from './StatDelta.vue'
+import { uvLevel } from './uvScale'
+import { buildStatDeltas } from './statDeltas'
 import OnboardingPanel from '@/features/onboarding/OnboardingPanel.vue'
-import SettingsPanel from '@/features/onboarding/SettingsPanel.vue'
-import { OnboardingOpen, SettingsOpen, WeatherReady, closeSettings, openSettings } from '@/features/onboarding/onboardingState'
-import { WallpaperPropertiesReady } from '@/features/wallpaper/properties'
-import { useLayerOutsideClick } from '@/shared/useLayerOutsideClick'
+import { OnboardingOpen, SettingsOpen, WeatherReady, openSettings } from '@/features/onboarding/onboardingState'
+import { WallpaperPropertiesReady, ForecastDays } from '@/features/wallpaper/properties'
 import Bus from '@/shared/Bus';
 import { BUS_EVENTS, STORAGE_KEYS } from '@/features/wallpaper/constants';
 import { useWeatherRefresh } from './useWeatherRefresh';
@@ -228,30 +262,60 @@ const activeWeatherDate = computed(() => FourDayWeatherData.value.filter(item =>
 const activeDaily = computed(() => activeWeatherDate.value[0] || null)
 
 /**
+ * 七天里的第一列永远是今天：六张卡上的差值都以它为基准（「相对今天」说的是这一天）。
+ * 它和 ActiveDaily 是同一个对象引用，所以下面直接用 === 判断选中的是不是今天 ——
+ * 从 fxDate 字符串去比也不保险（预报刷新后仍是同一个 fxDate，但对象已经换了一批）。
+ */
+const todayDaily = computed(() => FourDayWeatherData.value[0] || null)
+
+/**
+ * 预报条实际显示几天：壁纸属性里选 5 / 6 / 7，默认 7。
+ * 接口始终只请求一次 7 天，这里只是截断显示 —— 改天数不发请求、也不丢数据，
+ * 曲线按实际条数重新等分（列中心 = i / (n - 1)），5 天时每列自然变宽。
+ */
+const forecastDays = computed(() => FourDayWeatherData.value.slice(0, ForecastDays.value))
+
+// 选中的那天不在了才回落到第一列（别的情况一律不动选中项）。
+// 两种场景会走到这里：天数调小后选中的那天被截掉；跨过零点后旧的那一列被挤出 7 天窗口。
+// 两种都必须回退，否则卡片上的温度和预报条对不上，曲线上的端点也会消失。
+const keepActiveDayInRange = () => {
+  const list = forecastDays.value
+  if (!list.length) return
+  if (list.some((item) => item.fxDate === activeItem.value)) return
+  activeItem.value = list[0].fxDate
+}
+
+watch(forecastDays, keepActiveDayInRange)
+
+/**
  * 紫外线强度等级。
- * 按 WHO《全球紫外线指数指南》的五档划分：
- *   0–2 最弱 · 3–5 弱 · 6–7 中 · 8–10 强 · ≥11 很强
- * 接口 uvIndexMax 的取值范围是 [0, 15]，11 以上统一按「很强」处理。
+ * 五档表本身在 uvScale.js —— 角标要比的是等级的强弱顺序，不是指数值的差，
+ * 两边必须查同一张表，所以那一份挪出去了。
  * 卡片里只显示「弱」这样的强度等级纯文本，字号和颜色跟其它指标一致；
  * 具体指数值放在 title 提示里。
  */
-const UV_LEVELS = [
-  { max: 2, level: '最弱', advice: '紫外线很弱，正常外出无需特别防护。' },
-  { max: 5, level: '弱', advice: '紫外线较弱，外出可涂 SPF15+ 防晒霜。' },
-  { max: 7, level: '中', advice: '紫外线中等，外出建议涂 SPF30+ 防晒霜、戴遮阳帽。' },
-  { max: 10, level: '强', advice: '紫外线强，10–16 点减少户外暴晒，做好防晒。' },
-  { max: Infinity, level: '很强', advice: '紫外线很强，尽量避免正午外出，注意遮阳防晒。' },
-]
 const activeUv = computed(() => {
-  const raw = activeDaily.value?.uvIndex
-  if (raw === null || raw === undefined || Number.isNaN(Number(raw))) {
-    return { text: '—', title: '暂无紫外线数据' }
-  }
-  const index = Number(raw)
-  const level = UV_LEVELS.find((item) => index <= item.max) || UV_LEVELS[UV_LEVELS.length - 1]
+  const uv = uvLevel(activeDaily.value?.uvIndex)
+  if (!uv) return { text: '—', title: '暂无紫外线数据' }
   return {
-    text: level.level,
-    title: `紫外线指数 ${index}（${level.level}）· ${level.advice}`,
+    text: uv.level,
+    title: `紫外线指数 ${uv.index}（${uv.level}）· ${uv.advice}`,
+  }
+})
+
+/**
+ * 风向风力：风向是文字、不能滚动，只有风级能滚。
+ * 和风偶尔给区间（如「3-4」），这时整段保持文字展示 —— 不能只动区间里的一个数字。
+ */
+const activeWind = computed(() => {
+  const dir = activeDaily.value?.windDirDay
+  const raw = activeDaily.value?.windScaleDay
+  const text = raw === null || raw === undefined || raw === '' ? '—' : String(raw)
+  return {
+    dir: dir || '—',
+    text,
+    // 只认纯数字；「3-4」这种区间走 text 原样显示
+    scale: /^\d+(?:\.\d+)?$/.test(text) ? Number(text) : null,
   }
 })
 
@@ -268,14 +332,14 @@ const locationTitle = computed(() => {
   return `${full}（${coords}）`
 })
 
-// 面板视图：引导 → 设置 → 地址选择 → 天气卡（四者尺寸/层级一致，见 style/weather-panel.scss）
-const LocationPickerOpen = ref(false)
+// 面板视图：引导 → 地址选择 → 天气卡（三者尺寸/层级一致，见 style/weather-panel.scss）。
+// 设置页不在这张表里：它是盖在整张卡上的一层弹窗（App.vue → SettingsDialog），
+// 打开时天气卡仍留在背后，关掉直接回到原样，中间不用换外壳、也不用重播 panel-swap。
 const panelView = computed(() => {
   // 壁纸引擎下发的属性还没补发完成 → 先什么都不显示，避免闪一下引导页
   if (!WallpaperPropertiesReady.value) return 'loading'
-  // 引导页永远优先：凭据没配好、密钥失效、还没选位置时，设置页没有意义
+  // 引导页优先：凭据没配好、密钥失效、还没选位置时，设置页没有意义
   if (OnboardingOpen.value) return 'onboarding'
-  if (SettingsOpen.value) return 'settings'
   if (LocationPickerOpen.value) return 'location'
   return 'weather'
 })
@@ -302,15 +366,6 @@ watch([OnboardingOpen, SettingsOpen], ([onboarding, settings]) => {
 watch(WeatherMainIsShow, (hidden) => {
   if (hidden) LocationPickerOpen.value = false
 })
-
-/* 点击卡片外的空白关闭设置页。
-   地址页的「点外面确认已选点」由 LocationPicker 自己接管（它可能在引导页里，不在这一层直接渲染）。 */
-const layerRef = ref(null)
-const handleLayerClick = () => {
-  // 只有设置页这么关：引导页是必填流程，地址页有自己的规则（只认地图上点过的 pin）
-  if (panelView.value === 'settings') closeSettings()
-}
-useLayerOutsideClick(layerRef, handleLayerClick)
 
 /* 一言（名言）模块：右侧“今天”下方
  *
@@ -478,11 +533,26 @@ const ensureRotateWorker = () => {
 
 // 选中日的标签与温度区间（用于右侧详情头部）
 const activeDayLabel = computed(() => activeWeatherDate.value[0]?.fxDate ?? activeItem.value)
+
+/**
+ * 六项差值（选中日 − 今天）。纯计算，不缓存：
+ * 七天数据一刷新、或者换一天选中，下一次读它就会重算一遍。
+ *
+ * 选中今天时 buildStatDeltas 直接返回空对象 —— 今天相对今天没有差值可言，
+ * 六张卡就一个角标都不出（拿不到选中日、数据还没回来时同样按这个处理：
+ * 宁可不显示，也不要在一排「—」旁边挂六个空箭头）。
+ * 表头不再补「较今日」：左边预报条已经选中了那一天的列，日期旁边再写一遍等于同义反复，
+ * 基准由每枚角标的悬停提示（「比今天低 5 个点」+「今天 97% → 周二 92%」两句）和读屏文案各自说全。
+ */
+const statDeltas = computed(() => buildStatDeltas(todayDaily.value, activeDaily.value, activeDayLabel.value))
+// 首屏占位时温度是「—」，不要拼成「—°」
+const degree = (value) => (value === null || value === undefined || value === '—' ? '' : '°')
 const activeTempMax = computed(() => activeWeatherDate.value[0]?.tempMax ?? '—')
 const activeTempMin = computed(() => activeWeatherDate.value[0]?.tempMin ?? '—')
 const todayTempRange = computed(() => {
   const d = FourDayWeatherData.value[0]
-  return d ? `${d.tempMax}° / ${d.tempMin}°` : '—'
+  if (!d || d.tempMax === null || d.tempMax === undefined) return '—'
+  return `${d.tempMax}° / ${d.tempMin}°`
 })
 
 
@@ -602,32 +672,29 @@ const { errCount } = useWeatherRefresh({
   // 引导未完成（没有可用的域名/密钥）时不发任何请求
   enabled: WeatherReady,
   onSuccess: () => {
-    activeItem.value = FourDayWeatherData.value[0].fxDate
+    // 刷新不能动选中项。这里以前是无条件写回第一列，
+    // 于是每 60 秒一次的后台刷新（以及切回标签页触发的那次）都会把用户弹回今天 ——
+    // 正在看周六的详情，一分钟不到就自己跳回今天，后几天根本读不完。
+    // 现在只沿用上面的回退规则：选中的那天还在预报条上，就停在原地。
+    keepActiveDayInRange()
     ReviseState(200)
   },
 })
 const openSelectLocationDialog = () => {
-  LocationPickerOpen.value = true
+  openLocationPicker()
 }
 const handleShowWeatherMain = (val) => {
   WeatherMainIsShow.value = val
 }
-const handleBackgroundIndexChange = (val) => {
-  if (String(val) !== '4') {
-    WeatherMainIsShow.value = false
-  }
-}
 
 onMounted(() => {
   Bus.on(BUS_EVENTS.SHOW_WEATHER_MAIN, handleShowWeatherMain)
-  Bus.on(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, handleBackgroundIndexChange)
   ensureRotateWorker()
   startIndexRotate()
   startHitokotoAuto()
 })
 onUnmounted(() => {
   Bus.off(BUS_EVENTS.SHOW_WEATHER_MAIN, handleShowWeatherMain)
-  Bus.off(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, handleBackgroundIndexChange)
   rotateWorker?.terminate()
   rotateWorker = null
   stopIndexRotate()
@@ -706,7 +773,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
 
 .hero-top {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -857,6 +924,22 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   color: var(--text-secondary);
 }
 
+/* 空气质量胶囊：「下 · 左」—— 底边与温度数字的下沿齐平，横向紧跟 °C（位置对比板里选的那一档）。
+   横向只给 margin-right:auto：右边那片余量整块留白，胶囊和温度之间只留 .875rem 的 flex gap，
+   读起来是「19°C」的注脚而不是另一块内容。反过来，居中（left/right 都 auto）或靠右（只给
+   margin-left:auto）会让胶囊飘到温度行右端、和温度断开联系；而「紧跟温度」这一档同时最省空间：
+   余量不足时 auto 外边距本来就归零，负数温度下也是它先站得住。
+   纵向 align-self:flex-end 从行底往上量，margin-bottom 决定抬多高 —— 抬高了会浮在数字腰上，
+   抬少了又会掉到基线下面。0.7rem 是量出来的「行底 → 数字墨迹下沿」的距离：
+   6rem 的数字（line-height:1）里基线在行底往上 0.847rem，Montserrat 的数字到基线下再探
+   0.02rem，两者相减即 0.7rem；图谱换 6.65rem 衬线字后是 1.03rem（见 style/index.scss）。 */
+.hero-aqi {
+  margin-right: auto;
+  margin-bottom: 0.7rem;
+  align-self: flex-end;
+  flex: none;
+}
+
 /* 天气文案 + 体感/温区合成一行：省下的这一行高度让给常驻的分钟级降水胶囊，
    否则左栏（预警 + 分钟级 + 生活指数）会顶出卡片下沿 */
 .now-desc {
@@ -991,6 +1074,7 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   }
 }
 
+/* 日期：就是预报条里选中的那一列的全名（今天 / 明天 / 周二…） */
 .details-day {
   display: block;
   font-size: 1.9rem;
@@ -1052,11 +1136,26 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   color: var(--text-muted);
 }
 
+/* 数值行：数字靠左、角标贴右端（C 方案）。两端对齐比「角标紧跟数字」更稳 ——
+   六张卡的字宽各不相同，跟着数字走的话箭头的横向位置会一行一个样，看着像没对齐。
+   position: relative 是提示浮层的锚点：浮层从这一行往上长（见 StatDelta.vue），
+   改这里之前先看一眼 .tip 的 right / bottom。 */
+.stat-foot {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .stat-value {
+  flex: none;
   font-size: 1.9rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-value small {
@@ -1066,8 +1165,11 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   letter-spacing: normal;
 }
 
-/* 风向 + 风级整行同字号；8 方位最长的「西北风 12级」也只是贴到卡片内边距，不换行 */
+/* 风向 + 风级整行同字号；8 方位最长的「西北风 12级」也只是贴到卡片内边距，不换行。
+   加上角标之后这一卡要多让出约 1.75rem，字号比其它数值降一档 ——
+   1.9rem 时那六个字正好吃满整行，角标没有落脚的地方。 */
 .stat-wind {
+  font-size: 1.72rem;
   white-space: nowrap;
 }
 
@@ -1248,67 +1350,6 @@ watch(() => WeatherEarlyWarning.value.length, () => {
   -webkit-line-clamp: 3; /* 兜底：极端长的正文最多 3 行，不会把左栏顶出去 */
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.forecast-list {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-
-.forecast-list li {
-  min-width: 0;
-}
-
-.forecast-item {
-  appearance: none;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 1.125rem 0.5rem;
-  color: var(--text-secondary);
-  background: var(--glass-bg-subtle);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.forecast-item:hover {
-  background: var(--glass-bg-soft);
-}
-
-.forecast-item.active {
-  background: var(--glass-active);
-  border-color: var(--color-primary);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-panel);
-}
-
-.forecast-day {
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.forecast-item i {
-  font-size: 2.4rem;
-  line-height: 1;
-}
-
-.forecast-item i::before {
-  font-size: 1em;
-}
-
-.forecast-temp {
-  font-size: 0.94rem;
-  color: var(--text-muted);
-}
-
-.forecast-temp b {
-  font-weight: 700;
-  color: var(--text-primary);
 }
 
 /* ================= 响应式 ================= */

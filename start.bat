@@ -1,1 +1,1 @@
-yarn serve
+npm run serve

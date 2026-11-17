@@ -2193,13 +2193,15 @@ defineExpose({ reset, focusTo, waitRoad, exitFullscreen })
 
 .mp-btn--primary {
   font-weight: 600;
-  color: var(--text-on-accent);
-  background: var(--color-primary);
-  border-color: transparent;
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border-color: var(--control-accent-border);
+  transition: background 0.2s ease, border-color 0.2s ease;
 
   &:hover {
-    background: var(--color-primary);
-    filter: brightness(1.08);
+    color: var(--control-accent-text);
+    background: var(--control-accent-hover-bg);
+    border-color: var(--control-accent-hover-border);
   }
 }
 </style>

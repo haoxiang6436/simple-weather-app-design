@@ -182,13 +182,14 @@ const PRICE_ROWS = [
   transition: transform 0.18s var(--ease-leave), opacity 0.14s ease;
 }
 
+/* 只位移不缩放：缩放会在收尾重栅格时让文字和边框跳一下（理由见 WeatherDialog.vue）。 */
 .help-dialog-enter-from .HelpCard {
-  transform: translateY(1rem) scale(0.98);
+  transform: translateY(1rem);
   opacity: 0;
 }
 
 .help-dialog-leave-to .HelpCard {
-  transform: translateY(0.5rem) scale(0.99);
+  transform: translateY(0.5rem);
   opacity: 0;
 }
 
@@ -277,13 +278,16 @@ const PRICE_ROWS = [
   padding: 0.5rem 1.375rem;
   font-size: 0.86rem;
   font-weight: 600;
-  color: var(--text-on-accent);
-  background: var(--color-primary);
-  border: none;
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border: 1px solid var(--control-accent-border);
   border-radius: 999px;
+  transition: background 0.2s ease, border-color 0.2s ease;
 
   &:hover {
-    filter: brightness(1.07);
+    color: var(--control-accent-text);
+    background: var(--control-accent-hover-bg);
+    border-color: var(--control-accent-hover-border);
   }
 }
 
@@ -311,8 +315,9 @@ const PRICE_ROWS = [
   height: 1.5rem;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--text-on-accent);
-  background: var(--color-primary);
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border: 1px solid var(--control-accent-border);
   border-radius: 50%;
 }
 
@@ -385,13 +390,16 @@ const PRICE_ROWS = [
   padding: 0.3125rem 0.6875rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-on-accent);
-  background: var(--color-primary);
-  border: none;
+  color: var(--control-accent-text);
+  background: var(--control-accent-bg);
+  border: 1px solid var(--control-accent-border);
   border-radius: 999px;
+  transition: background 0.2s ease, border-color 0.2s ease;
 
   &:hover {
-    filter: brightness(1.08);
+    color: var(--control-accent-text);
+    background: var(--control-accent-hover-bg);
+    border-color: var(--control-accent-hover-border);
   }
 }
 

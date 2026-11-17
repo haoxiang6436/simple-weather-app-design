@@ -10,6 +10,14 @@
    ⚠️ 文字轮播用 mode="out-in"；叠放的面板与错峰列表按各自的生命周期运行。
    ⚠️ 嵌套切换（如引导页第 1 步 ↔ 第 2 步）时，内层元素的根节点必须是普通元素，
       不能直接是 <Transition> —— 否则外层 out-in 会取不到元素、卡在"正在离场"（只剩一张空壳卡）。
+   ⚠️ 被 <transition> 包围的组件必须是「单根元素」，不能是 Fragment。
+      模板顶层的 HTML 注释在开发构建里会被原样保留成真实的注释节点，根节点就变成
+      「注释 + 元素」两截 —— 这时进场照样能动（过渡 hooks 挂在组件 vnode 上），
+      离场却会被 Vue 直接 removeFragment（不跑任何 leave 钩子），弹层瞬间消失、一点渐出都没有。
+      生产构建会剥掉注释，所以这个坑只在 npm run dev 里发作，最难查。
+      顶层说明请写进根元素里面或 <script> 里（例：AirQualityDialog.vue 的组件注释）。
+      仓库里所有 .vue 都已经过一遍（引导页 / 设置页 / 地址页 / 空气质量 / 预报条 / 指标角标…），
+      并由 npm run lint（scripts/check-vue-roots.mjs）兜住：模板顶层再出现注释会直接报错。
 
    谁用哪个名字：
      panel-in   —— 天气卡外壳首次出现（.weather-shell）
@@ -17,6 +25,7 @@
      index-swap —— 生活指数聚焦卡换条目
      chip-fade  —— 天气预警 chip 轮播（刻意保留原作者的反方向「从下往上」，要统一就改这一处）
      Dialog     —— 全屏弹层（预警详情）的淡入淡出；面板自身的缩放动效在组件里
+   指标角标的悬停提示（tip-fade）已经搬去 StatDelta.vue：它改成 anime.js 的 InOutBack 了。
 */
 
 /* 「换内容」的通用手感：旧的向下沉出，新的从上方落下。
@@ -66,9 +75,11 @@
   transition: opacity 0.46s var(--ease-enter), transform 0.52s var(--ease-enter);
 }
 
+/* 只做位移、不做缩放：缩放会让合成器把整张卡当纹理缩放，收尾拆层重栅格时
+   卡里的文字和 1px 边框会跳一下（见 stagger.js 顶部的说明）。 */
 .panel-in-enter-from {
   opacity: 0;
-  transform: translate3d(0, 2rem, 0) scale(0.97);
+  transform: translate3d(0, 2rem, 0);
 }
 
 .panel-in-leave-active {
@@ -77,18 +88,23 @@
 
 .panel-in-leave-to {
   opacity: 0;
-  transform: translate3d(0, -1.5rem, 0) scale(0.985);
+  transform: translate3d(0, -1.5rem, 0);
 }
 
 /* 错峰渐入统一由 StaggerTransition / StaggerGroup 交给 Vue 托管。
    参数只在 shared/motion/stagger.js 定义；这里不依赖父级 active 类或 nth-child。
    使用独立 translate / scale，保留地图控件自身用于定位的 transform。
+   注意：错峰预设不再给 scale 赋值（默认 1）；这条规则还留着 scale，是给 bar 的
+   柱子从基线长高用的 —— 那是有意为之的功能性缩放，没有文字。
    active 期间优先使用生命周期过渡，防止按钮等组件的 hover transition 覆盖进场声明。 */
 .stagger-enter-active {
   transition:
     opacity var(--stagger-duration) var(--stagger-easing) var(--stagger-delay),
     translate var(--stagger-duration) var(--stagger-easing) var(--stagger-delay),
-    scale var(--stagger-duration) var(--stagger-easing) var(--stagger-delay) !important;
+    scale var(--stagger-duration) var(--stagger-easing) var(--stagger-delay),
+    /* clip-path 也走同一组参数：七日预报的曲线靠它做「从左画到右」，
+       其余预设不声明 clip-path 时这一项是空转，不影响它们 */
+    clip-path var(--stagger-duration) var(--stagger-easing) var(--stagger-delay) !important;
 }
 
 .stagger-enter-from,
@@ -123,10 +139,22 @@
   transform: translateY(-0.75rem);
 }
 
-/* 全屏弹层：整层只做淡入淡出（面板自身的位移/缩放见 EarlyWarningDetails.vue） */
-.Dialog-enter-active,
-.Dialog-leave-active {
+/* ================= 指标角标的悬停提示 =================
+   不在这里：悬停提示改成 anime.js 的 InOutBack 逐帧驱动了（原来那套是这里的 .stat:hover 纯 CSS）。
+   显隐的两个端点（--tip-hide / --tip-rise / --tip-defocus）在 StatDelta.vue 的 scoped 样式里，
+   节奏和触发在同一个文件的 TIP_MOTION。留这条索引是因为下面这一整段都在讲「谁用哪个名字」，
+   别让后来的人以为它还挂在全局。 */
+
+/* 全屏弹层：整层（遮罩）只做淡入淡出，面板自身的位移 / 缩放 / 模糊在 WeatherDialog.vue。
+   离场用 --ease-leave：起步慢、越走越快，弹层「收」得干净；时长和面板的离场对齐（0.34s），
+   否则遮罩先透明完、面板还差一截 —— Vue 是按根元素的过渡结束时间摘整棵子树的，
+   根元素一结束，面板那段位移就会被砍掉。 */
+.Dialog-enter-active {
   transition: opacity 0.3s ease;
+}
+
+.Dialog-leave-active {
+  transition: opacity 0.34s var(--ease-leave);
 }
 
 .Dialog-enter-from,

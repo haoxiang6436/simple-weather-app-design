@@ -1,7 +1,4 @@
 <template>
-  <!-- display: contents（见样式）：根节点不生成盒子，三列直接成为外层容器的 grid 项。
-       卡片里的三列页和全屏地图上的「重选地区」卡片共用这一份结构，
-       列的宽高、间距都由各自的容器决定（.lp-columns / .rpd-body） -->
   <StaggerGroup class="RegionCascade" preset="panel" :start-index="2">
     <PickerColumn key="province" title="省 / 直辖市" :items="provinceItems" :active="provinceId"
       @select="handleProvince" />
@@ -13,6 +10,10 @@
 </template>
 
 <script setup>
+/* display: contents（见样式）：根节点不生成盒子，三列直接成为外层容器的 grid 项。
+   卡片里的三列页和全屏地图上的「重选地区」卡片共用这一份结构，
+   列的宽高、间距都由各自的容器决定（.lp-columns / .rpd-body）。
+   （说明放在 script 里而不是 <template> 顶层，避免根节点变成 Fragment —— 见 transitions.scss 的 ⚠️） */
 import { computed } from 'vue'
 import StaggerGroup from '@/shared/motion/StaggerGroup'
 import CityList from '@/data/CityList'

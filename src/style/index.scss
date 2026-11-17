@@ -6,6 +6,8 @@
 @import './transitions.scss';
 /* 预警 / 分钟级降水共用的状态胶囊（浅底深字、无边框） */
 @import './chips.scss';
+/* 空气质量六档色相：胶囊和弹层共用的唯一一份色值 */
+@import './air-quality.scss';
 
 :root {
   color-scheme: dark;
@@ -19,7 +21,7 @@
   --font-body: 1rem;
 
   /* ---- 夜雨玻璃：一组雾蓝材质，靠深浅而非多种颜色区分层级 ---- */
-  --color-bg: #0b213a;
+  --color-bg: #12304d;
   --color-primary: #65c7f2;
   --color-primary-strong: #48b6e5;
   --color-primary-soft: #b9e9fb;
@@ -41,6 +43,12 @@
   --weather-dialog-bg: #0d233b7a;
   --surface-inset: rgba(5, 22, 38, 0.34);
   --text-on-accent: #082238;
+  /* 主操作、选中项与步骤编号：低饱和浅雾蓝底，蓝灰字与细边，不加发光。 */
+  --control-accent-text: #3b596c;
+  --control-accent-bg: #c0d6e1;
+  --control-accent-border: #6c899a;
+  --control-accent-hover-bg: #cedfe7;
+  --control-accent-hover-border: #58788d;
   /* 26px @设计基准；4K 以上不再等比放大（上限 40px），避免磨砂区域的 GPU 开销大幅上升 */
   --glass-blur: min(1.625rem, 40px);
 
@@ -84,6 +92,27 @@
   --chip-icon-size: 1.15em;
   --chip-glass-blur: 0.75rem;
 
+  /* ---- 指标差值角标（六张指标卡数值行右端那一小截） ----
+     冷暖色只给平均温度、湿度：升是暖、降是冷，说的是体感。
+     降雨 / 风力 / 紫外线 / 云量没有冷暖可言，直接跟着 --text-muted 走；
+     全都刻意不用红绿 —— 天气的升降不是涨跌，绿箭头会让人以为「雨变多」是好事。
+     提示浮层沿用卡片那一套毛玻璃，只有一条规矩：**它就是卡片玻璃再厚一档**。
+     浮层永远压在卡片上，它和卡面之间的「厚度差」比什么都显眼：
+     卡片是 0.48，浮层却用 0.72，等于在同一块玻璃上开了一个洞 ——
+     亮壁纸下实测浮层比卡面暗将近 4 倍，看着当然像贴上去的。
+     所以这里取 0.55（0.48 再厚一档），靠更重的模糊 + 细边 + 软影把两层分开，
+     而不是靠颜色深浅硬拉开。影是浮层必需品（不加它，浮层和卡面贴成一张），
+     渐变和内高光仍然不加。
+     文字单独给两个更亮的 --tip-* 值：浮层比原来透，正文就得比 --text-primary 更实。 */
+  --delta-up: #e9b77c;
+  --delta-down: #a9dcf2;
+  --tip-bg: rgba(13, 34, 56, 0.55);
+  --tip-border: rgba(237, 247, 252, 0.2);
+  --tip-shadow: 0 0.5rem 1.4rem -0.5rem rgba(0, 0, 0, 0.45);
+  --tip-blur: blur(1.75rem) saturate(150%);
+  --tip-text: #eef7fc;
+  --tip-text-weak: rgba(238, 247, 252, 0.72);
+
   /* ---- 动效 ---- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* 进场：起步就有速度、收尾稳稳停住（expo-out），比通用 ease-out 更"跟手" */
@@ -94,7 +123,7 @@
   /* ---- 天气面板整体缩放 ----
      由壁纸属性面板的 panelscale 通过 JS 覆盖（见 src/features/wallpaper/properties.js），
      1 = 设计原尺寸，这里的默认值需与 constants.js 的 DEFAULT_PANEL_SCALE 一致 */
-  --panel-scale: 0.75;
+  --panel-scale: 0.9;
 }
 
 /* 晨雾玻璃不是普通的白色后台：仍让壁纸透进来，只把同一套雾蓝材质翻到明面。
@@ -122,6 +151,8 @@
   --weather-dialog-bg: rgba(244, 250, 254, 0.76);
   --surface-inset: rgba(255, 255, 255, 0.3);
   --text-on-accent: #f8fbfe;
+  --control-accent-bg: #cbdfe8;
+  --control-accent-hover-bg: #d9e8ee;
 
   --text-primary: #17324b;
   --text-secondary: rgba(23, 50, 75, 0.76);
@@ -139,6 +170,21 @@
   --hero-gradient: linear-gradient(155deg, rgba(137, 193, 222, 0.34), rgba(222, 240, 250, 0.1) 55%, transparent);
   --hero-glow: radial-gradient(120% 90% at 18% -10%, rgba(103, 176, 211, 0.26), transparent 60%);
   --skeleton-gradient: linear-gradient(90deg, rgba(23, 50, 75, 0.05), rgba(23, 50, 75, 0.13), rgba(23, 50, 75, 0.05));
+
+  /* 明面上夜雨的浅粉已经看不见了：冷暖色改用本主题自己的暖赭 / 主蓝，
+     两个色的对比度在白色卡片上都还站得住。 */
+  --delta-up: #a96b1d;
+  --delta-down: #167da9;
+  /* 晨雾的卡片本来就接近白色（0.76），浮层只再白一档，别再往上堆。
+     模糊照样要开：这里曾经是 none —— 当时的理由是「外壳自己带 backdrop-filter，
+     再叠一层会把浮层洗白」。实测那是 saturate 放大的错觉，单给 blur 完全正常，
+     而关掉模糊的代价很大：浅色卡上的字会原样透上来（白玻璃 + 白卡，几乎没有遮挡）。 */
+  --tip-bg: rgba(248, 252, 255, 0.8);
+  --tip-border: rgba(23, 63, 88, 0.16);
+  --tip-shadow: 0 0.5rem 1.4rem -0.5rem rgba(23, 55, 77, 0.24);
+  --tip-blur: blur(1.5rem);
+  --tip-text: #17324b;
+  --tip-text-weak: rgba(23, 50, 75, 0.72);
 }
 
 /* ================= 全局缩放基准（多分辨率 / 系统缩放适配） =================
@@ -226,15 +272,22 @@ html {
   --chip-icon: #287ca8;
 }
 
+/* 黄色不能只靠一层 13% 的暖色底：晨雾的卡片是冷色（实测 #BFCBCE、b*≈-3），
+   低透明度的暖色叠上去会互相抵消 —— 合成出来是 5% 饱和度的灰（ΔE 只有 7.4），
+   看上去就是"没有颜色"；同时正文 4.29:1、时间 3.11:1，都不到 4.5。
+   所以这里的底色改成近乎实心的浅琥珀：黄度回到 b*≈15、ΔE≈21，正文 8.7:1、时间 5.9:1，
+   而且不再随壁纸明暗漂移（13% 时换个亮壁纸，正文对比度就会在 4.3–6.4 之间跳）。
+   想保留"透玻璃"的观感，就把 alpha 降回 .26 并把底色换成 #d69a1a：那是卡其色，
+   对比度刚好卡在 5.7，可以接受，但已经不"黄"了 —— 这条路的取舍写在这里，别两边都想要。 */
 :root[data-theme='mist'] .sev-yellow {
   --sev: #9b691c;
   --sev-bg: rgba(155, 105, 28, 0.12);
   --sev-border: rgba(155, 105, 28, 0.36);
-  --sev-text: #70470d;
-  --chip-bg: rgba(155, 105, 28, 0.13);
-  --chip-border: 1px solid rgba(155, 105, 28, 0.28);
-  --chip-text: #70470d;
-  --chip-icon: #9b691c;
+  --sev-text: #503005;
+  --chip-bg: rgba(243, 228, 197, 0.92);
+  --chip-border: 1px solid rgba(170, 116, 10, 0.45);
+  --chip-text: #54350a;
+  --chip-icon: #8a5a00;
 }
 
 :root[data-theme='mist'] .sev-orange {
@@ -258,6 +311,9 @@ html {
   --chip-text: #7f3034;
   --chip-icon: #af4e50;
 }
+
+/* 空气质量六档色相（.aqi-1 ~ .aqi-6 / .aqi-tone-1 ~ 6）挪到 air-quality.scss：
+   弹层要用同一组色值画刻度和污染条，色值写在两个文件里迟早会对不上。 */
 
 * {
   -webkit-box-sizing: border-box;
@@ -337,7 +393,6 @@ ul {
   --atlas-hero: linear-gradient(180deg, rgba(8, 21, 29, 0.98), rgba(8, 21, 29, 0.88));
   --atlas-shadow: 0 2rem 5rem -2rem rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(217, 148, 93, 0.08);
   --atlas-stat-bg: rgba(8, 21, 29, 0.28);
-  --atlas-forecast-bg: rgba(8, 21, 29, 0.18);
   color-scheme: dark;
   --color-bg: #08151d;
   --color-primary: #9ec5cf;
@@ -359,6 +414,11 @@ ul {
   --weather-dialog-bg: rgba(8, 21, 29, 0.48);
   --surface-inset: rgba(3, 13, 25, 0.34);
   --text-on-accent: #08151d;
+  --control-accent-text: #36515e;
+  --control-accent-bg: #b9cdd0;
+  --control-accent-border: #67858c;
+  --control-accent-hover-bg: #c9dadd;
+  --control-accent-hover-border: #55747e;
   --text-primary: #edf2ec;
   --text-secondary: rgba(237, 242, 236, 0.76);
   --text-muted: rgba(184, 203, 208, 0.7);
@@ -371,6 +431,17 @@ ul {
   --hero-gradient: linear-gradient(155deg, rgba(217, 148, 93, 0.18), rgba(158, 197, 207, 0.04) 55%, transparent);
   --hero-glow: radial-gradient(90% 60% at 12% 0%, rgba(217, 148, 93, 0.2), transparent 65%);
   --skeleton-gradient: linear-gradient(90deg, rgba(237, 242, 236, 0.04), rgba(237, 242, 236, 0.13), rgba(237, 242, 236, 0.04));
+
+  /* 图谱的冷暖就是它自己的铜色 / 雾蓝：换一套新色反而和整张卡打架 */
+  --delta-up: #d9945d;
+  --delta-down: #9ec5cf;
+  /* 图谱的卡片本身就厚（0.72），浮层同样只再厚一档 */
+  --tip-bg: rgba(8, 21, 29, 0.76);
+  --tip-border: rgba(237, 242, 236, 0.2);
+  --tip-shadow: 0 0.5rem 1.4rem -0.5rem rgba(0, 0, 0, 0.5);
+  --tip-blur: blur(1.75rem) saturate(120%);
+  --tip-text: #edf2ec;
+  --tip-text-weak: rgba(184, 203, 208, 0.8);
 }
 
 /* Atlas overrides stay in global SCSS. Keeping them out of a scoped SFC avoids
@@ -431,6 +502,13 @@ ul {
   color: var(--atlas-paper);
 }
 
+/* 图谱的数字换成 6.65rem 的衬线字后，行盒里的墨迹几乎顶满、基线整条往下沉：
+   行底到数字下沿的距离从 0.7rem 变成 1.03rem，胶囊得跟着往下挪才继续落在同一条地平线上。
+   （数值是量出来的：行盒 95.76px、基线在行顶往下 79.8px、数字到基线再探 1px。） */
+:root[data-theme='atlas'] .weather-layer .weather-card .hero-aqi {
+  margin-bottom: 1.03rem;
+}
+
 :root[data-theme='atlas'] .weather-layer .weather-card .now-temp-unit {
   color: var(--atlas-copper);
 }
@@ -457,22 +535,32 @@ ul {
   border-color: rgba(217, 148, 93, 0.55);
 }
 
-:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li {
-  padding: 1rem 0.5rem 0.9rem;
-  background: var(--atlas-forecast-bg);
-  border-color: var(--atlas-line);
+/* 预报列现在是「文字基线 + 温度带」结构，不再是独立的卡片：
+   atlas 主题只接管选中态的底色 / 文字色和描边，不追加内边距/边框，否则会把固定行高顶开。 */
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item {
   border-radius: 0.75rem;
 }
 
-:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li:hover {
-  background: rgba(237, 242, 236, 0.08);
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item:hover {
+  background: rgba(237, 242, 236, 0.06);
 }
 
-:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li.active {
+/* 选中态的底色现在画在滑动块上（.forecast-thumb），不再挂在列按钮上：
+   列按钮的 background 已经被收掉，底色必须跟着块一起走，否则高亮不移动。 */
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-thumb {
   background: var(--atlas-copper-soft);
-  border-color: var(--atlas-copper);
 }
 
-:root[data-theme='atlas'] .weather-layer .weather-card .forecast-list li i {
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item.active .forecast-day,
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item.active .forecast-icon,
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item.active .forecast-high,
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-item.active .forecast-low {
   color: var(--atlas-copper);
+}
+
+/* 选中列的描边在组件里是 --color-primary 调出来的蓝色，atlas 换成铜色：
+   这一列现在靠「底色 + 1px 描边」标记，描边不跟着换主题就会露馅。
+   描边是滑动块的上层（.forecast-frame），和底色同一套位移，所以只改颜色。 */
+:root[data-theme='atlas'] .weather-layer .weather-card .forecast-frame {
+  border-color: rgba(217, 148, 93, 0.5);
 }

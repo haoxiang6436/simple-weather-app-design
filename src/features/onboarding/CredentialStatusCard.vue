@@ -1,6 +1,4 @@
 <template>
-  <!-- 凭据检测结果卡：引导页与设置页共用同一份渲染，避免两处各写一套状态提示。
-       数据全部来自 onboardingState（检测状态机），组件本身不持有状态。 -->
   <div class="cred-status" :class="'tone-' + status.tone">
     <div class="cred-status-main">
       <span class="cred-status-icon">
@@ -25,6 +23,9 @@
 </template>
 
 <script setup>
+/* 凭据检测结果卡：引导页与设置页共用同一份渲染，避免两处各写一套状态提示。
+   数据全部来自 onboardingState（检测状态机），组件本身不持有状态。
+   （说明放在 script 里而不是 <template> 顶层，避免根节点变成 Fragment —— 见 transitions.scss 的 ⚠️） */
 import { computed } from 'vue'
 import { CheckResults, CredentialStatus } from './onboardingState'
 

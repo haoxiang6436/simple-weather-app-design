@@ -7,14 +7,21 @@
         </div>
       </template>
 
-      <div class="MinutelyBody" :class="{ 'is-state': !analysis }" :style="{ '--minutely-axis-gutter': `${axisGutter}rem` }">
+      <div ref="bodyEl" class="MinutelyBody" :class="{ 'is-state': !analysis }" :style="{ '--minutely-axis-gutter': `${axisGutter}rem` }">
         <!-- 有数据：标题 + 未来两小时柱状图 + 汇总 -->
         <template v-if="analysis">
           <p class="MinutelyHeadline">{{ headline }}</p>
           <p v-if="subline" class="MinutelySubline">{{ subline }}</p>
 
           <!-- 悬停看明细：上方留出一条给浮层的位置，避免柱子长高时把浮层顶出弹层 -->
-          <div class="MinutelyChartWrap" :class="{ 'is-empty': !hasRain }" @mouseleave="clearHover">
+          <div
+            ref="wrapEl"
+            class="MinutelyChartWrap"
+            :class="{ 'is-empty': !hasRain }"
+            @pointerenter="onPointerEnter"
+            @pointermove="onPointerMove"
+            @mouseleave="clearHover"
+          >
             <div ref="chartRef" class="MinutelyChart" :class="{ 'is-empty': !hasRain }" aria-hidden="true">
               <div class="MinutelyGrid">
                 <template v-for="tick in rainTicks" :key="tick.key">
@@ -26,14 +33,15 @@
                   <span class="MinutelyGridLabel" :style="{ bottom: `${tick.position}%` }">{{ tick.label }}</span>
                 </template>
               </div>
-              <span v-if="band" class="MinutelyHoverBand" :style="{ left: `${band.left}px`, width: `${band.width}px` }"></span>
+              <!-- 高亮竖条与浮层读同一个 --follow-x（JS 逐帧写），两者永远同步 -->
+              <span v-if="activeIndex !== null" class="MinutelyHoverBand"></span>
               <div class="MinutelyBars" :class="{ 'has-hover': activeIndex !== null }">
                 <div
                   v-for="(bar, index) in bars"
                   :key="index"
                   class="MinutelyBarSlot"
                   :class="[`tone-${bar.tone}`, { 'is-active': activeIndex === index }]"
-                  @mouseenter="focusBar(index, $event)"
+                  @mouseenter="onSlotEnter(index)"
                 >
                   <StaggerTransition preset="bar" :index="index">
                     <span class="MinutelyBar" :style="{ height: `${(bar.height * 100).toFixed(2)}%` }"></span>
@@ -46,7 +54,7 @@
               v-if="activeBar"
               class="MinutelyTooltip"
               :class="`tone-${activeBar.tone}`"
-              :style="{ '--tip-center': `${tipCenter}px`, '--tip-plot-width': `${tipPlotWidth}px` }"
+              :style="{ '--tip-plot-width': `${tipPlotWidth}px` }"
               aria-hidden="true"
             >
               <span class="MinutelyTipHead">
@@ -119,8 +127,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { animate, cubicBezier, stagger } from 'animejs'
 import { useWeatherStore } from '@/store/index'
 import { useWeatherNow } from './useWeatherNow'
 import WeatherDialog from './WeatherDialog.vue'
@@ -266,11 +275,31 @@ const bars = computed(() => chartPoints.value.map((point) => {
 }))
 
 /* —— 悬停明细 ——
-   位置全部按「被悬停那一格的实测矩形」来算，而不是「第几根 × 平均宽度」：
-   柱间有 gap，用平均宽度算会越往右偏得越多。浮层再夹一次，保证第一根、最后一根都不溢出。 */
+   位置按「每一格的实测矩形」来算，而不是「第几根 × 平均宽度」：柱间有 gap，
+   用平均宽度算会越往右偏得越多。浮层再由 CSS 夹一次，第一根、最后一根都不溢出。
+
+   ⚠️ 这一段改过一版，记录一下为什么不再是「每根柱子 mouseenter → 瞬移」：
+     · 以前浮层位置直接跟着 --tip-center 改值，CSS 上只有一条透明度动画（minutely-tip-in）。
+       鼠标从一格划到另一格时，浮层是**跳**过去的 —— 眼睛跟不上，也就读不清上面那行
+       「22:35 – 22:40 / 0.00 mm/h」到底还是不是刚才那个格子的。
+     · 命中判断挂在每根柱子上，柱子之间有 0.25rem 的 gap：划过 gap 时 hoverIndex 归空，
+       浮层整个卸载、再重新挂载并重播一次淡入 —— 快速横划时就是一路闪。
+     · 高亮竖条有 0.14s 的 left/width transition，浮层没有，两者还会各走各的。
+
+   现在：
+     · 命中判断改挂在整个图表区的 pointermove 上，取「离哪个格子中心最近」，
+       划过 gap 也不会有空档；再兜底保留每格的 mouseenter（触屏 tap 会补发它）。
+     · 位置由一个指数平滑跟随逐帧写进 --follow-x（px，相对图表内容盒左缘）。
+       高亮竖条和浮层读同一个变量，所以永远同步、也不会算出两种速度。
+       用指数衰减而不是弹簧：弹簧会冲过头，读数会短暂压在旁边那根柱子上，
+       而浮层是「跟着我指的这一格」，不该越过它。时间常数 48ms ≈ 跨一格
+       （约 34px）140ms 落定 —— 看得见是从旁边滑过来的，又不至于落后到手感变迟钝。
+     · 变量只由 JS 写，模板里不要再绑 :style —— Vue 每次重渲染都会按目标值重写一遍，
+       正在推的那一帧就被抹掉（和 ForecastStrip.vue 里 --fc-active 的约定一致）。
+     · 系统开了「减少动态效果」照旧直接落位。 */
+
+const wrapEl = ref(null)
 const hoverIndex = ref(null)
-const band = ref(null)
-const tipCenter = ref(0)
 const tipPlotWidth = ref(0)
 
 const activeIndex = computed(() => (
@@ -278,29 +307,164 @@ const activeIndex = computed(() => (
 ))
 const activeBar = computed(() => (activeIndex.value === null ? null : bars.value[activeIndex.value]))
 
-function focusBar(index, event) {
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+const setWrapVar = (name, value) => wrapEl.value?.style.setProperty(name, value)
+
+/* 几何缓存：进入图表区 / 尺寸变化时量一遍，pointermove 里只做算术 ——
+   每次移动都读 24 次 getBoundingClientRect 会强制同步布局，横划时直接掉帧。 */
+let geo = null
+
+function measureGeo() {
   const chart = chartRef.value
-  const slot = event?.currentTarget
-  if (!chart || !slot) return
+  geo = null
+  if (!chart) return geo
+  const slots = chart.querySelectorAll('.MinutelyBarSlot')
   const chartRect = chart.getBoundingClientRect()
-  const slotRect = slot.getBoundingClientRect()
-  const left = slotRect.left - chartRect.left
-  band.value = { left, width: slotRect.width }
+  if (!slots.length || !chartRect.width) return geo
+  const centers = []
+  let width = 0
+  slots.forEach((slot, index) => {
+    const rect = slot.getBoundingClientRect()
+    if (index === 0) width = rect.width
+    centers.push(rect.left - chartRect.left + rect.width / 2)
+  })
+  geo = { centers, width, plotWidth: chartRect.width, left: chartRect.left }
+  // 浮层的 max-width 与边缘夹紧都读它；宽度没变就不写，免得白白触发重渲染
+  if (tipPlotWidth.value !== geo.plotWidth) tipPlotWidth.value = geo.plotWidth
+  setWrapVar('--minutely-band-width', `${width}px`)
+  return geo
+}
+
+const ensureGeo = () => geo || measureGeo()
+
+/* —— 平滑跟随 —— */
+const FOLLOW_TAU = 48 // ms；越小越跟手，越大越「飘」
+const FOLLOW_EPSILON = 0.2 // px；收尾直接吸附，别为一个零点几像素再跑几帧
+let followNow = 0
+let followTarget = 0
+let followFrame = 0
+let followStamp = 0
+
+function renderFollow() {
+  setWrapVar('--follow-x', `${followNow.toFixed(2)}px`)
+}
+
+function followStep(stamp) {
+  // 掉帧（切回标签页、主线程被占）时按最多 4 帧算，免得一帧就冲到位、看着像瞬移
+  const dt = Math.min(Math.max(stamp - followStamp, 0), 64)
+  followStamp = stamp
+  followNow += (followTarget - followNow) * (1 - Math.exp(-dt / FOLLOW_TAU))
+  const settled = Math.abs(followTarget - followNow) <= FOLLOW_EPSILON
+  if (settled) followNow = followTarget
+  renderFollow()
+  followFrame = settled ? 0 : requestAnimationFrame(followStep)
+}
+
+function moveFollowTo(center, { snap = false } = {}) {
+  followTarget = center
+  // 首次出现 / 尺寸变化 / 减少动态效果：直接落位，不从别处滑过来
+  if (snap || prefersReducedMotion()) {
+    if (followFrame) cancelAnimationFrame(followFrame)
+    followFrame = 0
+    followNow = center
+    renderFollow()
+    return
+  }
+  if (followFrame) return // 已经在推了，只更新目标，别从当前位置重新起跳
+  followStamp = performance.now()
+  followFrame = requestAnimationFrame(followStep)
+}
+
+function stopFollow() {
+  if (followFrame) cancelAnimationFrame(followFrame)
+  followFrame = 0
+}
+
+function activate(index, { snap = false } = {}) {
+  const geometry = ensureGeo()
+  if (!geometry || index < 0 || index >= geometry.centers.length) return
+  if (hoverIndex.value === index) return
+  // 上一帧还没有激活项 = 浮层要新挂载，此时不该看到它从上一格滑过来
+  const appeared = hoverIndex.value === null
   hoverIndex.value = index
-  // CSS 直接用浮层自身宽度夹紧位置，首帧和内容变化时均不越界。
-  tipCenter.value = left + slotRect.width / 2
-  tipPlotWidth.value = chartRect.width
+  moveFollowTo(geometry.centers[index], { snap: snap || appeared })
+}
+
+function nearestIndex(clientX) {
+  const geometry = ensureGeo()
+  if (!geometry) return -1
+  const x = clientX - geometry.left
+  let best = 0
+  let bestGap = Math.abs(geometry.centers[0] - x)
+  for (let index = 1; index < geometry.centers.length; index += 1) {
+    const gap = Math.abs(geometry.centers[index] - x)
+    if (gap < bestGap) {
+      best = index
+      bestGap = gap
+    }
+  }
+  return best
+}
+
+function onPointerEnter() {
+  measureGeo()
+}
+
+function onPointerMove(event) {
+  // 手指按着划是滚动弹层正文，不是选格子；触屏靠下面那个 mouseenter 兜底
+  if (event.pointerType === 'touch') return
+  activate(nearestIndex(event.clientX))
+}
+
+function onSlotEnter(index) {
+  activate(index)
 }
 
 function clearHover() {
   hoverIndex.value = null
-  band.value = null
+  geo = null
+  stopFollow()
 }
 
 // 窗口尺寸变了，之前量到的像素位置就不作数了
 const onResize = () => clearHover()
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
+
+/* 图表自己变尺寸（换场景、刻度文字变了导致左侧留白变宽 / 窗口缩放）时，
+   缓存的像素位置要重测。正在悬停的话保持当前格子、直接落位，别让浮层漂在旧位置上。
+   ⚠️ ResizeObserver 只看布局盒，看不了 transform：进场时正文各块带 scale，
+   那期间量到的矩形会整体缩 1.5%（浮层贴近首尾时会偏 2~3px），
+   所以进场动画收尾时（playEntrance 的 onComplete）也调一次这里重新对准。 */
+let chartObserver = null
+
+function refreshHoverGeometry() {
+  const active = hoverIndex.value
+  if (active === null) {
+    geo = null
+    return
+  }
+  const geometry = measureGeo()
+  if (geometry && active < geometry.centers.length) moveFollowTo(geometry.centers[active], { snap: true })
+}
+
+watch(chartRef, (chart) => {
+  chartObserver?.disconnect()
+  chartObserver = null
+  if (!chart) {
+    geo = null
+    return
+  }
+  chartObserver = new ResizeObserver(() => refreshHoverGeometry())
+  chartObserver.observe(chart)
+}, { flush: 'post' })
+
+onUnmounted(() => {
+  chartObserver?.disconnect()
+  chartObserver = null
+  stopFollow()
+})
 
 const ticks = computed(() => {
   const points = chartPoints.value
@@ -333,6 +497,70 @@ const durationLabel = computed(() => {
 })
 
 const skeleton = [18, 26, 34, 30, 44, 62, 78, 70, 52, 40, 30, 24, 20, 16, 13, 11, 9, 8, 7, 6, 5, 4, 4, 3]
+
+/* ================= 正文各块的错峰进场 =================
+   打开弹层时按阅读顺序逐块落位：标题 → 副标题 → 柱状图 → 时间轴 → 三格汇总 → 来源。
+   延迟交给 anime.js 的 stagger()，写法和空气质量弹层一致（AirQualityDialog.vue 的 playEntrance()），
+   对照样机在 dev/stagger-lab.html。
+
+   为什么不用 CSS transition（StaggerTransition + stagger.js 的预设）：
+   走 transition 的 opacity 会让文字在过渡结束那一帧重新栅格化，看着像「错峰结束时抖一下」。
+   这一屏正文同样直接贴在共享的玻璃面板上、底下没有自己的不透明底色，抖动比有底有边的卡片明显。
+   逐帧写内联样式就不走那条路；写完落到 opacity 1 / scale 1（本来就是自然状态），
+   所以 onComplete 里把内联样式摘掉，进场结束后 DOM 和「从没做过动画」完全一致。
+
+   位移不做（travel 0px）：正文是 flex 列 + overflow-y 的滚动容器，
+   往上 / 下挪会在进场期间把最后一块顶出可视区、闪出滚动条。
+   缩放 0.985 没有这个问题，少了它整段又会变成纯淡入、看着发平。
+
+   离场不错峰：弹层整层（遮罩 + 面板）自己会淡出，正文跟着走就够了。
+
+   ⚠️ start + 2 × spacing 是「图表块」开始落位的时间，柱状图那 24 根柱子的 CSS 预设
+      bar（stagger.js）就是按这个数对齐的 —— 改这里的时序要同步改那边。 */
+const bodyEl = ref(null)
+const MINUTELY_ENTER = { start: 170, spacing: 55, duration: 400, scale: 0.985 }
+const MINUTELY_ENTER_EASE = cubicBezier(0.16, 1, 0.3, 1)
+let entrance = null
+
+const settle = (nodes) => {
+  for (const node of nodes) {
+    node.style.removeProperty('opacity')
+    node.style.removeProperty('transform')
+  }
+}
+
+const playEntrance = () => {
+  const body = bodyEl.value
+  if (!body || !body.children.length) return
+  // 系统开了「减少动态效果」就直接到位（transitions.scss 里也是同样的约定）
+  if (prefersReducedMotion()) return
+  if (entrance) entrance.revert() // 重播前清掉上一轮的内联样式，别叠加
+  const nodes = [...body.children]
+  entrance = animate(nodes, {
+    opacity: [0, 1],
+    scale: [MINUTELY_ENTER.scale, 1],
+    duration: MINUTELY_ENTER.duration,
+    ease: MINUTELY_ENTER_EASE,
+    delay: stagger(MINUTELY_ENTER.spacing, { start: MINUTELY_ENTER.start }),
+    onComplete: () => {
+      settle(nodes)
+      // 进场期间正文带着 scale，量到的格子坐标是缩过的；落定后重新对一次准
+      refreshHoverGeometry()
+    },
+  })
+}
+
+/* 正文结构变了才重播：第一次打开时数据可能还在路上（先渲染「加载中」，之后换成图表），
+   或者取数失败切到报错 / 无数据分支 —— 这两种情况都值得重新落位一次。
+   数据每 5 分钟刷新时 analysis 仍然是同一个真值，不会重播，已经在看的图不会重新淡一遍。 */
+watch(() => Boolean(analysis.value), async () => {
+  await nextTick()
+  playEntrance()
+}, { immediate: true })
+
+onUnmounted(() => {
+  if (entrance) entrance.revert()
+})
 </script>
 
 <style lang="scss" scoped>
@@ -359,11 +587,18 @@ const skeleton = [18, 26, 34, 30, 44, 62, 78, 70, 52, 40, 30, 24, 20, 16, 13, 11
   white-space: nowrap;
 }
 
+/* 撑满外壳的正文区，靠 flex 而不是 height:100%。
+   外壳面板现在是 height:auto + min-height（见 WeatherDialog.vue：1.618 只是「最矮高度」），
+   这种盒子的百分比高度按规范解析成 auto —— 之前这里写 height:100%，
+   量出来正文只有 289px、面板 469px，底下白空 98px，图表（flex:1 1 0）也没有余量可涨，
+   整块内容被压到顶部，看着像布局坏了。
+   换成 flex:1 1 auto 之后正文拿到剩余高度，面板停在 1.618 时图表把留白吃进去；
+   内容真超过 80vh 时 min-height:0 让它照旧收缩、由 overflow 滚动。 */
 .MinutelyBody {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -438,16 +673,19 @@ const skeleton = [18, 26, 34, 30, 44, 62, 78, 70, 52, 40, 30, 24, 20, 16, 13, 11
   transform: translateY(50%);
 }
 
-/* 鼠标所在那一格的竖向高亮条：比单根柱子亮一点，视线能顺着它落到柱子上 */
+/* 鼠标所在那一格的竖向高亮条：比单根柱子亮一点，视线能顺着它落到柱子上。
+   位置读 --follow-x（JS 逐帧推的平滑位置），和浮层共用同一个值 ——
+   这里不要再给 left 挂 transition：逐帧写值和过渡动画抢同一个属性，会走出「走走停停」。 */
 .MinutelyHoverBand {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: calc(var(--follow-x, 0px) - var(--minutely-band-width, 0px) / 2);
+  width: var(--minutely-band-width, 0px);
   border: 1px solid var(--glass-border);
   border-radius: 0.4rem;
   background: linear-gradient(180deg, var(--glass-bg-soft), var(--glass-bg-subtle) 62%, transparent);
   pointer-events: none;
-  transition: left 0.14s var(--ease), width 0.14s var(--ease);
 }
 
 /* ================= 悬停浮层 ================= */
@@ -472,8 +710,10 @@ const skeleton = [18, 26, 34, 30, 44, 62, 78, 70, 52, 40, 30, 24, 20, 16, 13, 11
   white-space: nowrap;
   pointer-events: none;
   margin-left: var(--minutely-axis-gutter);
-  /* 50% / 100% 取浮层自身宽度，不需要先渲染越界再测量并移回。 */
-  transform: translateX(clamp(2px, calc(var(--tip-center) - 50%), calc(var(--tip-plot-width) - 100% - 2px)));
+  /* 50% / 100% 取浮层自身宽度，不需要先渲染越界再测量并移回。
+     --follow-x 是 JS 逐帧写的平滑位置（见 script 里的平滑跟随），
+     挂到 transform 上就只走合成层，横划时不会每帧重排浮层里的文字。 */
+  transform: translateX(clamp(2px, calc(var(--follow-x, 0px) - 50%), calc(var(--tip-plot-width) - 100% - 2px)));
   animation: minutely-tip-in 0.16s ease-out;
 
   /* 浮层里的点、等级文字跟着柱子的色调走 */

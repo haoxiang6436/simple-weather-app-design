@@ -4,13 +4,21 @@ import Bus from '@/shared/Bus'
 import { setAmapKeyFromProperties, setUserApiFromProperties } from '@/api/credentials'
 import { markWallpaperEngineEvent } from '@/shared/env'
 import {
+  setCustomBackground,
+} from './customBackground'
+import { normalizeWallpaperColor } from './backgrounds/backgroundColors'
+import {
   BACKGROUND_INDEX_OPTIONS,
   BUS_EVENTS,
   COLOR_THEME_OPTIONS,
+  DEFAULT_BACKGROUND_COLOR,
   DEFAULT_BACKGROUND_INDEX,
   DEFAULT_COLOR_THEME,
+  DEFAULT_FORECAST_DAYS,
   DEFAULT_PANEL_OFFSET,
   DEFAULT_PANEL_SCALE,
+  DEFAULT_RAIN_ENABLED,
+  FORECAST_DAYS_OPTIONS,
   PANEL_OFFSET_MAX,
   PANEL_OFFSET_MIN,
   PANEL_SCALE_MAX,
@@ -18,6 +26,7 @@ import {
   RAIN_CONFIG_OPTIONS,
   STORAGE_KEYS,
   WALLPAPER_PROPERTIES,
+  isSolidBackgroundIndex,
 } from './constants'
 
 /**
@@ -36,17 +45,48 @@ import {
  *      所以这里必须逐个属性判空，不能假设一次能拿到所有字段。
  */
 
-// 背景序号：0-无 / 4-实时雨滴 / 5-整页雨珠叠加（1-小鸟 / 2-星空 / 3-动态粒子 已移除）
-// flush: 'sync'：背景切换后 BackgroundMain 会立即触发 location.reload()，
-// 必须先同步持久化，避免重载后丢失新的背景序号
+// 背景来源：0-纯色（跟随面板配色） / solid-自定义纯色 / 4-【默认】湖心桥 / 6-雾夜长街 / custom-自定义背景
+// （1-小鸟 / 2-星空 / 3-动态粒子 / 5-整页雨珠叠加 已移除）
+// flush: 'sync'：背景切换会立即影响渲染，必须同步持久化新的背景序号
 export const BackgroundIndex = useStorage(STORAGE_KEYS.BACKGROUND_INDEX, DEFAULT_BACKGROUND_INDEX, localStorage, {
   flush: 'sync',
 })
 
-// 旧版本可能存着已移除的背景序号（1 小鸟 / 2 星空 / 3 动态粒子），
+// 旧版本可能存着已移除的背景序号（1 小鸟 / 2 星空 / 3 动态粒子 / 5 整页雨珠叠加），
 // 这些值不再合法，直接回退到默认背景，避免页面渲染成空白背景
 if (!BACKGROUND_INDEX_OPTIONS.includes(String(BackgroundIndex.value))) {
   BackgroundIndex.value = DEFAULT_BACKGROUND_INDEX
+}
+
+// 「纯色」（跟随配色 / 自定义纯色）的颜色（backgroundcolor，引擎下发 "r g b" 三个 0~1 的小数）。
+// 只有「自定义纯色」用到它；跟随配色的纯色直接用 CSS 的 --color-bg，见 SolidBackground.vue
+export const BackgroundColor = useStorage(
+  STORAGE_KEYS.WALLPAPER_BACKGROUND_COLOR,
+  DEFAULT_BACKGROUND_COLOR,
+  localStorage,
+  { flush: 'sync' }
+)
+
+// 是否在当前背景图上实时渲染雨滴（rainenabled）。
+// 纯色背景没有可折射的底图，因此不渲染雨滴，属性面板里也会隐藏这个开关。
+export const RainEnabled = useStorage(
+  STORAGE_KEYS.WALLPAPER_RAIN_ENABLED,
+  DEFAULT_RAIN_ENABLED,
+  localStorage,
+  { flush: 'sync' }
+)
+
+// 沉浸式雨滴：隐藏天气面板。只在「实时渲染雨滴」打开时生效。
+export const ShowWeatherMain = ref(false)
+
+/**
+ * 天气面板是否隐藏 = 用户勾了「沉浸式雨滴」且当前确实在渲染雨滴。
+ * 纯色背景、或关掉雨滴时，哪怕属性值还是 true，也先把面板放出来；
+ * 之后重新打开雨滴 / 切回图片背景时再恢复用户的隐藏选择。
+ */
+const emitWeatherMainVisibility = () => {
+  const rainVisible = RainEnabled.value && !isSolidBackgroundIndex(BackgroundIndex.value)
+  Bus.emit(BUS_EVENTS.SHOW_WEATHER_MAIN, ShowWeatherMain.value && rainVisible)
 }
 
 // 天气面板整体缩放（panelscale，1 = 设计原尺寸）
@@ -54,13 +94,16 @@ export const PanelScale = ref(DEFAULT_PANEL_SCALE)
 export const PanelOffsetX = ref(DEFAULT_PANEL_OFFSET)
 export const PanelOffsetY = ref(DEFAULT_PANEL_OFFSET)
 
+// 底部预报条显示几天（forecastdays，5~7）。数据一直是 7 天，这里只决定显示几条
+export const ForecastDays = ref(DEFAULT_FORECAST_DAYS)
+
 // 面板配色：默认夜雨玻璃；保留一份本地值，避免引擎重载时主题闪回默认色。
 export const ColorTheme = useStorage(STORAGE_KEYS.WALLPAPER_COLOR_THEME, DEFAULT_COLOR_THEME, localStorage, {
   flush: 'sync',
 })
 
 // 引擎上一次下发过的属性快照（不含域名/密钥 —— 那两项在 api/credentials.js 里单独缓存）。
-// 壁纸引擎只在页面加载时下发一次属性，页面重载（换背景会主动 location.reload、部署新版本后
+// 壁纸引擎只在页面加载时下发一次属性，页面重载（包括背景切换或部署新版本后
 // 引擎也会重载页面）或切换壁纸后偶尔不再补发；只靠内存就会出现「面板缩放、
 // 背景编号全被重置」。这里同步落一份盘，加载时先当兜底基线，再用引擎这次真正下发的值覆盖。
 export const WallpaperPropertySnapshot = useStorage(
@@ -71,12 +114,15 @@ export const WallpaperPropertySnapshot = useStorage(
 // 域名、和风密钥、高德 key 都不在这里：它们自己带一份 localStorage 缓存（见 api/credentials.js）
 const SNAPSHOT_PROPERTY_KEYS = [
   WALLPAPER_PROPERTIES.BACKGROUND_INDEX,
+  WALLPAPER_PROPERTIES.BACKGROUND_COLOR,
+  WALLPAPER_PROPERTIES.RAIN_ENABLED,
   WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN,
   WALLPAPER_PROPERTIES.RAIN_CONFIG,
   WALLPAPER_PROPERTIES.PANEL_SCALE,
   WALLPAPER_PROPERTIES.PANEL_OFFSET_X,
   WALLPAPER_PROPERTIES.PANEL_OFFSET_Y,
   WALLPAPER_PROPERTIES.COLOR_THEME,
+  WALLPAPER_PROPERTIES.FORECAST_DAYS,
 ]
 
 const rememberProperties = (properties) => {
@@ -170,7 +216,7 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
   // 便于在壁纸引擎里自查：壁纸引擎设置 → 常规 → CEF devtools port（建议 8080），
   // 浏览器打开 localhost:8080 选中壁纸页面，就能在控制台看到每次下发的属性
   console.log('[Wallpaper] applyUserProperties', properties)
-  // 背景序号
+  // 背景来源：纯色 / 内置图片（湖心桥、雾夜长街）/ 自定义背景
   const backgroundIndex = readPropertyValue(properties, WALLPAPER_PROPERTIES.BACKGROUND_INDEX)
   if (backgroundIndex !== undefined) {
     const nextIndex = String(backgroundIndex)
@@ -178,13 +224,33 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
       console.warn(`[Wallpaper] 未知的背景序号 ${nextIndex}，已忽略（可用值：${BACKGROUND_INDEX_OPTIONS.join('/')}）`)
     } else if (nextIndex !== BackgroundIndex.value) {
       BackgroundIndex.value = nextIndex
-      Bus.emit(BUS_EVENTS.BACKGROUND_INDEX_CHANGE, nextIndex)
+      // 纯色背景不渲染雨滴 / 沉浸式雨滴，面板可见性要跟着变
+      emitWeatherMainVisibility()
     }
   }
-  // 天气面板显示隐藏（true = 隐藏）
+  // 「纯色」背景的颜色（color 属性，值为 "r g b"）
+  const backgroundColor = readPropertyValue(properties, WALLPAPER_PROPERTIES.BACKGROUND_COLOR)
+  if (backgroundColor !== undefined) {
+    BackgroundColor.value = normalizeWallpaperColor(backgroundColor)
+  }
+  // 是否在当前背景图上实时渲染雨滴（bool）
+  const rainEnabled = readPropertyValue(properties, WALLPAPER_PROPERTIES.RAIN_ENABLED)
+  if (rainEnabled !== undefined) {
+    RainEnabled.value = !!rainEnabled
+    emitWeatherMainVisibility()
+  }
+  // 天气面板显示隐藏（true = 隐藏）；只有雨滴真正在渲染时才生效
   const showWeatherMain = readPropertyValue(properties, WALLPAPER_PROPERTIES.SHOW_WEATHER_MAIN)
   if (showWeatherMain !== undefined) {
-    Bus.emit(BUS_EVENTS.SHOW_WEATHER_MAIN, !!showWeatherMain)
+    ShowWeatherMain.value = !!showWeatherMain
+    emitWeatherMainVisibility()
+  }
+  // 用户自选背景图（file 属性）：value 是本机路径，由 customBackground.js 补 file:///
+  // 它单独落盘（见 STORAGE_KEYS.WALLPAPER_CUSTOM_BACKGROUND），不进上面的属性快照，
+  // 避免把超长的调试用 data: URL 写进快照。
+  const customBackground = readPropertyValue(properties, WALLPAPER_PROPERTIES.CUSTOM_BACKGROUND)
+  if (customBackground !== undefined) {
+    setCustomBackground(customBackground)
   }
   // 雨滴强度配置
   const rainConfig = readPropertyValue(properties, WALLPAPER_PROPERTIES.RAIN_CONFIG)
@@ -209,6 +275,16 @@ export const applyWallpaperProperties = (properties, { remember = true } = {}) =
   const colorTheme = readPropertyValue(properties, WALLPAPER_PROPERTIES.COLOR_THEME)
   if (colorTheme !== undefined) {
     applyColorTheme(colorTheme)
+  }
+  // 预报条显示天数（5 / 6 / 7）：只切显示，接口那 7 天照旧
+  const forecastDays = readPropertyValue(properties, WALLPAPER_PROPERTIES.FORECAST_DAYS)
+  if (forecastDays !== undefined) {
+    const nextDays = Number(forecastDays)
+    if (FORECAST_DAYS_OPTIONS.includes(nextDays)) {
+      ForecastDays.value = nextDays
+    } else {
+      console.warn(`[Wallpaper] 未知的预报天数 ${forecastDays}，已忽略（可用值：${FORECAST_DAYS_OPTIONS.join('/')}）`)
+    }
   }
   // 用户自带的 和风天气 API 域名 / 密钥
   // 引擎只会下发「发生变化」的属性；没带上的字段由 credentials.js 保留原值，

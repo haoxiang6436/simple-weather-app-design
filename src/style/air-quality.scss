@@ -1,0 +1,126 @@
+/* ================= 空气质量（AQI）六档色相 =================
+   六级对应中国国标的「优 / 良 / 轻度污染 / 中度污染 / 重度污染 / 严重污染」，
+   色相也跟着国标走：绿 → 黄 → 橙 → 红 → 紫红 → 深红。
+
+   但**不要**直接用官方那套高饱和色值（优是 #00E400、良是 #FFFF00）：在深色玻璃上
+   会亮成一块荧光板，和整张卡的低饱和雾蓝完全不是一个语汇。这里全部压到 0.18~0.24
+   的透明度做底色、再用亮一档的同色系文字，材质和预警 / 分钟级降水胶囊一致。
+   颜色只表示等级，不参与其它语义 —— 所以它跟「生活指数」的语气色（tone-ok / tone-warn）
+   是两套东西，别互相套用。
+
+   两句都提到「胶囊」和「弹层」，所以色值只在这里写一遍：
+     --aqi-hue          色相本体（空格分隔的 RGB，方便下面按需拼 alpha）
+     --aqi-fill/--aqi-edge  胶囊底色 / 细边的透明度（两者不一样，越重的等级边越实）
+     --aqi-ink          深色玻璃上的可读文字色
+   胶囊（.aqi-N）只把上面四个拼成 --chip-*，弹层（.aqi-tone-N）直接取色相画刻度和条。 */
+.aqi-tone-1,
+.aqi-1 {
+  --aqi-hue: 140 200 166;
+  --aqi-fill: 0.18;
+  --aqi-edge: 0.34;
+  --aqi-ink: #d4f1e1;
+}
+
+.aqi-tone-2,
+.aqi-2 {
+  --aqi-hue: 226 197 109;
+  --aqi-fill: 0.18;
+  --aqi-edge: 0.34;
+  --aqi-ink: #f7e7b9;
+}
+
+.aqi-tone-3,
+.aqi-3 {
+  --aqi-hue: 227 163 110;
+  --aqi-fill: 0.2;
+  --aqi-edge: 0.36;
+  --aqi-ink: #ffdcc2;
+}
+
+.aqi-tone-4,
+.aqi-4 {
+  --aqi-hue: 224 138 125;
+  --aqi-fill: 0.2;
+  --aqi-edge: 0.36;
+  --aqi-ink: #ffd5d0;
+}
+
+.aqi-tone-5,
+.aqi-5 {
+  --aqi-hue: 192 139 208;
+  --aqi-fill: 0.2;
+  --aqi-edge: 0.36;
+  --aqi-ink: #eed4f6;
+}
+
+.aqi-tone-6,
+.aqi-6 {
+  --aqi-hue: 194 107 120;
+  --aqi-fill: 0.24;
+  --aqi-edge: 0.42;
+  --aqi-ink: #ffd3d9;
+}
+
+/* 晨雾是浅底：同一条色相换成「淡色底 + 深字」，理由和 .sev-* 的明面覆写一样 ——
+   浅色胶囊上继续用亮字，对比度会掉到 3:1 以下，等级字反而看不清。
+   弹层（.aqi-tone-N）跟着同一组变量走，所以明面下刻度、条形也自动变深。 */
+:root[data-theme='mist'] .aqi-tone-1,
+:root[data-theme='mist'] .aqi-1 {
+  --aqi-hue: 63 133 103;
+  --aqi-fill: 0.14;
+  --aqi-edge: 0.3;
+  --aqi-ink: #25684e;
+}
+
+:root[data-theme='mist'] .aqi-tone-2,
+:root[data-theme='mist'] .aqi-2 {
+  --aqi-hue: 169 107 29;
+  --aqi-fill: 0.13;
+  --aqi-edge: 0.3;
+  --aqi-ink: #7a5410;
+}
+
+:root[data-theme='mist'] .aqi-tone-3,
+:root[data-theme='mist'] .aqi-3 {
+  --aqi-hue: 182 109 51;
+  --aqi-fill: 0.14;
+  --aqi-edge: 0.3;
+  --aqi-ink: #7a4318;
+}
+
+:root[data-theme='mist'] .aqi-tone-4,
+:root[data-theme='mist'] .aqi-4 {
+  --aqi-hue: 191 95 92;
+  --aqi-fill: 0.14;
+  --aqi-edge: 0.3;
+  --aqi-ink: #8c3a37;
+}
+
+:root[data-theme='mist'] .aqi-tone-5,
+:root[data-theme='mist'] .aqi-5 {
+  --aqi-hue: 137 79 160;
+  --aqi-fill: 0.14;
+  --aqi-edge: 0.3;
+  --aqi-ink: #6b3a80;
+}
+
+:root[data-theme='mist'] .aqi-tone-6,
+:root[data-theme='mist'] .aqi-6 {
+  --aqi-hue: 150 60 80;
+  --aqi-fill: 0.15;
+  --aqi-edge: 0.32;
+  --aqi-ink: #7d2b3c;
+}
+
+/* 胶囊：材质见 chips.scss，这里只把上面那组变量拼成三件套。
+   色值一个都不在这里写 —— 想调档位颜色就改上面，胶囊和弹层会一起变。 */
+.aqi-1,
+.aqi-2,
+.aqi-3,
+.aqi-4,
+.aqi-5,
+.aqi-6 {
+  --chip-bg: rgb(var(--aqi-hue) / var(--aqi-fill));
+  --chip-border: 1px solid rgb(var(--aqi-hue) / var(--aqi-edge));
+  --chip-text: var(--aqi-ink);
+}

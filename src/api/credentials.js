@@ -16,13 +16,19 @@ import { computed, ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { isBrowserRuntime } from '@/shared/env'
 
+// 开发环境凭据：仅 dev 有效，从 .env 的 VITE_* 预填；生产构建不包含这些值。
+// import.meta.env.DEV 在打包时会被替换为 false，配合 terser 常量折叠把密钥语句一起消除。
+const DEV_ENV_HOST = import.meta.env.DEV ? String(import.meta.env.VITE_QWEATHER_HOST || '') : ''
+const DEV_ENV_KEY = import.meta.env.DEV ? String(import.meta.env.VITE_QWEATHER_KEY || '') : ''
+const DEV_ENV_AMAP = import.meta.env.DEV ? String(import.meta.env.VITE_AMAP_KEY || '') : ''
+
 const DEV_STORAGE_KEY = {
   HOST: 'WallpaperUserApiHost',
   KEY: 'WallpaperUserApiKey',
 }
 // 壁纸引擎里「上一次成功下发」的域名/密钥。
 // 引擎虽然在 config.json 的 wproperties 里存了用户填的值，但它只在页面加载时下发一次；
-// 页面重载（换背景会主动 location.reload、部署新版本后引擎也会重载页面）或切换壁纸后
+// 页面重载（包括背景切换或部署新版本后引擎重载页面）或切换壁纸后
 // 偶尔不再补发，只靠内存里的值就会出现「重载之后检测不到域名和密钥」。
 // 所以这里和 BackgroundIndex 一样同步落一份缓存当兜底。
 const CACHE_STORAGE_KEY = {
@@ -32,9 +38,9 @@ const CACHE_STORAGE_KEY = {
 const REJECTED_STORAGE_KEY = 'WallpaperUserApiRejected'
 
 // 开发环境（浏览器）持久化，方便刷新后继续调试
-const DevHost = useStorage(DEV_STORAGE_KEY.HOST, '')
-const DevKey = useStorage(DEV_STORAGE_KEY.KEY, '')
-// flush: 'sync'：页面随时可能被 location.reload() 打断，必须同步落盘
+const DevHost = useStorage(DEV_STORAGE_KEY.HOST, DEV_ENV_HOST)
+const DevKey = useStorage(DEV_STORAGE_KEY.KEY, DEV_ENV_KEY)
+// flush: 'sync'：页面随时可能被刷新打断，必须同步落盘
 const CachedHost = useStorage(CACHE_STORAGE_KEY.HOST, '', localStorage, { flush: 'sync' })
 const CachedKey = useStorage(CACHE_STORAGE_KEY.KEY, '', localStorage, { flush: 'sync' })
 
@@ -222,7 +228,7 @@ const AMAP_STORAGE_KEY = {
 }
 
 // 开发环境（浏览器）持久化
-const DevAmapKey = useStorage(AMAP_STORAGE_KEY.DEV, '')
+const DevAmapKey = useStorage(AMAP_STORAGE_KEY.DEV, DEV_ENV_AMAP)
 // 引擎上一次成功下发的 key：页面重载 / 引擎偶发不下发时兜底（理由同上面的和风凭据）
 const CachedAmapKey = useStorage(AMAP_STORAGE_KEY.CACHE, '', localStorage, { flush: 'sync' })
 

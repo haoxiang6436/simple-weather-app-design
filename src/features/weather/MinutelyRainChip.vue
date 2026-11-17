@@ -1,5 +1,4 @@
 <template>
-  <!-- 分钟级降水入口：常驻在天气预警胶囊前面，点开看未来两小时的柱状图 -->
   <button class="status-chip minutely-chip" :class="`tone-${tone}`" type="button" aria-haspopup="dialog"
     :title="`${presentation.title}：${text}（${presentation.referenceLabel}，点击查看未来两小时）`"
     :aria-label="`${presentation.title}：${text}，${presentation.referenceLabel}，点击查看未来两小时`" @click="openMinutelyDetails">
@@ -9,6 +8,8 @@
 </template>
 
 <script setup>
+/* 分钟级降水入口：常驻在天气预警胶囊前面，点开看未来两小时的柱状图。
+   （说明放在 script 里而不是 <template> 顶层，避免根节点变成 Fragment —— 见 transitions.scss 的 ⚠️） */
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWeatherStore } from '@/store/index'
@@ -53,9 +54,9 @@ const tone = computed(() => {
 /* 和天气预警胶囊共用 .status-chip 的几何 / 字号（0.875rem / 600 / 12px 圆角）。
    A 方案：只有「正在下 / 马上要下」才点亮；无雨 / 加载中 / 不可用保持
    暗玻璃或中性，不常亮，避免常驻亮块抢大温度。
-   点亮时是半透明蓝色玻璃 + 1px 同色细边（--chip-bg / --chip-border +
-   backdrop blur，材质见 chips.scss），不是浅色平涂，也不用深色文字。
-   宽度仍是最紧的一处：1920×1080 + panel-scale 0.75 下左栏内容宽约 255px（padding 2rem），
+   点亮时是半透明蓝色玻璃 + 1px 同色细边（--chip-bg / --chip-border；
+   毛玻璃在 chips.scss，晨雾下会去掉，原因见那里的注释），不是浅色平涂，也不用深色文字。
+   宽度仍是最紧的一处：左栏内容区域最容易受限（含 2rem padding），
    最长的一句在 0.875rem 下接近这个宽度；改文案前先量一次，别让后半场被省略号截掉。
    高度由 .status-chip 的 min-height 管着，和预警胶囊一样高，左栏排版不会因文案变长而上下跳。 */
 .minutely-chip-icon {

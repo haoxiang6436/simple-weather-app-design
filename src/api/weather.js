@@ -17,6 +17,29 @@
 
 import httpClient from './httpClient';
 import { getNextTarget } from './hostPool';
+import { STATS_SERVICE } from './requestStats';
+
+/**
+ * 路径 → 统计用的接口代号（见 api/requestStats.js 的 REQUEST_API_LABELS）
+ *
+ * 从路径推，而不是让每个接口多传一个参数：路径本来就是接口的身份，
+ * 少一个能写错的地方。以后加接口时忘了在这里登记，统计里会落到「其他」——
+ * 看得见，不会悄悄算进别的接口。
+ */
+const API_BY_PATH = [
+  [/^\/weather\/v1\/current\//, 'current'],
+  [/^\/weather\/v1\/daily\//, 'daily'],
+  [/^\/weatheralert\/v1\/current\//, 'alert'],
+  [/^\/v7\/indices\//, 'indices'],
+  [/^\/airquality\/v1\/current\//, 'air'],
+  [/^\/v7\/minutely\//, 'minutely'],
+  [/^\/geo\/v2\/city\/lookup/, 'geo'],
+];
+
+const apiOfPath = (path) => {
+  const hit = API_BY_PATH.find(([pattern]) => pattern.test(path));
+  return hit ? hit[1] : 'other';
+};
 
 /**
  * @param {string} path 接口路径，如 /weather/v1/current/39.92/116.41
@@ -28,6 +51,11 @@ const requestWeather = (path, params, target, config = {}) => {
   const { host, key } = target || getNextTarget();
   return httpClient.get(`https://${host}${path}`, {
     ...config,
+    // 计数用：响应拦截器靠这几个字段把这次请求归到「哪个服务、哪个接口、哪个域名」。
+    // service 是必须的（见 api/requestStats.js 的 STATS_SERVICE）：
+    // 高德路名、一言那些请求不计入和风额度，不带这个标记就进不了统计。
+    // 放在 config 之后，调用方即使误传 meta 也覆盖不掉（同下面 params 的道理）
+    meta: { service: STATS_SERVICE, api: apiOfPath(path), host },
     // params 放最后：config 里即使误传了 params，也不能把 key / location 覆盖掉
     params: { ...params, key },
   });
@@ -223,6 +251,122 @@ export const getWeatherWarnings = ({ lat, lon }) =>
  */
 export const getWeatherIndices = ({ lat, lon }, type) =>
   requestWeather('/v7/indices/1d', { location: `${round2(lon)},${round2(lat)}`, type });
+
+/* ------------------------------------------------------------------ *
+ * 实时空气质量
+ * GET /airquality/v1/current/{latitude}/{longitude}
+ *
+ * 接口一次最多返回两个 AQI：一个是本地标准（中国是 cn-mee），另一个是和风通用 QAQI。
+ * 展示哪一个必须挑：
+ *   1. 优先本地标准 —— 用户看到的「优 / 良 / 轻度污染」和环保部门发布的口径一致；
+ *   2. 中国不返回 QAQI（官方明确「暂不适用于中国地区」），所以大陆只会命中 cn-mee，
+ *      不存在「两个都差不多、挑谁都行」的情况；
+ *   3. 只有 qaqi 时（没有本地标准的国家 / 地区）才退回它。
+ * 顺序表按「中国大陆 → 港澳台 → 日韩 → 英美欧」排，未列出的地区按接口返回顺序取第一个本地 AQI。
+ * ------------------------------------------------------------------ */
+const AQI_PREFERENCE = [
+  'cn-mee', 'cn-mee-1h',
+  'hk-epd', 'mo-smg', 'tw-me', 'tw-me-1h',
+  'jp-moe', 'kr-moe',
+  'us-epa', 'us-epa-nc',
+  'gb-defra', 'eu-eea', 'fr-atmo', 'ca-eccc',
+  'sg-nea', 'sg-nea-pm1h', 'th-pcd',
+]
+
+const pickAirIndex = (indexes) => {
+  const list = (Array.isArray(indexes) ? indexes : []).filter(
+    (item) => item && Number.isFinite(Number(item.aqi))
+  )
+  if (!list.length) return null
+  // qaqi 不参与排序，只在没有本地标准时才用（见上面的注释）
+  const rank = (item) => {
+    if (item.code === 'qaqi') return AQI_PREFERENCE.length + 1
+    const index = AQI_PREFERENCE.indexOf(item.code)
+    return index === -1 ? AQI_PREFERENCE.length : index
+  }
+  return list.slice().sort((a, b) => rank(a) - rank(b))[0]
+}
+
+/**
+ * 只留 buildAirQualityView（features/weather/airQuality.js）真正会读的字段。
+ *
+ * 为什么要裁：这份数据会跟着 AirQuality 一起进 localStorage（见 useWeatherStore 的
+ * persist.paths）。原始响应里有整个 pollutants 的多语言名、additionalInfo、
+ * 每个污染物下所有标准的 subIndexes（一个响应能翻出十几份指数），
+ * 全都存下来会让缓存膨胀几倍，而弹层一个字也用不到。
+ * 为什么是白名单而不是原样存：白名单一旦加了不被读的字段就会被发现；
+ * 反过来「以后弹层要多看一个字段」时，改这里必须同时改 buildAirQualityView —— 两处挨着写注释互相指认。
+ */
+const trimAirQualityDetail = (raw) => ({
+  indexes: (Array.isArray(raw?.indexes) ? raw.indexes : []).map((item) => ({
+    code: item?.code,
+    name: item?.name,
+    aqi: item?.aqi,
+    aqiDisplay: item?.aqiDisplay,
+    level: item?.level,
+    category: item?.category,
+    primaryPollutant: item?.primaryPollutant ? { name: item.primaryPollutant.name } : null,
+    health: {
+      effect: item?.health?.effect,
+      advice: {
+        generalPopulation: item?.health?.advice?.generalPopulation,
+        sensitivePopulation: item?.health?.advice?.sensitivePopulation,
+      },
+    },
+  })),
+  pollutants: (Array.isArray(raw?.pollutants) ? raw.pollutants : []).map((item) => ({
+    code: item?.code,
+    name: item?.name,
+    fullName: item?.fullName,
+    concentration: { value: item?.concentration?.value, unit: item?.concentration?.unit },
+    subIndexes: (Array.isArray(item?.subIndexes) ? item.subIndexes : [])
+      .map((sub) => ({ code: sub?.code, aqi: sub?.aqi })),
+  })),
+  stations: (Array.isArray(raw?.stations) ? raw.stations : [])
+    .map((item) => ({ id: item?.id, name: item?.name })),
+  metadata: { attributions: raw?.metadata?.attributions },
+})
+
+/**
+ * /airquality/v1/current 的响应 → UI 用的空气质量字段
+ *
+ * 顶层是「摘要」：胶囊、悬停提示、持久化缓存里那份够用的一眼数据。
+ * detail 是同一份响应裁过的明细：弹层（AirQualityDialog）要靠它展开六个污染物、
+ * 监测站和两类人群的健康建议 —— 只留摘要的话，点开只能看到 PM2.5 一条。
+ *
+ * metadata.attributions 一并带上：官方要求空气质量数据必须与来源一起展示。
+ */
+const normalizeAirQuality = (raw) => {
+  const index = pickAirIndex(raw?.indexes)
+  if (!index) return null
+  const pm25 = (raw?.pollutants || []).find((item) => item?.code === 'pm2p5')
+  return {
+    aqi: Math.round(Number(index.aqi)),
+    // aqiDisplay 才是「给人看」的值（可能带 10+ 之类的非数字写法），优先用它
+    display: String(index.aqiDisplay || Math.round(Number(index.aqi))),
+    level: Number(index.level) || null,
+    category: String(index.category || '').trim(),
+    standard: String(index.code || ''),
+    standardName: String(index.name || ''),
+    primaryPollutant: String(index.primaryPollutant?.name || ''),
+    effect: String(index.health?.effect || '').trim(),
+    advice: String(index.health?.advice?.generalPopulation || '').trim(),
+    pm25: Number.isFinite(Number(pm25?.concentration?.value))
+      ? { value: Number(pm25.concentration.value), unit: String(pm25.concentration.unit || 'μg/m³') }
+      : null,
+    attributions: (raw?.metadata?.attributions || []).filter((url) => typeof url === 'string'),
+    // 弹层专用的明细（同一份响应，裁掉没人读的字段）
+    detail: trimAirQualityDetail(raw),
+  }
+}
+
+/**
+ * 实时空气质量（1 km 分辨率，全球覆盖）
+ * @param {{lat:number, lon:number}} coord
+ */
+export const getAirQuality = ({ lat, lon }) =>
+  requestWeather(`/airquality/v1/current/${round2(lat)}/${round2(lon)}`)
+    .then(normalizeAirQuality);
 
 /**
  * 分钟级降水（只有 v7 版本，没有 v1；同样注意是「经度,纬度」）
