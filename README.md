@@ -14,11 +14,11 @@
 
 ## 技术栈
 
-Vue 3（`<script setup>`）、Vite 5、Pinia（持久化）、Axios、raindrop-fx、BetterScroll、Swiper、@vueuse/core、mitt、SCSS。Arco Design 仅用于开发调试面板。
+Vue 3（`<script setup>`）、Vite 7、Pinia（持久化）、Axios、raindrop-fx、BetterScroll、Swiper、@vueuse/core、mitt、SCSS。Arco Design 仅用于开发调试面板。
 
 ## 命令
 
-建议 Node 24（Vite 5 ≥18 即可）。本项目统一使用 npm。
+建议 Node 24（Vite 7 需 Node `^20.19` 或 `>=22.12`）。本项目统一使用 npm。
 
 ```bash
 npm run serve        # 开发（或双击 start.bat）

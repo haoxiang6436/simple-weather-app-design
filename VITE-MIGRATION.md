@@ -1,4 +1,4 @@
-# Vue CLI → Vite 迁移要点（PoC 已验证，项目尚未改动）
+# Vue CLI → Vite 迁移要点（已落地，当前运行 Vite 7）
 
 **结论**：小改造，约 4.5–6 h（含 Wallpaper Engine 内回归雨滴效果）。构建 19.9s → ~6s，dev 启动 650ms，体积持平。
 
@@ -11,7 +11,7 @@
 ## 必改清单
 1. `public/index.html` 移到根目录，保留 `<head>` 里的 `wallpaperPropertyListener`，加 `<script type="module" src="/src/main.js"></script>`。
 2. `package.json`：
-   - 依赖：加 `vite@^5.4`、`@vitejs/plugin-vue@^5`；删 `@vue/cli-*`、`sass-loader`、`babel.config.js`；**保留** `@babel/eslint-parser` 与 `@babel/core`。固定 Vite 5（Node ≥ 18 即可；Node 21 装不了 Vite 7），README 的 Node 要求同步。
+   - 依赖：加 `vite@^5.4`、`@vitejs/plugin-vue@^5`；删 `@vue/cli-*`、`sass-loader`、`babel.config.js`；**保留** `@babel/eslint-parser` 与 `@babel/core`。固定 Vite 5（Node ≥ 18 即可；Node 21 装不了 Vite 7），README 的 Node 要求同步。**后续按安全告警升级为 `vite@^7.3` + `@vitejs/plugin-vue@^6`（Node 需 `^20.19` 或 `>=22.12`），构建配置无需改动，产物仍是 iife + file:// 可用。**
    - **lint 配置**：删掉 `babel.config.js` 后，`@babel/eslint-parser` 会报 “No Babel config”。在 `eslintConfig.parserOptions` 里加 `requireConfigFile: false`。
    - **scripts** 全部改写（现有的都调用 `vue-cli-service`，删依赖后会失效）：
      - `serve` → `vite`
