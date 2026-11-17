@@ -28,18 +28,18 @@
     "pinia-plugin-persistedstate": "^3.2.1",
     "qweather-icons": "^1.6.0",
     "swiper": "^14.4.0",
-    "vue": "^3.2.13"
+    "vue": "^3.5.45"
   },
   "devDependencies": {
     "@arco-design/web-vue": "^2.55.3",
     "@babel/core": "^7.12.16",
     "@babel/eslint-parser": "^7.12.16",
-    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitejs/plugin-vue": "^6.0.11",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
     "sass": "^1.70.0",
     "terser": "^5.51.2",
-    "vite": "^5.4.0"
+    "vite": "^7.3.8"
   },
   "eslintConfig": {
     "root": true,
